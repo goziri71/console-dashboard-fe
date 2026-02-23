@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSummary, getActivities } from '../../services/dashboard'
+import { getSummary } from '../../services/dashboard'
 import { DashboardSkeleton } from '../../components/ui/Skeleton'
 import MetricsRow from './MetricsRow'
 import QuickActionsPanel from './QuickActionsPanel'
@@ -22,19 +22,14 @@ function Stagger({ children, delay = 0 }) {
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState(null)
-  const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [summaryRes, activitiesRes] = await Promise.all([
-          getSummary(),
-          getActivities(1, 20),
-        ])
+        const summaryRes = await getSummary()
         setSummary(summaryRes.data)
-        setActivities(activitiesRes.records || activitiesRes.data || [])
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load dashboard data.')
       } finally {
@@ -61,6 +56,8 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  const dept = summary?.department
 
   return (
     <div>
@@ -96,24 +93,30 @@ export default function DashboardPage() {
           <Stagger delay={120}>
             <QuickActionsPanel />
           </Stagger>
-          <Stagger delay={180}>
-            <SettlementStatus data={summary?.settlement_status} />
-          </Stagger>
-          <Stagger delay={240}>
-            <CurrencyUsageChart data={summary?.currency_usage} />
-          </Stagger>
+          {dept?.settlement_status && (
+            <Stagger delay={180}>
+              <SettlementStatus data={dept.settlement_status} />
+            </Stagger>
+          )}
+          {dept?.currency_volume && (
+            <Stagger delay={240}>
+              <CurrencyUsageChart data={dept.currency_volume} />
+            </Stagger>
+          )}
           <Stagger delay={300}>
-            <DepartmentMetrics department={summary?.department} />
+            <DepartmentMetrics department={dept} />
           </Stagger>
         </div>
 
         {/* Right Column */}
         <div className="flex flex-col gap-6">
-          <Stagger delay={140}>
-            <OperationalMonitoring data={summary?.operational_monitoring} />
-          </Stagger>
+          {(dept?.kyc_pending_approval != null || dept?.id_verification_pending_approval != null) && (
+            <Stagger delay={140}>
+              <OperationalMonitoring data={dept} />
+            </Stagger>
+          )}
           <Stagger delay={200}>
-            <RecentActivityFeed activities={activities} />
+            <RecentActivityFeed />
           </Stagger>
         </div>
       </div>

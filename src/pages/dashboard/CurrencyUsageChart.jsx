@@ -32,11 +32,12 @@ export default function CurrencyUsageChart({ data }) {
 
   const chartData = data.map((item) => ({
     currency: item.currency_code,
-    amount: item.wallet_count,
+    amount: parseFloat(item.total_volume || item.wallet_count || 0),
   }))
 
   const maxVal = Math.max(...chartData.map((d) => d.amount))
-  const ceilMax = Math.ceil(maxVal / 100) * 100
+  const magnitude = Math.pow(10, Math.floor(Math.log10(maxVal || 1)))
+  const ceilMax = Math.ceil(maxVal / magnitude) * magnitude
   const step = Math.ceil(ceilMax / 5)
   const ticks = Array.from({ length: 6 }, (_, i) => i * step)
 
