@@ -8,6 +8,7 @@ import CurrencyUsageChart from './CurrencyUsageChart'
 import OperationalMonitoring from './OperationalMonitoring'
 import RecentActivityFeed from './RecentActivityFeed'
 import DepartmentMetrics from './DepartmentMetrics'
+import GenerateReportPanel from '../../components/ui/GenerateReportPanel'
 
 function Stagger({ children, delay = 0 }) {
   return (
@@ -24,6 +25,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showReportPanel, setShowReportPanel] = useState(false)
 
   useEffect(() => {
     async function fetchData() {
@@ -71,10 +73,13 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-3">
-            <button className="rounded-[var(--radius-button)] bg-accent px-5 py-2.5 text-sm font-medium text-page transition-all hover:opacity-90 active:scale-[0.97]">
+            <button
+              onClick={() => setShowReportPanel(true)}
+              className="rounded-[2em] bg-accent px-5 py-2.5 text-sm font-medium text-page transition-all hover:opacity-90 hover:cursor-pointer active:scale-[0.97]"
+            >
               Generate Report
             </button>
-            <button className="rounded-[var(--radius-button)] border border-border bg-card px-5 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-card-hover active:scale-[0.97]">
+            <button className="rounded-[2em] border border-border bg-card px-5 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-card-hover hover:cursor-pointer active:scale-[0.97]">
               Export Snapshot
             </button>
           </div>
@@ -120,6 +125,11 @@ export default function DashboardPage() {
           </Stagger>
         </div>
       </div>
+
+      <GenerateReportPanel
+        isOpen={showReportPanel}
+        onClose={() => setShowReportPanel(false)}
+      />
     </div>
   )
 }

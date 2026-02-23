@@ -105,7 +105,7 @@ export default function RecentActivityFeed() {
   }
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-card mt-[-22px]">
+    <div className="rounded-[var(--radius-card)] border border-border bg-card">
       <div className="border-b border-border px-4 py-4">
         <h3 className="text-base font-medium text-text-primary">Recent Operational Activities</h3>
       </div>

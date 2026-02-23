@@ -10,6 +10,7 @@ import {
   FileText,
   Settings,
 } from 'lucide-react'
+import logo from '../../assets/Authlogo/Sterllologo.svg'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
@@ -27,9 +28,7 @@ export default function Sidebar() {
   return (
     <aside className="flex w-[248px] flex-col bg-sidebar border-r border-border-subtle">
       <div className="flex items-center gap-2 px-6 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
-          <span className="text-sm font-bold text-page">S</span>
-        </div>
+        <img src={logo} alt="Sterllo Logo" className="h-6 w-6" />
         <span className="text-lg font-semibold text-text-primary">Sterllo</span>
       </div>
 
@@ -42,12 +41,12 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-accent text-page shadow-md shadow-accent/20'
+                  ? 'bg-[#252A09] text-[#F7F7F7] shadow-md shadow-accent/20'
                   : 'text-text-secondary hover:bg-card-hover hover:text-text-primary hover:translate-x-0.5 active:scale-[0.98]'
               }`
             }
           >
-            <item.icon size={20} />
+            <item.icon size={19} />
             <span>{item.label}</span>
           </NavLink>
         ))}
