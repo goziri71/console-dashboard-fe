@@ -409,24 +409,32 @@ export default function MerchantDetailsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {wallets.map((w, idx) => {
-                      const status = idx === 1 ? 'inactive' : idx === 2 ? 'suspended' : 'active'
-                      return (
-                        <tr key={w.id || idx} className="border-t border-border/60 text-sm">
-                          <td className="px-4 py-2.5 text-text-secondary">
-                            {w.wallet_key ? `WLT-${w.wallet_key.slice(-8).toUpperCase()}` : '--'}
-                          </td>
-                          <td className="px-4 py-2.5 text-text-secondary">
-                            <span className="mr-2">{currencyFlag[w.currency_code] || '◯'}</span>
-                            {w.currency_code || '--'}
-                          </td>
-                          <td className="px-4 py-2.5 text-text-secondary">{formatDate(w.date_created).split(' ')[0]}</td>
-                          <td className="px-4 py-2.5">
-                            {dotBadge(status, status[0].toUpperCase() + status.slice(1))}
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {wallets.length > 0 ? (
+                      wallets.map((w, idx) => {
+                        const status = idx === 1 ? 'inactive' : idx === 2 ? 'suspended' : 'active'
+                        return (
+                          <tr key={w.id || idx} className="border-t border-border/60 text-sm">
+                            <td className="px-4 py-2.5 text-text-secondary">
+                              {w.wallet_key ? `WLT-${w.wallet_key.slice(-8).toUpperCase()}` : '--'}
+                            </td>
+                            <td className="px-4 py-2.5 text-text-secondary">
+                              <span className="mr-2">{currencyFlag[w.currency_code] || '◯'}</span>
+                              {w.currency_code || '--'}
+                            </td>
+                            <td className="px-4 py-2.5 text-text-secondary">{formatDate(w.date_created).split(' ')[0]}</td>
+                            <td className="px-4 py-2.5">
+                              {dotBadge(status, status[0].toUpperCase() + status.slice(1))}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr className="border-t border-border/60">
+                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-text-muted">
+                          No linked wallets found for this merchant.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -456,21 +464,27 @@ export default function MerchantDetailsPage() {
 
           <Card title="Activity Feed">
             <div className="space-y-1 p-4">
-              {activityRows.map((a, idx) => {
-                const Icon = a.icon
-                return (
-                  <div key={idx} className="flex items-start gap-3 rounded-xl px-1 py-2">
-                    <div className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-full', a.iconCls)}>
-                      <Icon size={16} />
+              {activityRows.length > 0 ? (
+                activityRows.map((a, idx) => {
+                  const Icon = a.icon
+                  return (
+                    <div key={idx} className="flex items-start gap-3 rounded-xl px-1 py-2">
+                      <div className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-full', a.iconCls)}>
+                        <Icon size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base text-text-secondary">{a.label}</p>
+                        <p className="truncate text-sm text-text-muted">by {a.by}</p>
+                      </div>
+                      <span className="whitespace-nowrap text-xs text-text-muted">{timeAgo(a.at)}</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-base text-text-secondary">{a.label}</p>
-                      <p className="truncate text-sm text-text-muted">by {a.by}</p>
-                    </div>
-                    <span className="whitespace-nowrap text-xs text-text-muted">{timeAgo(a.at)}</span>
-                  </div>
-                )
-              })}
+                  )
+                })
+              ) : (
+                <div className="px-1 py-6 text-center text-sm text-text-muted">
+                  No activity yet for this merchant.
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -492,22 +506,30 @@ export default function MerchantDetailsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentTxRows.map((tx, idx) => (
-                      <tr key={`${tx.id}-${idx}`} className="border-t border-border/60 text-sm">
-                        <td className="px-4 py-2.5 text-text-secondary">{tx.id}</td>
-                        <td className="px-4 py-2.5">
-                          <p className="text-text-secondary">{tx.amount}</p>
-                          <p className="text-[10px] uppercase tracking-widest text-text-muted">{tx.type}</p>
-                        </td>
-                        <td className="px-4 py-2.5 text-text-secondary">{formatDate(tx.date).split(' ')[0]}</td>
-                        <td className="px-4 py-2.5">
-                          {dotBadge(
-                            tx.status === 'processing' ? 'processing' : tx.status === 'failed' ? 'failed' : 'completed',
-                            tx.status === 'processing' ? 'Processing' : tx.status === 'failed' ? 'Failed' : 'Completed'
-                          )}
+                    {recentTxRows.length > 0 ? (
+                      recentTxRows.map((tx, idx) => (
+                        <tr key={`${tx.id}-${idx}`} className="border-t border-border/60 text-sm">
+                          <td className="px-4 py-2.5 text-text-secondary">{tx.id}</td>
+                          <td className="px-4 py-2.5">
+                            <p className="text-text-secondary">{tx.amount}</p>
+                            <p className="text-[10px] uppercase tracking-widest text-text-muted">{tx.type}</p>
+                          </td>
+                          <td className="px-4 py-2.5 text-text-secondary">{formatDate(tx.date).split(' ')[0]}</td>
+                          <td className="px-4 py-2.5">
+                            {dotBadge(
+                              tx.status === 'processing' ? 'processing' : tx.status === 'failed' ? 'failed' : 'completed',
+                              tx.status === 'processing' ? 'Processing' : tx.status === 'failed' ? 'Failed' : 'Completed'
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-border/60">
+                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-text-muted">
+                          No recent transactions found for this merchant.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
