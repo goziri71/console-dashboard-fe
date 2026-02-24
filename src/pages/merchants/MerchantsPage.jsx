@@ -4,8 +4,8 @@ import { getMerchantStats, getMerchants } from '../../services/merchants'
 import { formatNumber, exportToCsv } from '../../lib/utils'
 import MetricCard from '../../components/ui/MetricCard'
 import Pagination from '../../components/ui/Pagination'
-import CustomerToolbar from './CustomerToolbar'
-import CustomerTable from './CustomerTable'
+import MerchantToolbar from './MerchantToolbar'
+import MerchantTable from './MerchantTable'
 
 const LIMIT = 20
 
@@ -19,7 +19,7 @@ function StatsSkeleton() {
   )
 }
 
-export default function CustomersPage() {
+export default function MerchantsPage() {
   const [stats, setStats] = useState(null)
   const [statsLoading, setStatsLoading] = useState(true)
 
@@ -72,16 +72,16 @@ export default function CustomersPage() {
 
   function handleExport() {
     if (!merchants.length) return
-    const rows = merchants.map((m) => ({
-      Name: m.name || '',
-      Trade_Name: m.trade_name || '',
-      KYC_Tier: m.default_kyc_tier ?? 1,
-      Customers: m.customer_count ?? 0,
-      Ledgers: m.ledger_count ?? 0,
-      Currencies: (m.currencies || []).join(', '),
-      Settlements: m.settlement_count ?? 0,
-      Date_Created: m.date_created || '',
-      Last_Modified: m.date_modified || '',
+    const rows = merchants.map((merchant) => ({
+      Name: merchant.name || '',
+      Trade_Name: merchant.trade_name || '',
+      KYC_Tier: merchant.default_kyc_tier ?? 1,
+      Customers: merchant.customer_count ?? 0,
+      Ledgers: merchant.ledger_count ?? 0,
+      Currencies: (merchant.currencies || []).join(', '),
+      Settlements: merchant.settlement_count ?? 0,
+      Date_Created: merchant.date_created || '',
+      Last_Modified: merchant.date_modified || '',
     }))
     exportToCsv(rows, `merchants-page-${page}.csv`)
   }
@@ -90,7 +90,7 @@ export default function CustomersPage() {
   const statCards = stats
     ? [
         {
-          label: 'Total Customers',
+          label: 'Total Merchants',
           value: formatNumber(tm?.count ?? 0),
           icon: Building2,
           iconColor: 'accent',
@@ -99,21 +99,21 @@ export default function CustomersPage() {
             : null,
         },
         {
-          label: 'Active Customers',
+          label: 'Total Customers',
           value: formatNumber(stats.total_customers ?? 0),
           icon: Users,
           iconColor: 'success',
           comparison: null,
         },
         {
-          label: 'KYC Pending',
+          label: 'Total Ledgers',
           value: formatNumber(stats.total_ledgers ?? 0),
           icon: BookOpen,
           iconColor: 'warning',
           comparison: null,
         },
         {
-          label: 'Restricted Accounts',
+          label: 'Total Settlements',
           value: formatNumber(stats.total_settlements ?? 0),
           icon: Landmark,
           iconColor: 'error',
@@ -125,9 +125,9 @@ export default function CustomersPage() {
   return (
     <div>
       <div className="animate-fade-in-up mb-6">
-        <h1 className="text-2xl font-semibold text-text-primary">Customers</h1>
+        <h1 className="text-2xl font-semibold text-text-primary">Merchants</h1>
         <p className="mt-1 text-sm text-text-secondary">
-          View, monitor, and manage all individual and business customers across the Sterllo platform, including compliance status, wallet activity, and account health.
+          View, monitor, and manage all merchants on the Sterllo platform, including customer activity, ledger usage, and settlement data.
         </p>
       </div>
 
@@ -150,8 +150,8 @@ export default function CustomersPage() {
 
       <div className="animate-fade-in-up mt-6 rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
         <div className="flex items-center justify-between border-b border-border px-4 py-4">
-          <h3 className="text-base font-medium text-text-primary">All Customers</h3>
-          <CustomerToolbar
+          <h3 className="text-base font-medium text-text-primary">All Merchants</h3>
+          <MerchantToolbar
             search={search}
             onSearchChange={setSearch}
             sortBy={sortBy}
@@ -180,7 +180,7 @@ export default function CustomersPage() {
             </button>
           </div>
         ) : (
-          <CustomerTable customers={merchants} />
+          <MerchantTable merchants={merchants} />
         )}
 
         <Pagination

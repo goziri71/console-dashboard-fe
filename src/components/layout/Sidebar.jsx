@@ -14,7 +14,7 @@ import logo from '../../assets/Authlogo/Sterllologo.svg'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
-  { label: 'Customers', icon: Users, path: '/customers' },
+  { label: 'Merchants', icon: Users, path: '/merchants' },
   { label: 'Wallet', icon: Wallet, path: '/wallets' },
   { label: 'Transactions', icon: ArrowLeftRight, path: '/transactions' },
   { label: 'Compliance', icon: ShieldCheck, path: '/compliance' },

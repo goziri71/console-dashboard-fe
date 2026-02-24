@@ -42,7 +42,16 @@ function Dropdown({ trigger, children }) {
   )
 }
 
-export default function CustomerToolbar({ search, onSearchChange, sortBy, order, onSortChange, statusFilter, onStatusChange, onExport }) {
+export default function MerchantToolbar({
+  search,
+  onSearchChange,
+  sortBy,
+  order,
+  onSortChange,
+  statusFilter,
+  onStatusChange,
+  onExport,
+}) {
   const [localSearch, setLocalSearch] = useState(search)
   const timerRef = useRef(null)
 
@@ -65,7 +74,7 @@ export default function CustomerToolbar({ search, onSearchChange, sortBy, order,
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           type="text"
-          placeholder="Search customers..."
+          placeholder="Search merchants..."
           value={localSearch}
           onChange={(e) => handleSearchInput(e.target.value)}
           className="w-[260px] rounded-lg border border-border bg-card py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"

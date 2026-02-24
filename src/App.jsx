@@ -3,7 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
-import CustomersPage from './pages/customers/CustomersPage'
+import MerchantsPage from './pages/merchants/MerchantsPage'
+import MerchantDetailsPage from './pages/merchants/MerchantDetailsPage'
 import WalletsPage from './pages/wallets/WalletsPage'
 import TransactionsPage from './pages/transactions/TransactionsPage'
 import CompliancePage from './pages/compliance/CompliancePage'
@@ -42,7 +43,9 @@ function AppRoutes() {
         }
       >
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/customers" element={<CustomersPage />} />
+        <Route path="/merchants" element={<MerchantsPage />} />
+        <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />
+        <Route path="/customers" element={<Navigate to="/merchants" replace />} />
         <Route path="/wallets" element={<WalletsPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/compliance" element={<CompliancePage />} />
