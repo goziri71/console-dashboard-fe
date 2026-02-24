@@ -136,7 +136,7 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
     <div
       className={`fixed inset-0 z-50 flex items-stretch justify-end transition-all duration-300 ${
         isOpen
-          ? 'visible bg-black/50 backdrop-blur-sm'
+          ? 'visible bg-black/50 backdrop-blur-[7px]'
           : 'invisible bg-black/0 backdrop-blur-0'
       }`}
       onClick={(e) => {

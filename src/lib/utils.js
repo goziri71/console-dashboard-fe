@@ -42,3 +42,94 @@ export function formatUptime(seconds) {
   if (days > 0) return `${days}d ${hrs}h`
   return `${hrs}h`
 }
+
+const alpha3ToAlpha2 = {
+  NGA: 'NG', USA: 'US', GBR: 'GB', GHA: 'GH', ZAF: 'ZA', KEN: 'KE',
+  TZA: 'TZ', UGA: 'UG', RWA: 'RW', ETH: 'ET', EGY: 'EG', MAR: 'MA',
+  CMR: 'CM', SEN: 'SN', CIV: 'CI', BEN: 'BJ', TGO: 'TG', NER: 'NE',
+  MLI: 'ML', BFA: 'BF', GAB: 'GA', COD: 'CD', AGO: 'AO', MOZ: 'MZ',
+  BWA: 'BW', NAM: 'NA', ZMB: 'ZM', ZWE: 'ZW', MWI: 'MW', LSO: 'LS',
+  SWZ: 'SZ', MUS: 'MU', MDG: 'MG', SYC: 'SC', CPV: 'CV', SLE: 'SL',
+  LBR: 'LR', GIN: 'GN', GMB: 'GM', MRT: 'MR', DJI: 'DJ', ERI: 'ER',
+  SOM: 'SO', SDN: 'SD', SSD: 'SS', TCD: 'TD', CAF: 'CF', COG: 'CG',
+  GNQ: 'GQ', STP: 'ST', COM: 'KM', TUN: 'TN', LBY: 'LY', DZA: 'DZ',
+  CAN: 'CA', MEX: 'MX', BRA: 'BR', ARG: 'AR', COL: 'CO', CHL: 'CL',
+  PER: 'PE', VEN: 'VE', ECU: 'EC', BOL: 'BO', PRY: 'PY', URY: 'UY',
+  IND: 'IN', CHN: 'CN', JPN: 'JP', KOR: 'KR', IDN: 'ID', THA: 'TH',
+  VNM: 'VN', MYS: 'MY', SGP: 'SG', PHL: 'PH', AUS: 'AU', NZL: 'NZ',
+  DEU: 'DE', FRA: 'FR', ITA: 'IT', ESP: 'ES', PRT: 'PT', NLD: 'NL',
+  BEL: 'BE', AUT: 'AT', CHE: 'CH', SWE: 'SE', NOR: 'NO', DNK: 'DK',
+  FIN: 'FI', POL: 'PL', CZE: 'CZ', ROU: 'RO', HUN: 'HU', GRC: 'GR',
+  IRL: 'IE', ISR: 'IL', TUR: 'TR', SAU: 'SA', ARE: 'AE', QAT: 'QA',
+  KWT: 'KW', BHR: 'BH', OMN: 'OM', JOR: 'JO', LBN: 'LB', PAK: 'PK',
+  BGD: 'BD', LKA: 'LK', NPL: 'NP', MMR: 'MM', KHM: 'KH', LAO: 'LA',
+}
+
+export function countryCodeToFlag(code) {
+  if (!code) return ''
+  const alpha2 = code.length === 3 ? (alpha3ToAlpha2[code.toUpperCase()] || '') : code.toUpperCase()
+  if (alpha2.length !== 2) return ''
+  return String.fromCodePoint(
+    ...[...alpha2].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+  )
+}
+
+export function deriveRiskLevel(customer) {
+  if (customer.is_pnd === '1' || customer.is_pnc === '1') return 'high'
+  if (customer.is_personal_compliant === '0' || customer.is_business_compliant === '0') return 'medium'
+  return 'low'
+}
+
+export function exportToCsv(rows, filename = 'export.csv') {
+  if (!rows.length) return
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.join(','),
+    ...rows.map((row) =>
+      headers.map((h) => {
+        const val = row[h] ?? ''
+        return typeof val === 'string' && (val.includes(',') || val.includes('"'))
+          ? `"${val.replace(/"/g, '""')}"`
+          : val
+      }).join(',')
+    ),
+  ].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const currencySymbolMap = {
+  NGN: '₦', USD: '$', GBP: '£', EUR: '€', JPY: '¥', INR: '₹',
+  KRW: '₩', BRL: 'R$', CHF: 'CHF', CAD: 'C$', AUD: 'A$', NZD: 'NZ$',
+  ZAR: 'R', GHS: 'GH₵', KES: 'KSh', AED: 'د.إ', SAR: 'ر.س',
+  JOD: 'J.D', BWP: 'P', XOF: 'CFA', XAF: 'FCFA',
+}
+
+export function formatBalance(amount, currencyCode) {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount
+  if (isNaN(num)) return '--'
+  const symbol = currencySymbolMap[currencyCode?.toUpperCase()] || currencyCode || ''
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(num)
+  return `${symbol} ${formatted}`
+}
+
+export function formatDate(dateStr) {
+  if (!dateStr) return '--'
+  const d = new Date(dateStr)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const ampm = d.getHours() >= 12 ? 'PM' : 'AM'
+  const h12 = d.getHours() % 12 || 12
+  return `${mm}-${dd}-${yyyy} ${String(h12).padStart(2, '0')}:${min}${ampm}`
+}

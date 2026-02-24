@@ -1,8 +1,196 @@
+import { useState, useEffect, useCallback } from 'react'
+import { Building2, Users, BookOpen, Landmark } from 'lucide-react'
+import { getMerchantStats, getMerchants } from '../../services/merchants'
+import { formatNumber, exportToCsv } from '../../lib/utils'
+import MetricCard from '../../components/ui/MetricCard'
+import Pagination from '../../components/ui/Pagination'
+import CustomerToolbar from './CustomerToolbar'
+import CustomerTable from './CustomerTable'
+
+const LIMIT = 20
+
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-4 gap-6">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-[140px] skeleton rounded-card" />
+      ))}
+    </div>
+  )
+}
+
 export default function CustomersPage() {
+  const [stats, setStats] = useState(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  const [merchants, setMerchants] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+
+  const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('date_created')
+  const [order, setOrder] = useState('desc')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  useEffect(() => {
+    getMerchantStats()
+      .then((res) => setStats(res.data))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false))
+  }, [])
+
+  const fetchMerchants = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = { page, limit: LIMIT, sort_by: sortBy, order }
+      if (search) params.name = search
+      const res = await getMerchants(params)
+      const records = res.records || res.data || []
+      const pag = res.pagination || {}
+      setMerchants(records)
+      setTotal(pag.total || records.length)
+      setTotalPages(pag.total_pages || Math.ceil((pag.total || records.length) / LIMIT))
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load merchants.')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, search, sortBy, order])
+
+  useEffect(() => {
+    fetchMerchants()
+  }, [fetchMerchants])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, sortBy, order, statusFilter])
+
+  function handleExport() {
+    if (!merchants.length) return
+    const rows = merchants.map((m) => ({
+      Name: m.name || '',
+      Trade_Name: m.trade_name || '',
+      KYC_Tier: m.default_kyc_tier ?? 1,
+      Customers: m.customer_count ?? 0,
+      Ledgers: m.ledger_count ?? 0,
+      Currencies: (m.currencies || []).join(', '),
+      Settlements: m.settlement_count ?? 0,
+      Date_Created: m.date_created || '',
+      Last_Modified: m.date_modified || '',
+    }))
+    exportToCsv(rows, `merchants-page-${page}.csv`)
+  }
+
+  const tm = stats?.total_merchants
+  const statCards = stats
+    ? [
+        {
+          label: 'Total Customers',
+          value: formatNumber(tm?.count ?? 0),
+          icon: Building2,
+          iconColor: 'accent',
+          comparison: tm?.change_pct != null
+            ? { value: Math.abs(tm.change_pct), direction: tm.change_pct >= 0 ? 'up' : 'down', label: 'Compared to last month' }
+            : null,
+        },
+        {
+          label: 'Active Customers',
+          value: formatNumber(stats.total_customers ?? 0),
+          icon: Users,
+          iconColor: 'success',
+          comparison: null,
+        },
+        {
+          label: 'KYC Pending',
+          value: formatNumber(stats.total_ledgers ?? 0),
+          icon: BookOpen,
+          iconColor: 'warning',
+          comparison: null,
+        },
+        {
+          label: 'Restricted Accounts',
+          value: formatNumber(stats.total_settlements ?? 0),
+          icon: Landmark,
+          iconColor: 'error',
+          comparison: null,
+        },
+      ]
+    : []
+
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-text-primary">Customers</h1>
-      <p className="mt-1 text-sm text-text-secondary">Manage customer accounts and profiles.</p>
+      <div className="animate-fade-in-up mb-6">
+        <h1 className="text-2xl font-semibold text-text-primary">Customers</h1>
+        <p className="mt-1 text-sm text-text-secondary">
+          View, monitor, and manage all individual and business customers across the Sterllo platform, including compliance status, wallet activity, and account health.
+        </p>
+      </div>
+
+      {statsLoading ? (
+        <StatsSkeleton />
+      ) : stats ? (
+        <div className="animate-fade-in-up grid grid-cols-4 gap-6" style={{ animationDelay: '60ms' }}>
+          {statCards.map((card) => (
+            <MetricCard
+              key={card.label}
+              label={card.label}
+              value={card.value}
+              comparison={card.comparison}
+              icon={card.icon}
+              iconColor={card.iconColor}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      <div className="animate-fade-in-up mt-6 rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
+        <div className="flex items-center justify-between border-b border-border px-4 py-4">
+          <h3 className="text-base font-medium text-text-primary">All Customers</h3>
+          <CustomerToolbar
+            search={search}
+            onSearchChange={setSearch}
+            sortBy={sortBy}
+            order={order}
+            onSortChange={(s, o) => { setSortBy(s); setOrder(o) }}
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            onExport={handleExport}
+          />
+        </div>
+
+        {loading ? (
+          <div className="p-4 flex flex-col gap-3">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <p className="text-sm text-error">{error}</p>
+            <button
+              onClick={fetchMerchants}
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-text-primary transition-colors hover:bg-card-hover active:scale-[0.97]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <CustomerTable customers={merchants} />
+        )}
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          label="Merchants"
+          onPageChange={setPage}
+        />
+      </div>
     </div>
   )
 }
