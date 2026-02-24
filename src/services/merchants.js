@@ -51,3 +51,20 @@ export async function getMerchantSettlements(accountKey, params = {}) {
   const { data } = await api.get(`/merchants/${accountKey}/settlements`, { params })
   return data
 }
+
+// ── Transaction history (global endpoints) ───────────────────────────────────
+
+export async function getDepositTransactions(params = {}) {
+  const { data } = await api.get('/transactions/deposits', { params })
+  return data
+}
+
+export async function getWithdrawalTransactions(params = {}) {
+  const { data } = await api.get('/transactions/withdrawals', { params })
+  return data
+}
+
+export async function getTransferTransactions(params = {}) {
+  const { data } = await api.get('/transactions/transfers', { params })
+  return data
+}

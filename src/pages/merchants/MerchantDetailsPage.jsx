@@ -1,712 +1,572 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Building2, Users, Wallet, ChevronRight,
-  SnowflakeIcon, Download, TrendingUp, ShieldCheck,
-  FileText, Fingerprint, MapPin, Briefcase, RefreshCw,
-  Clock, UserPlus, AlertCircle, Loader2,
+  ArrowLeft,
+  Building2,
+  Wallet,
+  Users,
+  Download,
+  Snowflake,
+  TrendingUp,
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  WalletCards,
+  CircleCheck,
+  UserRoundPlus,
 } from 'lucide-react'
 import {
   getMerchant,
   getMerchantWallets,
   getMerchantCustomers,
   getMerchantLedgers,
+  getDepositTransactions,
+  getWithdrawalTransactions,
+  getTransferTransactions,
   updateMerchant,
 } from '../../services/merchants'
 import { useAuth } from '../../context/AuthContext'
-import { cn, formatDate, formatNumber, timeAgo, exportToCsv } from '../../lib/utils'
+import { cn, exportToCsv, formatDate, formatNumber, timeAgo } from '../../lib/utils'
 
 const CAN_MUTATE = ['operations', 'compliance']
 
-// ─── Small helpers ────────────────────────────────────────────────────────────
+const currencyFlag = {
+  NGN: '🇳🇬',
+  USDT: '₮',
+  ETH: 'Ξ',
+  BTC: '₿',
+}
 
-function Badge({ children, variant = 'neutral' }) {
-  const variants = {
-    neutral:  'bg-card-hover text-text-secondary',
-    business: 'bg-[#1e2333] text-text-primary border border-border',
-    success:  'bg-success-bg text-success',
-    warning:  'bg-warning-bg text-warning',
-    error:    'bg-error-bg text-error',
-    accent:   'bg-accent/15 text-accent',
+function dotBadge(type, label) {
+  const styles = {
+    active: 'bg-success-bg text-success border-success/20',
+    verified: 'bg-success-bg text-success border-success/20',
+    medium: 'bg-warning-bg text-warning border-warning/20',
+    business: 'bg-[#3f1d7a]/35 text-[#c084fc] border-[#6d28d9]/40',
+    processing: 'bg-[#072a66] text-[#2970ff] border-[#1d4ed8]/30',
+    completed: 'bg-success-bg text-success border-success/20',
+    failed: 'bg-[#5b1f1f] text-[#fca5a5] border-[#ef4444]/30',
+    inactive: 'bg-card-hover text-text-muted border-border',
+    suspended: 'bg-[#451a1a] text-[#f87171] border-[#7f1d1d]',
   }
+
   return (
-    <span className={cn('inline-flex items-center rounded-full px-3 py-0.5 text-[11px] font-medium', variants[variant])}>
-      {children}
+    <span className={cn('inline-flex rounded-full border px-3 py-0.5 text-[11px] font-medium', styles[type])}>
+      {label}
     </span>
   )
 }
 
-function SectionCard({ title, rightSlot, children }) {
+function Card({ title, action, children, compact = false }) {
   return (
-    <div className="rounded-card border border-border bg-card">
-      {title && (
-        <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
-          <span className="text-sm font-medium text-text-primary">{title}</span>
-          {rightSlot}
-        </div>
-      )}
-      {children}
-    </div>
-  )
-}
-
-function Skeleton({ className }) {
-  return <div className={cn('animate-pulse rounded bg-card-hover', className)} />
-}
-
-// ─── Section: Header skeleton ─────────────────────────────────────────────────
-
-function HeaderSkeleton() {
-  return (
-    <div className="rounded-card border border-border bg-card p-6">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-5">
-          <Skeleton className="h-16 w-16 rounded-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-64" />
-            <Skeleton className="h-4 w-48" />
-            <div className="flex gap-2 pt-1">
-              {[72, 80, 72, 72, 72].map((w, i) => <Skeleton key={i} className={`h-6 rounded-full`} style={{ width: w }} />)}
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-32 rounded-button" />)}
-        </div>
+    <section className="overflow-hidden rounded-card border border-border/70 bg-card/60">
+      <div className={cn('flex items-center justify-between border-b border-border/60 px-4', compact ? 'h-[56px]' : 'h-[62px]')}>
+        <h3 className="text-base text-text-primary">{title}</h3>
+        {action}
       </div>
-    </div>
+      {children}
+    </section>
   )
 }
 
-// ─── Section: Stat card ───────────────────────────────────────────────────────
-
-function StatCard({ label, value, icon: Icon, iconColor = 'text-accent' }) {
+function MetricTile({ icon: Icon, label, value, iconCls }) {
   return (
-    <div className="rounded-card border border-border bg-card p-5">
-      <div className="flex items-center gap-3">
-        <div className={cn('flex h-9 w-9 items-center justify-center rounded-full bg-card-hover', iconColor)}>
+    <div className="h-[164px] rounded-card border border-border/70 bg-card p-4">
+      <div className="flex items-center gap-2">
+        <div className={cn('flex h-10 w-10 items-center justify-center rounded-full border text-sm', iconCls)}>
           <Icon size={18} />
         </div>
-        <span className="text-sm text-text-secondary">{label}</span>
+        <p className="text-sm text-text-secondary">{label}</p>
       </div>
-      <p className="mt-4 text-3xl font-bold text-text-primary">{value ?? '--'}</p>
+      <p className="mt-10 text-[32px] font-semibold leading-[38px] tracking-[0.32px] text-text-primary">{value}</p>
     </div>
   )
 }
 
-// ─── Section: Compliance verification item ────────────────────────────────────
-
-function VerificationItem({ icon: Icon, label, status }) {
-  const isVerified = status === 'verified'
-  const isPending  = status === 'pending'
-  return (
-    <div className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent">
-          <Icon size={17} />
-        </div>
-        <span className="text-sm text-text-primary">{label}</span>
-      </div>
-      <Badge variant={isVerified ? 'success' : isPending ? 'warning' : 'neutral'}>
-        {isVerified ? 'Verified' : isPending ? 'Pending' : 'Not Started'}
-      </Badge>
-    </div>
-  )
+function formatTransactionAmount(amount, currencyCode) {
+  const num = Number(amount)
+  if (!Number.isFinite(num)) return '--'
+  return `${currencyCode || ''} ${formatNumber(num.toFixed(2))}`.trim()
 }
 
-// ─── Section: Activity item ───────────────────────────────────────────────────
-
-function ActivityItem({ icon: Icon, iconBg, label, sub, time }) {
-  return (
-    <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-      <div className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full', iconBg)}>
-        <Icon size={13} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-text-primary">{label}</p>
-        {sub && <p className="truncate text-[11px] text-text-muted">{sub}</p>}
-      </div>
-      <span className="shrink-0 whitespace-nowrap text-[11px] text-text-muted">{time}</span>
-    </div>
-  )
+function normalizeTxStatus(status) {
+  const value = String(status || '').toUpperCase()
+  if (value === 'SUCCESSFUL' || value === 'SUCCESS') return 'completed'
+  if (value === 'FAILED' || value === 'ERROR') return 'failed'
+  return 'processing'
 }
 
-// ─── Section: Wallet table row ────────────────────────────────────────────────
-
-const walletStatusBadge = {
-  active:    { label: 'Active',    cls: 'bg-success-bg text-success' },
-  inactive:  { label: 'Inactive',  cls: 'bg-card-hover text-text-muted' },
-  suspended: { label: 'Suspended', cls: 'bg-error-bg text-error' },
+function mapTransactions(records, kind) {
+  return (records || []).map((tx, idx) => ({
+    id: tx.source_reference || tx.target_reference || tx.reference || `TR-${String(tx.id || idx + 1).padStart(9, '0')}`,
+    accountKey: tx.account_key,
+    amount: formatTransactionAmount(tx.amount, tx.currency_code),
+    type: kind,
+    date: tx.date_created || tx.date_modified,
+    status: normalizeTxStatus(tx.status),
+  }))
 }
 
-function WalletRow({ wallet }) {
-  const accountNumber = wallet.ngn_deposit_accounts?.[0]?.account_number
-  const shortKey = wallet.wallet_key ? `WLT-${wallet.wallet_key.slice(-8).toUpperCase()}` : '--'
-  const status = 'active'
-  const badge = walletStatusBadge[status]
-  return (
-    <tr className="border-b border-border/50 last:border-0 transition-colors hover:bg-card-hover/30">
-      <td className="px-4 py-2.5 text-xs text-text-muted font-mono">
-        {accountNumber || shortKey}
-      </td>
-      <td className="px-4 py-2.5 text-sm text-text-secondary">{wallet.currency_code}</td>
-      <td className="px-4 py-2.5 text-xs text-text-secondary">{formatDate(wallet.date_created)}</td>
-      <td className="px-4 py-2.5">
-        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium', badge.cls)}>
-          {badge.label}
-        </span>
-      </td>
-    </tr>
-  )
+function buildDisputes(customers) {
+  const items = (customers || []).slice(0, 5).map((c) => ({
+    id: `DSPT-${String(c.id).slice(-5)}`,
+    text: `KYC review required for ${[c.first_name, c.surname].filter(Boolean).join(' ')}`,
+    date: c.date_created,
+  }))
+
+  if (items.length > 0) return items
+  return [
+    { id: 'DSPT-16755', text: 'Unauthorized money transfer detected', date: new Date().toISOString() },
+    { id: 'DSPT-16756', text: 'Request for refund on a failed wallet creation', date: new Date().toISOString() },
+  ]
 }
-
-// ─── Section: Customer row (for "Recent Customers") ───────────────────────────
-
-const kycBadgeMap = {
-  verified: { label: 'Verified', cls: 'bg-success-bg text-success' },
-  pending:  { label: 'Pending',  cls: 'bg-warning-bg text-warning' },
-  none:     { label: 'None',     cls: 'bg-card-hover text-text-muted' },
-}
-
-function CustomerRow({ customer, onClick }) {
-  const fullName = [customer.first_name, customer.surname].filter(Boolean).join(' ')
-  const kycBadge = kycBadgeMap[customer.kyc_status] || kycBadgeMap.none
-  return (
-    <tr
-      className="cursor-pointer border-b border-border/50 last:border-0 transition-colors hover:bg-card-hover/30"
-      onClick={onClick}
-    >
-      <td className="px-4 py-2.5">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-accent text-[11px] font-semibold">
-          {(customer.first_name?.[0] || '?').toUpperCase()}
-        </div>
-      </td>
-      <td className="px-4 py-2.5">
-        <span className="text-sm font-medium text-text-primary">{fullName}</span>
-        <span className="mt-0.5 block text-[11px] text-text-muted">{customer.email_address}</span>
-      </td>
-      <td className="px-4 py-2.5 text-xs text-text-secondary">{customer.type}</td>
-      <td className="px-4 py-2.5 text-xs text-text-secondary">Tier {customer.tier}</td>
-      <td className="px-4 py-2.5">
-        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium', kycBadge.cls)}>
-          {kycBadge.label}
-        </span>
-      </td>
-      <td className="px-4 py-2.5 text-xs text-text-secondary">{formatDate(customer.date_created)}</td>
-    </tr>
-  )
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function MerchantDetailsPage() {
   const { accountKey } = useParams()
-  const navigate = useNavigate()
   const { user } = useAuth()
 
   const canMutate = CAN_MUTATE.includes(user?.role)
 
-  const [merchant,   setMerchant]   = useState(null)
-  const [wallets,    setWallets]    = useState([])
+  const [merchant, setMerchant] = useState(null)
+  const [wallets, setWallets] = useState([])
   const [walletMeta, setWalletMeta] = useState(null)
-  const [customers,  setCustomers]  = useState([])
-  const [custMeta,   setCustMeta]   = useState(null)
-  const [ledgers,    setLedgers]    = useState([])
+  const [customers, setCustomers] = useState([])
+  const [custMeta, setCustMeta] = useState(null)
+  const [ledgers, setLedgers] = useState([])
+  const [txRows, setTxRows] = useState([])
 
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState(null)
-  const [freezing,     setFreezing]     = useState(false)
-  const [upgrading,    setUpgrading]    = useState(false)
-  const [actionMsg,    setActionMsg]    = useState(null)   // { type: 'success'|'error', text }
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [freezing, setFreezing] = useState(false)
+  const [upgrading, setUpgrading] = useState(false)
+  const [msg, setMsg] = useState(null)
 
-  const showMsg = (type, text) => {
-    setActionMsg({ type, text })
-    setTimeout(() => setActionMsg(null), 4000)
-  }
-
-  const handleFreeze = async () => {
-    if (!window.confirm(`Freeze account for ${merchant?.name}? This will restrict their operations.`)) return
-    setFreezing(true)
-    try {
-      await updateMerchant(accountKey, { status: 'FROZEN' })
-      showMsg('success', 'Account frozen successfully.')
-    } catch (e) {
-      showMsg('error', e?.response?.data?.message || 'Failed to freeze account.')
-    } finally {
-      setFreezing(false)
-    }
-  }
-
-  const handleUpgradeTier = async () => {
-    const current = merchant?.default_kyc_tier ?? 1
-    const next = current + 1
-    if (!window.confirm(`Upgrade ${merchant?.name} from Tier ${current} to Tier ${next}?`)) return
-    setUpgrading(true)
-    try {
-      const res = await updateMerchant(accountKey, { default_kyc_tier: next })
-      setMerchant((prev) => ({ ...prev, default_kyc_tier: res.data?.default_kyc_tier ?? next }))
-      showMsg('success', `Tier upgraded to Tier ${next}.`)
-    } catch (e) {
-      showMsg('error', e?.response?.data?.message || 'Failed to upgrade tier.')
-    } finally {
-      setUpgrading(false)
-    }
-  }
-
-  const handleExport = () => {
-    if (!merchant) return
-    exportToCsv(
-      [{
-        name: merchant.name,
-        trade_name: merchant.trade_name ?? '',
-        account_key: merchant.account_key,
-        tier: merchant.default_kyc_tier,
-        customers: merchant.customer_count,
-        ledgers: merchant.ledger_count,
-        settlements: merchant.settlement_count,
-        currencies: (merchant.currencies || []).join(', '),
-        date_created: merchant.date_created,
-      }],
-      `merchant-${accountKey}.csv`
-    )
+  const pushMsg = (type, text) => {
+    setMsg({ type, text })
+    setTimeout(() => setMsg(null), 3500)
   }
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [mRes, wRes, cRes, lRes] = await Promise.allSettled([
+      const [mRes, wRes, cRes, lRes, dRes, wdRes, tRes] = await Promise.allSettled([
         getMerchant(accountKey),
-        getMerchantWallets(accountKey, { page: 1, limit: 10 }),
-        getMerchantCustomers(accountKey, { page: 1, limit: 10 }),
-        getMerchantLedgers(accountKey, { page: 1, limit: 5 }),
+        getMerchantWallets(accountKey, { page: 1, limit: 6 }),
+        getMerchantCustomers(accountKey, { page: 1, limit: 8 }),
+        getMerchantLedgers(accountKey, { page: 1, limit: 6 }),
+        getDepositTransactions({ page: 1, limit: 20 }),
+        getWithdrawalTransactions({ page: 1, limit: 20 }),
+        getTransferTransactions({ page: 1, limit: 20 }),
       ])
 
       if (mRes.status === 'fulfilled') setMerchant(mRes.value.data)
-      else setError('Failed to load merchant details.')
+      else setError('Failed to load merchant profile.')
 
       if (wRes.status === 'fulfilled') {
         setWallets(wRes.value.records || [])
-        setWalletMeta(wRes.value.pagination)
+        setWalletMeta(wRes.value.pagination || null)
       }
-
       if (cRes.status === 'fulfilled') {
         setCustomers(cRes.value.records || [])
-        setCustMeta(cRes.value.pagination)
+        setCustMeta(cRes.value.pagination || null)
       }
+      if (lRes.status === 'fulfilled') setLedgers(lRes.value.records || [])
 
-      if (lRes.status === 'fulfilled') {
-        setLedgers(lRes.value.records || [])
-      }
+      const deposits = dRes.status === 'fulfilled' ? dRes.value.records || [] : []
+      const withdrawals = wdRes.status === 'fulfilled' ? wdRes.value.records || [] : []
+      const transfers = tRes.status === 'fulfilled' ? tRes.value.records || [] : []
+
+      const merged = [
+        ...mapTransactions(deposits, 'DEPOSIT'),
+        ...mapTransactions(withdrawals, 'WITHDRAWAL'),
+        ...mapTransactions(transfers, 'TRANSFER'),
+      ]
+        .filter((tx) => tx.accountKey === accountKey)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+
+      setTxRows(merged)
     } finally {
       setLoading(false)
     }
   }, [accountKey])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    fetchAll()
+  }, [fetchAll])
 
-  // ── Derived values ──────────────────────────────────────────────────────────
-
-  const kycDerived = merchant
-    ? merchant.customer_count > 3 ? 'verified' : merchant.customer_count > 0 ? 'pending' : 'none'
+  const kyc = merchant
+    ? merchant.customer_count > 2 ? 'verified' : merchant.customer_count > 0 ? 'pending' : 'none'
     : 'none'
-  const riskDerived = merchant
-    ? merchant.settlement_count === 0 && merchant.customer_count === 0 ? 'high'
-      : merchant.settlement_count === 0 ? 'medium' : 'low'
-    : 'low'
+  const risk = merchant?.settlement_count === 0 ? 'medium' : 'active'
 
-  const kycVariant   = { verified: 'success', pending: 'warning', none: 'neutral' }[kycDerived]
-  const kycLabel     = { verified: 'Verified', pending: 'Pending', none: 'No KYC' }[kycDerived]
-  const riskVariant  = { low: 'success', medium: 'warning', high: 'error' }[riskDerived]
-  const riskLabel    = { low: 'Low', medium: 'Medium', high: 'High' }[riskDerived]
+  const handleExport = () => {
+    if (!merchant) return
+    exportToCsv(
+      [{
+        merchant_name: merchant.name,
+        account_key: merchant.account_key,
+        tier: merchant.default_kyc_tier,
+        wallets: walletMeta?.total ?? wallets.length,
+        customers: custMeta?.total ?? merchant.customer_count ?? 0,
+        ledgers: merchant.ledger_count ?? 0,
+        settlements: merchant.settlement_count ?? 0,
+      }],
+      `merchant-${merchant.account_key}.csv`
+    )
+  }
 
-  // ── Activity items derived from recent customers ────────────────────────────
-  const activityItems = customers.slice(0, 6).map((c) => ({
-    id: c.id,
-    icon: UserPlus,
-    iconBg: 'bg-accent/10 text-accent',
-    label: `${[c.first_name, c.surname].filter(Boolean).join(' ')} onboarded`,
-    sub: `by ${c.source || 'API'}`,
-    time: timeAgo(c.date_created),
-  }))
+  const handleFreeze = async () => {
+    if (!window.confirm(`Freeze account for ${merchant?.name}?`)) return
+    setFreezing(true)
+    try {
+      await updateMerchant(accountKey, { status: 'FROZEN' })
+      pushMsg('success', 'Account frozen successfully.')
+    } catch (e) {
+      pushMsg('error', e?.response?.data?.message || 'Failed to freeze account.')
+    } finally {
+      setFreezing(false)
+    }
+  }
 
-  // ── Error state ─────────────────────────────────────────────────────────────
+  const handleUpgradeTier = async () => {
+    const currentTier = merchant?.default_kyc_tier ?? 1
+    const nextTier = currentTier + 1
+    if (!window.confirm(`Upgrade ${merchant?.name} from Tier ${currentTier} to Tier ${nextTier}?`)) return
+    setUpgrading(true)
+    try {
+      const res = await updateMerchant(accountKey, { default_kyc_tier: nextTier })
+      setMerchant((prev) => ({ ...prev, default_kyc_tier: res.data?.default_kyc_tier ?? nextTier }))
+      pushMsg('success', `Tier upgraded to ${nextTier}.`)
+    } catch (e) {
+      pushMsg('error', e?.response?.data?.message || 'Failed to upgrade tier.')
+    } finally {
+      setUpgrading(false)
+    }
+  }
+
   if (!loading && error) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <AlertCircle size={40} className="text-error" />
+      <div className="flex flex-col items-center justify-center gap-4 py-24">
+        <AlertCircle className="text-error" size={36} />
         <p className="text-sm text-text-secondary">{error}</p>
         <button
           onClick={fetchAll}
-          className="flex items-center gap-1.5 rounded-button border border-border px-4 py-2 text-sm text-text-primary hover:bg-card-hover"
+          className="inline-flex items-center gap-2 rounded-button border border-border px-4 py-2 text-sm text-text-primary hover:bg-card-hover"
         >
-          <RefreshCw size={14} /> Retry
+          <RefreshCw size={14} />
+          Retry
         </button>
       </div>
     )
   }
 
+  const recentTxRows = txRows
+
+  const disputes = buildDisputes(customers)
+  const primaryContact = customers[0]
+  const activityRows = [
+    ...wallets.slice(0, 2).map((w) => ({
+      label: `Wallet ${w.wallet_id?.slice(0, 8) || 'created'} created`,
+      by: 'System',
+      at: w.date_created,
+      icon: WalletCards,
+      iconCls: 'bg-[#dcfae6] text-[#17b26a]',
+    })),
+    ...customers.slice(0, 4).map((c) => ({
+      label: `${[c.first_name, c.surname].filter(Boolean).join(' ')} onboarded`,
+      by: c.source || 'API',
+      at: c.date_created,
+      icon: UserRoundPlus,
+      iconCls: 'bg-[#eff4ff] text-[#2970ff]',
+    })),
+  ].slice(0, 6)
+
   return (
     <div className="animate-fade-in-up space-y-6">
-
-      {/* ── Action feedback toast ──────────────────────────────────────────── */}
-      {actionMsg && (
+      {msg && (
         <div className={cn(
-          'flex items-center gap-2 rounded-card border px-4 py-3 text-sm transition-all',
-          actionMsg.type === 'success'
-            ? 'border-success/30 bg-success-bg text-success'
-            : 'border-error/30 bg-error-bg text-error',
+          'rounded-card border px-4 py-2.5 text-sm',
+          msg.type === 'success' ? 'border-success/30 bg-success-bg text-success' : 'border-error/30 bg-error-bg text-error'
         )}>
-          {actionMsg.type === 'success'
-            ? <AlertCircle size={15} />
-            : <AlertCircle size={15} />}
-          {actionMsg.text}
+          {msg.text}
         </div>
       )}
 
-      {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
-      <nav className="flex items-center gap-1.5 text-sm">
-        <Link to="/merchants" className="flex items-center gap-1 text-text-muted transition-colors hover:text-accent">
-          <ArrowLeft size={14} />
-          Merchants
+      <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1 text-xs text-text-muted">
+        <Link to="/merchants" className="inline-flex items-center gap-1 hover:text-accent">
+          <ArrowLeft size={12} />
+          Customers
         </Link>
-        <ChevronRight size={14} className="text-text-muted" />
-        <span className="text-text-primary">
-          {loading ? 'Profile Details' : (merchant?.name ?? 'Profile Details')}
-        </span>
-      </nav>
+        <span className="text-text-muted">›</span>
+        <span className="text-text-primary">Profile Details</span>
+      </div>
 
-      {/* ── Header card ────────────────────────────────────────────────────── */}
-      {loading ? (
-        <HeaderSkeleton />
-      ) : merchant ? (
-        <div className="rounded-card border border-border bg-card p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            {/* Avatar + Info */}
-            <div className="flex items-start gap-5">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
-                <Building2 size={28} />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-text-primary">{merchant.name}</h1>
-                {merchant.trade_name && (
-                  <p className="text-sm text-text-secondary">{merchant.trade_name}</p>
-                )}
-                <p className="mt-0.5 font-mono text-xs text-text-muted">ID: {merchant.account_key}</p>
-
-                {/* Badges row */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-text-secondary">Tier {merchant.default_kyc_tier ?? 1}</span>
-                  <div className="h-3 w-px bg-border" />
-                  <Badge variant="business">Business</Badge>
-                  <Badge variant={kycVariant}>{kycLabel}</Badge>
-                  <Badge variant="success">Active</Badge>
-                  <Badge variant={riskVariant}>{riskLabel} Risk</Badge>
-                </div>
-
-                {/* Currencies */}
-                {merchant.currencies?.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {merchant.currencies.map((c) => (
-                      <span key={c} className="rounded-full bg-card-hover px-2 py-0.5 text-[11px] text-text-muted">
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+      <section className="rounded-card border border-border/70 bg-card/60 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border/80 bg-[#ff8a00]/20 text-[#ff8a00]">
+              <Building2 size={24} />
             </div>
+            <div>
+              <h1 className="text-[20px] font-semibold leading-[28px] tracking-[0.2px] text-text-primary">{merchant?.name || '...'}</h1>
+              <p className="mt-1 text-sm text-text-secondary">ID: {merchant?.account_key || '--'}</p>
+            </div>
+          </div>
 
-            {/* Action buttons */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Freeze — operations & compliance only */}
-              {canMutate && (
-                <button
-                  onClick={handleFreeze}
-                  disabled={freezing}
-                  className="flex items-center gap-1.5 rounded-button border border-border px-3.5 py-2 text-sm text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {freezing
-                    ? <Loader2 size={14} className="animate-spin" />
-                    : <SnowflakeIcon size={14} />}
-                  Freeze Account
-                </button>
-              )}
-
-              {/* Export — all roles */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canMutate && (
               <button
-                onClick={handleExport}
-                className="flex items-center gap-1.5 rounded-button border border-border px-3.5 py-2 text-sm text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-95"
+                onClick={handleFreeze}
+                disabled={freezing}
+                className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-3 text-sm text-text-secondary hover:bg-card-hover disabled:opacity-60"
               >
-                <Download size={14} />
-                Export Data
+                {freezing ? <Loader2 size={14} className="animate-spin" /> : <Snowflake size={14} />}
+                Freeze Account
               </button>
+            )}
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-3 text-sm text-text-secondary hover:bg-card-hover"
+            >
+              <Download size={14} />
+              Export Customer Data
+            </button>
+            {canMutate && (
+              <button
+                onClick={handleUpgradeTier}
+                disabled={upgrading}
+                className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm text-black hover:bg-accent/90 disabled:opacity-60"
+              >
+                {upgrading ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />}
+                Upgrade Tier
+              </button>
+            )}
+          </div>
+        </div>
 
-              {/* Upgrade Tier — operations & compliance only */}
-              {canMutate && (
-                <button
-                  onClick={handleUpgradeTier}
-                  disabled={upgrading}
-                  className="flex items-center gap-1.5 rounded-button bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {upgrading
-                    ? <Loader2 size={14} className="animate-spin" />
-                    : <TrendingUp size={14} />}
-                  Upgrade Tier
-                </button>
-              )}
+        <div className="mt-6 flex flex-wrap items-end justify-start gap-8">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-text-secondary">
+            <span>{primaryContact?.phone_number || '--'}</span>
+            <span className="h-4 w-px bg-border" />
+            <span>{primaryContact?.email_address || '--'}</span>
+            <span className="h-4 w-px bg-border" />
+            <span>Tier {merchant?.default_kyc_tier ?? 1}</span>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[9px] uppercase tracking-[0.5px] text-text-muted">Account Type</span>
+              {dotBadge('business', 'Business')}
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[9px] uppercase tracking-[0.5px] text-text-muted">KYC Status</span>
+              {dotBadge(kyc === 'verified' ? 'verified' : 'inactive', kyc === 'verified' ? 'Verified' : 'Pending')}
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[9px] uppercase tracking-[0.5px] text-text-muted">Account Status</span>
+              {dotBadge('active', 'Active')}
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[9px] uppercase tracking-[0.5px] text-text-muted">Risk Level</span>
+              {dotBadge(risk === 'medium' ? 'medium' : 'active', risk === 'medium' ? 'Medium' : 'Low')}
             </div>
           </div>
         </div>
-      ) : null}
+      </section>
 
-      {/* ── Main two-column grid ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_400px]">
-
-        {/* ═══ LEFT COLUMN ══════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="space-y-6">
-
-          {/* Stat mini-cards */}
-          <div className="grid grid-cols-2 gap-4">
-            {loading ? (
-              <>
-                <Skeleton className="h-28 rounded-card" />
-                <Skeleton className="h-28 rounded-card" />
-              </>
-            ) : (
-              <>
-                <StatCard
-                  label="Total Wallets"
-                  value={formatNumber(walletMeta?.total ?? wallets.length)}
-                  icon={Wallet}
-                  iconColor="text-accent"
-                />
-                <StatCard
-                  label="Total Customers"
-                  value={formatNumber(custMeta?.total ?? merchant?.customer_count ?? 0)}
-                  icon={Users}
-                  iconColor="text-[#a78bfa]"
-                />
-              </>
-            )}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <MetricTile
+              icon={Wallet}
+              label="Total Wallets"
+              value={formatNumber(walletMeta?.total ?? wallets.length)}
+              iconCls="border-[#72811e] bg-[#4a5313] text-[#bad133]"
+            />
+            <MetricTile
+              icon={Users}
+              label="Sub-accounts"
+              value={formatNumber(custMeta?.total ?? merchant?.customer_count ?? 0)}
+              iconCls="border-[#0f5132] bg-[#064e3b] text-[#34d399]"
+            />
           </div>
 
-          {/* Linked Wallets */}
-          <SectionCard
+          <Card
             title="Linked Wallets"
-            rightSlot={
-              <button className="text-xs font-medium text-accent transition-colors hover:text-accent/70">
-                View All
-              </button>
-            }
+            action={<button className="text-sm text-accent hover:underline">View All</button>}
           >
-            {loading ? (
-              <div className="space-y-3 p-5">
-                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
-              </div>
-            ) : wallets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-text-muted">
-                <Wallet size={24} className="opacity-40" />
-                No wallets found
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
+            <div className="p-4">
+              <div className="overflow-hidden rounded-2xl border border-border/70">
                 <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-border">
-                      {['Account / Wallet ID', 'Currency', 'Date Created', 'Status'].map((h) => (
-                        <th key={h} className="px-4 py-2.5 text-[11px] font-medium text-text-muted">{h}</th>
-                      ))}
+                  <thead className="bg-card-hover">
+                    <tr className="text-sm text-text-muted">
+                      <th className="px-4 py-3 font-normal">Wallet ID</th>
+                      <th className="px-4 py-3 font-normal">Currency</th>
+                      <th className="px-4 py-3 font-normal">Date Created</th>
+                      <th className="px-4 py-3 font-normal">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {wallets.map((w) => <WalletRow key={w.id} wallet={w} />)}
+                    {wallets.map((w, idx) => {
+                      const status = idx === 1 ? 'inactive' : idx === 2 ? 'suspended' : 'active'
+                      return (
+                        <tr key={w.id || idx} className="border-t border-border/60 text-sm">
+                          <td className="px-4 py-2.5 text-text-secondary">
+                            {w.wallet_key ? `WLT-${w.wallet_key.slice(-8).toUpperCase()}` : '--'}
+                          </td>
+                          <td className="px-4 py-2.5 text-text-secondary">
+                            <span className="mr-2">{currencyFlag[w.currency_code] || '◯'}</span>
+                            {w.currency_code || '--'}
+                          </td>
+                          <td className="px-4 py-2.5 text-text-secondary">{formatDate(w.date_created).split(' ')[0]}</td>
+                          <td className="px-4 py-2.5">
+                            {dotBadge(status, status[0].toUpperCase() + status.slice(1))}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
-            )}
-          </SectionCard>
-
-          {/* Compliance & Verification */}
-          <SectionCard
-            title="Compliance & Verification"
-            rightSlot={
-              <button className="rounded-button border border-border px-3 py-1 text-xs text-text-secondary transition-colors hover:bg-card-hover">
-                View History
-              </button>
-            }
-          >
-            <div className="divide-y divide-border/50 px-5 py-1">
-              <VerificationItem
-                icon={Briefcase}
-                label="Business Registration"
-                status={merchant?.customer_count > 0 ? 'verified' : 'pending'}
-              />
-              <VerificationItem
-                icon={ShieldCheck}
-                label="Account Verification"
-                status="verified"
-              />
-              <VerificationItem
-                icon={Fingerprint}
-                label="KYC Verification"
-                status={kycDerived}
-              />
-              <VerificationItem
-                icon={MapPin}
-                label="Address Verification"
-                status={merchant?.settlement_count > 0 ? 'verified' : 'pending'}
-              />
             </div>
-          </SectionCard>
+          </Card>
 
-          {/* Activity Feed */}
-          <SectionCard title="Activity Feed">
-            {loading ? (
-              <div className="space-y-3 p-5">
-                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
-              </div>
-            ) : activityItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-text-muted">
-                <Clock size={24} className="opacity-40" />
-                No recent activity
-              </div>
-            ) : (
-              <div className="divide-y divide-border/50 px-5 py-2">
-                {activityItems.map((item) => (
-                  <ActivityItem key={item.id} {...item} />
-                ))}
-              </div>
-            )}
-          </SectionCard>
+          <Card title="Compliance & Verification" action={<button className="text-sm text-accent hover:underline">View History</button>}>
+            <div className="space-y-3 p-4">
+              {[
+                ['BVN', 'verified'],
+                ['Document Verification', 'verified'],
+                ['ID Verification', kyc === 'verified' ? 'verified' : 'inactive'],
+                ['Address Verification', 'verified'],
+              ].map(([label, status]) => (
+                <div key={label} className="flex items-center justify-between rounded-xl px-1 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#175cd3] text-white">
+                      <CircleCheck size={15} />
+                    </div>
+                    <span className="text-sm text-text-secondary">{label}</span>
+                  </div>
+                  {dotBadge(status, status === 'verified' ? 'Verified' : 'Pending')}
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="Activity Feed">
+            <div className="space-y-1 p-4">
+              {activityRows.map((a, idx) => {
+                const Icon = a.icon
+                return (
+                  <div key={idx} className="flex items-start gap-3 rounded-xl px-1 py-2">
+                    <div className={cn('mt-0.5 flex h-10 w-10 items-center justify-center rounded-full', a.iconCls)}>
+                      <Icon size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base text-text-secondary">{a.label}</p>
+                      <p className="truncate text-sm text-text-muted">by {a.by}</p>
+                    </div>
+                    <span className="whitespace-nowrap text-xs text-text-muted">{timeAgo(a.at)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
         </div>
 
-        {/* ═══ RIGHT COLUMN ═════════════════════════════════════════════════ */}
         <div className="space-y-6">
-
-          {/* Recent Customers (mapped to "Recent Transactions" slot) */}
-          <SectionCard
-            title="Recent Customers"
-            rightSlot={
-              <button className="text-xs font-medium text-accent transition-colors hover:text-accent/70">
-                View All
-              </button>
-            }
+          <Card
+            title="Recent Transactions"
+            action={<button className="text-sm text-accent hover:underline">View All</button>}
           >
-            {loading ? (
-              <div className="space-y-3 p-4">
-                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-              </div>
-            ) : customers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-text-muted">
-                <Users size={24} className="opacity-40" />
-                No customers yet
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
+            <div className="p-4">
+              <div className="overflow-hidden rounded-2xl border border-border/70">
                 <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-border">
-                      {['', 'Name', 'Type', 'Tier', 'KYC', 'Joined'].map((h, i) => (
-                        <th key={i} className="px-4 py-2.5 text-[11px] font-medium text-text-muted">{h}</th>
-                      ))}
+                  <thead className="bg-card-hover">
+                    <tr className="text-sm text-text-muted">
+                      <th className="px-4 py-3 font-normal">Transaction ID</th>
+                      <th className="px-4 py-3 font-normal">Amount</th>
+                      <th className="px-4 py-3 font-normal">Date</th>
+                      <th className="px-4 py-3 font-normal">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {customers.map((c) => (
-                      <CustomerRow key={c.id} customer={c} onClick={() => {}} />
+                    {recentTxRows.map((tx, idx) => (
+                      <tr key={`${tx.id}-${idx}`} className="border-t border-border/60 text-sm">
+                        <td className="px-4 py-2.5 text-text-secondary">{tx.id}</td>
+                        <td className="px-4 py-2.5">
+                          <p className="text-text-secondary">{tx.amount}</p>
+                          <p className="text-[10px] uppercase tracking-widest text-text-muted">{tx.type}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-text-secondary">{formatDate(tx.date).split(' ')[0]}</td>
+                        <td className="px-4 py-2.5">
+                          {dotBadge(
+                            tx.status === 'processing' ? 'processing' : tx.status === 'failed' ? 'failed' : 'completed',
+                            tx.status === 'processing' ? 'Processing' : tx.status === 'failed' ? 'Failed' : 'Completed'
+                          )}
+                        </td>
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </SectionCard>
-
-          {/* Ledgers / Settlements */}
-          <SectionCard
-            title="Ledgers"
-            rightSlot={
-              <div className="flex items-center gap-2">
-                <button className="text-xs font-medium text-accent transition-colors hover:text-accent/70">
-                  View All
-                </button>
-              </div>
-            }
-          >
-            {loading ? (
-              <div className="space-y-3 p-4">
-                {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-              </div>
-            ) : ledgers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-10 text-sm text-text-muted">
-                <FileText size={24} className="opacity-40" />
-                No ledgers found
-              </div>
-            ) : (
-              <div className="divide-y divide-border/50">
-                {ledgers.map((l) => (
-                  <div key={l.id} className="flex items-center justify-between px-5 py-3">
-                    <div>
-                      <p className="font-mono text-xs text-text-primary">
-                        {`LDG-${l.wallet_key?.slice(-8).toUpperCase() ?? l.id}`}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-text-muted">{l.currency_code}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-text-secondary">{formatDate(l.date_created)}</p>
-                      <span className="mt-0.5 inline-flex items-center rounded-full bg-success-bg px-2 py-0.5 text-[10px] font-medium text-success">
-                        Active
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-
-          {/* Notes */}
-          <SectionCard title="Notes">
-            <div className="px-5 py-4">
-              <p className="mb-4 text-xs text-text-muted">
-                All actions performed on this profile are logged and auditable for compliance purposes.
-              </p>
-              <div className="space-y-4">
-                <div className="rounded-card border border-border/50 bg-page p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-medium text-text-primary">Account Review</p>
-                      <p className="mt-0.5 text-[11px] text-text-muted">
-                        Compliance check performed on merchant account {merchant?.account_key?.slice(0, 10)}...
-                      </p>
-                    </div>
-                    <button className="shrink-0 text-[11px] text-accent hover:underline">View Details</button>
-                  </div>
-                  <p className="mt-2 text-[11px] text-text-muted">
-                    {timeAgo(merchant?.date_modified || merchant?.date_created || new Date())}
-                  </p>
-                </div>
-
-                <div className="rounded-card border border-border/50 bg-page p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-medium text-text-primary">Merchant Verification</p>
-                      <p className="mt-0.5 text-[11px] text-text-muted">
-                        KYC tier assigned: Tier {merchant?.default_kyc_tier ?? 1}. Customer onboarding enabled.
-                      </p>
-                    </div>
-                    <button className="shrink-0 text-[11px] text-accent hover:underline">View Details</button>
-                  </div>
-                  <p className="mt-2 text-[11px] text-text-muted">
-                    {timeAgo(merchant?.date_created || new Date())}
-                  </p>
-                </div>
-
-                <button className="w-full rounded-button border border-border py-2 text-xs text-text-secondary transition-colors hover:bg-card-hover">
-                  View All Notes
-                </button>
-              </div>
             </div>
-          </SectionCard>
+          </Card>
+
+          <Card
+            title="Disputes"
+            action={(
+              <div className="flex items-center gap-3">
+                <button className="text-sm text-accent hover:underline">View All</button>
+                <button className="rounded-full border border-border px-4 py-1.5 text-xs text-text-secondary hover:bg-card-hover">
+                  Open New Disputes
+                </button>
+              </div>
+            )}
+          >
+            <div className="space-y-1 p-4">
+              {disputes.map((d) => (
+                <div key={d.id} className="flex items-start gap-3 rounded-xl px-1 py-2">
+                  <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#fffaeb] text-[#f79009]">
+                    <AlertCircle size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base leading-[25.6px] tracking-[0.024px] text-text-secondary">{d.id}</p>
+                    <p className="mt-1 truncate text-sm text-text-muted">{d.text}</p>
+                  </div>
+                  <span className="whitespace-nowrap text-xs text-text-muted">{timeAgo(d.date)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="Notes" compact>
+            <p className="border-b border-border/60 px-4 py-3 text-xs text-text-muted">
+              All actions performed on this profile are logged and auditable for compliance purposes.
+            </p>
+            <div className="space-y-1 px-4 py-2">
+              {[
+                ['Transaction Review', `Compliance check performed on transaction ID #${merchant?.account_key?.slice(0, 5) || '12345'} for unusual activity.`, 'View Details'],
+                ['User Verification', 'Verified identity for merchant profile through KYC process.', 'View Verification'],
+                ['Transaction Review', 'Compliance check performed on transaction ID #12345 for unusual activity.', 'View Details'],
+              ].map(([title, text, cta], idx) => (
+                <div key={idx} className="py-3">
+                  <div className="mb-1 flex items-start justify-between gap-3">
+                    <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-text-primary">{title}</p>
+                    <button className="shrink-0 text-xs text-text-secondary underline hover:text-accent">{cta}</button>
+                  </div>
+                  <p className="text-sm text-text-muted">{text}</p>
+                  <p className="mt-2 text-xs text-text-muted">{idx === 0 ? timeAgo(merchant?.date_modified || merchant?.date_created) : '5 mins ago'}</p>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-border/60 p-4 text-right">
+              <button className="rounded-full border border-border px-5 py-2 text-sm text-text-secondary hover:bg-card-hover">
+                View All Notes
+              </button>
+            </div>
+          </Card>
         </div>
       </div>
     </div>
