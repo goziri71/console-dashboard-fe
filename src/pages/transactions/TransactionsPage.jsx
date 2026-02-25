@@ -4,12 +4,15 @@ import {
   ArrowLeftRight,
   ArrowUpCircle,
   BookOpenText,
+  CheckCircle2,
+  ChevronRight,
   ChevronDown,
+  Copy,
   Download,
   Filter,
-  MoreVertical,
   Search,
   Shuffle,
+  X,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
 import { cn, exportToCsv, formatBalance, formatDate } from '../../lib/utils'
@@ -100,6 +103,7 @@ export default function TransactionsPage() {
   const [status, setStatus] = useState('')
   const [currencyCode, setCurrencyCode] = useState('')
   const [query, setQuery] = useState({ search: '', status: '', currency_code: '' })
+  const [selectedTx, setSelectedTx] = useState(null)
 
   const abortRef = useRef(null)
   const inFlightKeyRef = useRef('')
@@ -243,6 +247,9 @@ export default function TransactionsPage() {
           ? pickFirst(tx, ['payout_status', 'status', 'transaction_status'])
           : pickFirst(tx, ['status', 'transaction_status'])) || '--'
     const id = pickFirst(tx, ['reference', 'source_reference', 'target_reference', 'transaction_id']) || `TX-${sn}`
+    const feeRaw = pickFirst(tx, ['fee', 'transaction_fee', 'charges', 'charge']) || 0
+    const openingBalanceRaw = pickFirst(tx, ['opening_balance', 'balance_before']) || 0
+    const closingBalanceRaw = pickFirst(tx, ['closing_balance', 'balance_after']) || 0
 
     return {
       sn,
@@ -252,8 +259,14 @@ export default function TransactionsPage() {
       senderName,
       senderMeta,
       amount: formatBalance(amountRaw, currency),
+      amountRaw,
+      currency,
+      feeRaw,
+      openingBalanceRaw,
+      closingBalanceRaw,
       date,
       status: statusValue,
+      raw: tx,
     }
   }
 
@@ -273,6 +286,20 @@ export default function TransactionsPage() {
       })),
       `transactions-${activeTab}-page-${page}.csv`
     )
+  }
+
+  function formatDateParts(value) {
+    if (!value) return { date: '--', time: '--' }
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return { date: '--', time: '--' }
+    const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    return { date, time }
+  }
+
+  function copyText(value) {
+    if (!value) return
+    navigator.clipboard?.writeText(String(value)).catch(() => {})
   }
 
   return (
@@ -386,8 +413,11 @@ export default function TransactionsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <button className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary">
-                          <MoreVertical size={14} />
+                        <button
+                          onClick={() => setSelectedTx(row)}
+                          className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+                        >
+                          <ChevronRight size={16} />
                         </button>
                       </td>
                     </tr>
@@ -412,6 +442,79 @@ export default function TransactionsPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {selectedTx && (
+        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm">
+          <div className="absolute inset-y-6 right-6 w-[532px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="relative border-b border-border px-6 pb-6 pt-6">
+              <button
+                onClick={() => setSelectedTx(null)}
+                className="absolute right-5 top-5 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+              >
+                <X size={18} />
+              </button>
+              <div className="mx-auto mb-5 flex h-28 w-28 items-center justify-center rounded-full bg-success-bg/20">
+                <CheckCircle2 size={44} className="text-success" />
+              </div>
+              <p className="text-center text-xl font-semibold text-text-primary">
+                {normalizeStatus(selectedTx.status) === 'completed'
+                  ? 'Transaction Successful'
+                  : normalizeStatus(selectedTx.status) === 'failed'
+                    ? 'Transaction Failed'
+                    : 'Transaction Processing'}
+              </p>
+            </div>
+
+            <div className="h-[calc(100%-196px)] overflow-y-auto px-6 py-5">
+              <div className="mb-6 text-center">
+                <p className="text-sm text-text-muted">Amount</p>
+                <p className="mt-1 text-3xl font-semibold text-text-primary">{selectedTx.amount}</p>
+                <p className="mt-1 text-sm text-text-secondary">{formatDate(selectedTx.date)}</p>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-border">
+                <div className="border-b border-border bg-card-hover px-4 py-3 text-sm font-medium text-text-primary">
+                  Payment Details
+                </div>
+
+                {[
+                  ['Recipient', selectedTx.recipientName],
+                  ['Sender', selectedTx.senderName],
+                  ['Reference ID', selectedTx.id],
+                  ['Date', formatDateParts(selectedTx.date).date],
+                  ['Time', formatDateParts(selectedTx.date).time],
+                  ['Status', normalizeStatus(selectedTx.status)],
+                  ['Fee', formatBalance(selectedTx.feeRaw, selectedTx.currency)],
+                  ['Opening Balance', formatBalance(selectedTx.openingBalanceRaw, selectedTx.currency)],
+                  ['Closing Balance', formatBalance(selectedTx.closingBalanceRaw, selectedTx.currency)],
+                ].map(([label, value], idx) => (
+                  <div
+                    key={label}
+                    className={cn(
+                      'flex items-center justify-between px-4 py-3',
+                      idx < 8 && 'border-b border-border/60'
+                    )}
+                  >
+                    <span className="text-sm text-text-secondary">{label}</span>
+                    <span className="flex items-center gap-2 text-sm text-text-primary">
+                      {String(value || '--')}
+                      {label === 'Reference ID' && value && (
+                        <button
+                          onClick={() => copyText(value)}
+                          className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
+                          title="Copy reference"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
