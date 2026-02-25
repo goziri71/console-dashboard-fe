@@ -63,67 +63,69 @@ export default function MerchantTable({ merchants }) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-border">
-            {COLUMNS.map((col) => (
-              <th key={col.key} className={cn('px-4 py-3 text-xs font-medium text-text-muted', col.width)}>
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {merchants.map((merchant, idx) => {
-            const kyc  = deriveMerchantKyc(merchant)
-            const risk = deriveMerchantRisk(merchant)
-            const currencies = merchant.currencies || []
-            return (
-              <tr
-                key={merchant.account_key || merchant.id || idx}
-                className="cursor-pointer border-b border-border/50 transition-colors hover:bg-card-hover/40"
-                onClick={() => navigate(`/merchants/${merchant.account_key}`)}
-              >
-                <td className="px-4 py-2.5">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-card-hover text-text-muted">
-                    <Building2 size={14} />
-                  </div>
-                </td>
-                <td className="px-4 py-2.5">
-                  <span className="font-medium text-text-primary">{merchant.name || '--'}</span>
-                  {merchant.trade_name && (
-                    <span className="mt-0.5 block text-[11px] text-text-muted">{merchant.trade_name}</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 text-text-secondary">Business</td>
-                <td className="px-4 py-2.5 text-text-secondary">Tier {merchant.default_kyc_tier ?? 1}</td>
-                <td className="px-4 py-2.5"><Badge config={kycBadge} value={kyc} /></td>
-                <td className="px-4 py-2.5"><Badge config={statusBadge} value="active" /></td>
-                <td className="px-4 py-2.5 text-text-primary">
-                  {currencies.length > 0
-                    ? currencies.join(', ')
-                    : <span className="text-text-muted">--</span>}
-                  {merchant.ledger_count > 0 && (
-                    <span className="ml-1.5 text-[11px] text-text-muted">
-                      ({merchant.ledger_count} ledger{merchant.ledger_count > 1 ? 's' : ''})
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5"><Badge config={riskBadge} value={risk} /></td>
-                <td className="px-4 py-2.5 text-xs text-text-secondary">
-                  {formatDate(merchant.date_modified || merchant.date_created)}
-                </td>
-                <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                  <button className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary active:scale-90">
-                    <MoreVertical size={16} />
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+    <div className="p-4">
+      <div className="overflow-x-auto overflow-hidden rounded-2xl border border-border/70">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-border bg-card-hover/40">
+              {COLUMNS.map((col) => (
+                <th key={col.key} className={cn('px-4 py-3 text-xs font-medium text-text-muted', col.width)}>
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {merchants.map((merchant, idx) => {
+              const kyc  = deriveMerchantKyc(merchant)
+              const risk = deriveMerchantRisk(merchant)
+              const currencies = merchant.currencies || []
+              return (
+                <tr
+                  key={merchant.account_key || merchant.id || idx}
+                  className="cursor-pointer border-b border-border/40 transition-colors hover:bg-card-hover/30"
+                  onClick={() => navigate(`/merchants/${merchant.account_key}`)}
+                >
+                  <td className="px-4 py-2.5">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-card-hover text-text-muted">
+                      <Building2 size={14} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium text-text-primary">{merchant.name || '--'}</span>
+                    {merchant.trade_name && (
+                      <span className="mt-0.5 block text-[11px] text-text-muted">{merchant.trade_name}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-text-secondary">Business</td>
+                  <td className="px-4 py-2.5 text-text-secondary">Tier {merchant.default_kyc_tier ?? 1}</td>
+                  <td className="px-4 py-2.5"><Badge config={kycBadge} value={kyc} /></td>
+                  <td className="px-4 py-2.5"><Badge config={statusBadge} value="active" /></td>
+                  <td className="px-4 py-2.5 text-text-primary">
+                    {currencies.length > 0
+                      ? currencies.join(', ')
+                      : <span className="text-text-muted">--</span>}
+                    {merchant.ledger_count > 0 && (
+                      <span className="ml-1.5 text-[11px] text-text-muted">
+                        ({merchant.ledger_count} ledger{merchant.ledger_count > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5"><Badge config={riskBadge} value={risk} /></td>
+                  <td className="px-4 py-2.5 text-xs text-text-secondary">
+                    {formatDate(merchant.date_modified || merchant.date_created)}
+                  </td>
+                  <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                    <button className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary active:scale-90">
+                      <MoreVertical size={16} />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

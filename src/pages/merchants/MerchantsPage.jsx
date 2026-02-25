@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { Building2, Users, BookOpen, Landmark } from 'lucide-react'
 import { getMerchantStats, getMerchants } from '../../services/merchants'
 import { formatNumber, exportToCsv } from '../../lib/utils'
-import MetricCard from '../../components/ui/MetricCard'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
 import MerchantTable from './MerchantTable'
@@ -15,6 +14,27 @@ function StatsSkeleton() {
       {[...Array(4)].map((_, i) => (
         <div key={i} className="h-[140px] skeleton rounded-card" />
       ))}
+    </div>
+  )
+}
+
+function SummaryCard({ label, value, icon: Icon, iconWrapCls, comparison }) {
+  return (
+    <div className="rounded-card border border-border bg-card p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <div className={iconWrapCls}>
+          <Icon size={14} />
+        </div>
+        <span className="text-xs text-text-muted">{label}</span>
+      </div>
+      <p className="text-[34px] font-semibold leading-none text-text-primary">{value}</p>
+      {comparison ? (
+        <p className={`mt-2 text-[11px] ${comparison.direction === 'up' ? 'text-success' : 'text-error'}`}>
+          {comparison.direction === 'up' ? '↑' : '↓'} {comparison.value}% {comparison.label}
+        </p>
+      ) : (
+        <p className="mt-2 text-[11px] text-transparent">.</p>
+      )}
     </div>
   )
 }
@@ -93,7 +113,7 @@ export default function MerchantsPage() {
           label: 'Total Merchants',
           value: formatNumber(tm?.count ?? 0),
           icon: Building2,
-          iconColor: 'accent',
+          iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-accent-bg text-accent',
           comparison: tm?.change_pct != null
             ? { value: Math.abs(tm.change_pct), direction: tm.change_pct >= 0 ? 'up' : 'down', label: 'Compared to last month' }
             : null,
@@ -102,21 +122,21 @@ export default function MerchantsPage() {
           label: 'Total Customers',
           value: formatNumber(stats.total_customers ?? 0),
           icon: Users,
-          iconColor: 'success',
+          iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-success-bg text-success',
           comparison: null,
         },
         {
           label: 'Total Ledgers',
           value: formatNumber(stats.total_ledgers ?? 0),
           icon: BookOpen,
-          iconColor: 'warning',
+          iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-warning-bg text-warning',
           comparison: null,
         },
         {
           label: 'Total Settlements',
           value: formatNumber(stats.total_settlements ?? 0),
           icon: Landmark,
-          iconColor: 'error',
+          iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-error-bg text-error',
           comparison: null,
         },
       ]
@@ -136,19 +156,19 @@ export default function MerchantsPage() {
       ) : stats ? (
         <div className="animate-fade-in-up grid grid-cols-4 gap-6" style={{ animationDelay: '60ms' }}>
           {statCards.map((card) => (
-            <MetricCard
+            <SummaryCard
               key={card.label}
               label={card.label}
               value={card.value}
               comparison={card.comparison}
               icon={card.icon}
-              iconColor={card.iconColor}
+              iconWrapCls={card.iconWrapCls}
             />
           ))}
         </div>
       ) : null}
 
-      <div className="animate-fade-in-up mt-6 rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
+      <div className="animate-fade-in-up mt-6 overflow-hidden rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
         <div className="flex items-center justify-between border-b border-border px-4 py-4">
           <h3 className="text-base font-medium text-text-primary">All Merchants</h3>
           <MerchantToolbar

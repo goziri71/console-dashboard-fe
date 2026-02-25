@@ -28,13 +28,13 @@ function Dropdown({ trigger, children }) {
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-[0.97]"
+        className="flex h-9 items-center gap-2 rounded-full border border-border bg-page px-3.5 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-[0.97]"
       >
         {trigger}
         <ChevronDown size={14} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-1.5 min-w-[160px] overflow-hidden rounded-xl border border-border bg-page shadow-xl shadow-black/30">
+        <div className="absolute right-0 top-full z-20 mt-1.5 min-w-[170px] overflow-hidden rounded-xl border border-border bg-page shadow-xl shadow-black/30">
           {children(setOpen)}
         </div>
       )}
@@ -69,15 +69,15 @@ export default function MerchantToolbar({
   const currentStatus = STATUS_OPTIONS.find((o) => o.value === statusFilter)
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2.5">
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           type="text"
-          placeholder="Search merchants..."
+          placeholder="Search..."
           value={localSearch}
           onChange={(e) => handleSearchInput(e.target.value)}
-          className="w-[260px] rounded-lg border border-border bg-card py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+          className="h-9 w-[300px] rounded-xl border border-border bg-page py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
         />
       </div>
 
@@ -122,10 +122,11 @@ export default function MerchantToolbar({
 
       <button
         onClick={onExport}
-        className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-[0.97]"
+        className="flex h-9 items-center gap-2 rounded-full border border-border bg-page px-3.5 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-[0.97]"
       >
         <Download size={14} />
         Export
+        <ChevronDown size={13} />
       </button>
     </div>
   )
