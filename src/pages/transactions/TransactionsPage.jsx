@@ -21,7 +21,7 @@ import {
   getTransferTransactions,
 } from '../../services/transactions'
 
-const TABLE_LIMIT = 20
+const TABLE_LIMIT = 10
 
 const TAB_ITEMS = [
   { key: 'deposits', label: 'Deposits', icon: ArrowDownCircle, fetcher: getNgnDeposits },
@@ -66,13 +66,13 @@ function statusBadgeCls(status) {
 function FilterPill({ icon: Icon, label, value, options, onChange }) {
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-page">
+      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#979797]">
         <Icon size={14} />
       </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 appearance-none rounded-full border border-accent bg-accent pl-8 pr-8 text-xs font-semibold text-page outline-none"
+        className="h-10 appearance-none rounded-full bg-[#494949] pl-8 pr-8 text-xs font-medium text-[#979797] outline-none"
       >
         {options.map((option) => (
           <option key={option || 'all'} value={option}>
@@ -88,7 +88,7 @@ function FilterPill({ icon: Icon, label, value, options, onChange }) {
 }
 
 export default function TransactionsPage() {
-  const [activeTab, setActiveTab] = useState('statement')
+  const [activeTab, setActiveTab] = useState('deposits')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -236,7 +236,12 @@ export default function TransactionsPage() {
     const currency = pickFirst(tx, ['currency_code', 'currency', 'asset_code']) || 'NGN'
     const amountRaw = pickFirst(tx, ['amount', 'value', 'gross_amount', 'net_amount']) || 0
     const date = pickFirst(tx, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date']) || ''
-    const statusValue = pickFirst(tx, ['status', 'transaction_status']) || '--'
+    const statusValue =
+      (activeTab === 'deposits'
+        ? pickFirst(tx, ['credit_status', 'status', 'transaction_status'])
+        : activeTab === 'withdrawals'
+          ? pickFirst(tx, ['payout_status', 'status', 'transaction_status'])
+          : pickFirst(tx, ['status', 'transaction_status'])) || '--'
     const id = pickFirst(tx, ['reference', 'source_reference', 'target_reference', 'transaction_id']) || `TX-${sn}`
 
     return {
@@ -252,7 +257,7 @@ export default function TransactionsPage() {
     }
   }
 
-  const displayRows = useMemo(() => rows.map(mapRow), [rows, page])
+  const displayRows = useMemo(() => rows.map(mapRow), [rows, page, activeTab])
 
   function handleExport() {
     if (!displayRows.length) return
@@ -330,7 +335,7 @@ export default function TransactionsPage() {
 
           <button
             onClick={handleExport}
-            className="flex h-10 items-center gap-1.5 rounded-full border border-accent bg-accent px-4 text-xs font-semibold text-page transition-colors hover:brightness-95"
+            className="flex h-10 items-center gap-1.5 rounded-full bg-[#F8FAEA] px-4 text-xs font-semi text-page transition-colors hover:brightness-95"
           >
             <Download size={14} />
             Export
