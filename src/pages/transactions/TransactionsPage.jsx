@@ -5,6 +5,7 @@ import {
   ArrowUpCircle,
   BookOpenText,
   CheckCircle2,
+  Clock3,
   ChevronRight,
   ChevronDown,
   Copy,
@@ -12,6 +13,7 @@ import {
   Filter,
   Search,
   Shuffle,
+  XCircle,
   X,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
@@ -302,6 +304,8 @@ export default function TransactionsPage() {
     navigator.clipboard?.writeText(String(value)).catch(() => {})
   }
 
+  const modalState = selectedTx ? normalizeStatus(selectedTx.status) : 'processing'
+
   return (
     <div>
       <div className="mb-6">
@@ -444,8 +448,13 @@ export default function TransactionsPage() {
       </div>
 
       {selectedTx && (
-        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm">
-          <div className="absolute inset-y-6 right-6 w-[532px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div
+          className={cn(
+            'fixed inset-0 z-40 flex justify-end bg-black/45 p-6 backdrop-blur-sm',
+            modalState === 'failed' ? 'items-start' : 'items-center'
+          )}
+        >
+          <div className="h-[934px] max-h-[calc(100vh-48px)] w-[532px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
             <div className="relative border-b border-border px-6 pb-6 pt-6">
               <button
                 onClick={() => setSelectedTx(null)}
@@ -453,15 +462,24 @@ export default function TransactionsPage() {
               >
                 <X size={18} />
               </button>
-              <div className="mx-auto mb-5 flex h-28 w-28 items-center justify-center rounded-full bg-success-bg/20">
-                <CheckCircle2 size={44} className="text-success" />
+              <div
+                className={cn(
+                  'mx-auto mb-5 flex h-28 w-28 items-center justify-center rounded-full',
+                  modalState === 'completed' && 'bg-success-bg/20',
+                  modalState === 'failed' && 'bg-error-bg/20',
+                  modalState === 'processing' && 'bg-card-hover'
+                )}
+              >
+                {modalState === 'completed' && <CheckCircle2 size={44} className="text-success" />}
+                {modalState === 'failed' && <XCircle size={44} className="text-error" />}
+                {modalState === 'processing' && <Clock3 size={44} className="text-warning" />}
               </div>
               <p className="text-center text-xl font-semibold text-text-primary">
-                {normalizeStatus(selectedTx.status) === 'completed'
+                {modalState === 'completed'
                   ? 'Transaction Successful'
-                  : normalizeStatus(selectedTx.status) === 'failed'
+                  : modalState === 'failed'
                     ? 'Transaction Failed'
-                    : 'Transaction Processing'}
+                    : 'Transaction Pending'}
               </p>
             </div>
 

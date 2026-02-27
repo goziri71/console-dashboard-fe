@@ -155,9 +155,9 @@ export default function MerchantDetailsPage() {
         getMerchantWallets(accountKey, { page: 1, limit: 6 }),
         getMerchantCustomers(accountKey, { page: 1, limit: 8 }),
         getMerchantLedgers(accountKey, { page: 1, limit: 6 }),
-        getDepositTransactions({ page: 1, limit: 20 }),
-        getWithdrawalTransactions({ page: 1, limit: 20 }),
-        getTransferTransactions({ page: 1, limit: 20 }),
+        getDepositTransactions({ page: 1, limit: 10, account_key: accountKey }),
+        getWithdrawalTransactions({ page: 1, limit: 10, account_key: accountKey }),
+        getTransferTransactions({ page: 1, limit: 10, account_key: accountKey }),
       ])
 
       if (mRes.status === 'fulfilled') setMerchant(mRes.value.data)
@@ -182,11 +182,10 @@ export default function MerchantDetailsPage() {
         ...mapTransactions(withdrawals, 'WITHDRAWAL'),
         ...mapTransactions(transfers, 'TRANSFER'),
       ]
-        .filter((tx) => tx.accountKey === accountKey)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5)
-
+        .slice(0, 10)
       setTxRows(merged)
+
     } finally {
       setLoading(false)
     }
@@ -262,9 +261,8 @@ export default function MerchantDetailsPage() {
     )
   }
 
-  const recentTxRows = txRows
-
   const disputes = buildDisputes(customers)
+  const recentTxRows = txRows
   const primaryContact = customers[0]
   const activityRows = [
     ...wallets.slice(0, 2).map((w) => ({
@@ -463,7 +461,7 @@ export default function MerchantDetailsPage() {
           </Card>
 
           <Card title="Activity Feed">
-            <div className="space-y-1 p-4">
+            <div className="max-h-[360px] space-y-1 overflow-y-auto p-4">
               {activityRows.length > 0 ? (
                 activityRows.map((a, idx) => {
                   const Icon = a.icon
@@ -491,10 +489,52 @@ export default function MerchantDetailsPage() {
 
         <div className="space-y-6">
           <Card
+            title="Merchant Customers"
+            action={<button className="text-sm text-accent hover:underline">View All</button>}
+          >
+            <div className="max-h-[360px] overflow-y-auto p-4">
+              <div className="overflow-hidden rounded-2xl border border-border/70">
+                <table className="w-full text-left">
+                  <thead className="bg-card-hover">
+                    <tr className="text-sm text-text-muted">
+                      <th className="px-4 py-3 font-normal">Name</th>
+                      <th className="px-4 py-3 font-normal">Email</th>
+                      <th className="px-4 py-3 font-normal">Phone</th>
+                      <th className="px-4 py-3 font-normal">KYC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers.length > 0 ? (
+                      customers.slice(0, 8).map((customer, idx) => (
+                        <tr key={customer.id || idx} className="border-t border-border/60 text-sm">
+                          <td className="px-4 py-2.5 text-text-secondary">
+                            {[customer.first_name, customer.surname].filter(Boolean).join(' ') || '--'}
+                          </td>
+                          <td className="px-4 py-2.5 text-text-secondary">{customer.email_address || '--'}</td>
+                          <td className="px-4 py-2.5 text-text-secondary">{customer.phone_number || '--'}</td>
+                          <td className="px-4 py-2.5">
+                            {dotBadge(customer.kyc_status ? 'verified' : 'inactive', customer.kyc_status ? 'Verified' : 'Pending')}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-border/60">
+                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-text-muted">
+                          No customers found for this merchant.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Card>
+
+          <Card
             title="Recent Transactions"
             action={<button className="text-sm text-accent hover:underline">View All</button>}
           >
-            <div className="p-4">
+            <div className="max-h-[360px] overflow-y-auto p-4">
               <div className="overflow-hidden rounded-2xl border border-border/70">
                 <table className="w-full text-left">
                   <thead className="bg-card-hover">
@@ -547,7 +587,7 @@ export default function MerchantDetailsPage() {
               </div>
             )}
           >
-            <div className="space-y-1 p-4">
+            <div className="max-h-[360px] space-y-1 overflow-y-auto p-4">
               {disputes.map((d) => (
                 <div key={d.id} className="flex items-start gap-3 rounded-xl px-1 py-2">
                   <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#fffaeb] text-[#f79009]">
@@ -563,32 +603,6 @@ export default function MerchantDetailsPage() {
             </div>
           </Card>
 
-          <Card title="Notes" compact>
-            <p className="border-b border-border/60 px-4 py-3 text-xs text-text-muted">
-              All actions performed on this profile are logged and auditable for compliance purposes.
-            </p>
-            <div className="space-y-1 px-4 py-2">
-              {[
-                ['Transaction Review', `Compliance check performed on transaction ID #${merchant?.account_key?.slice(0, 5) || '12345'} for unusual activity.`, 'View Details'],
-                ['User Verification', 'Verified identity for merchant profile through KYC process.', 'View Verification'],
-                ['Transaction Review', 'Compliance check performed on transaction ID #12345 for unusual activity.', 'View Details'],
-              ].map(([title, text, cta], idx) => (
-                <div key={idx} className="py-3">
-                  <div className="mb-1 flex items-start justify-between gap-3">
-                    <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-text-primary">{title}</p>
-                    <button className="shrink-0 text-xs text-text-secondary underline hover:text-accent">{cta}</button>
-                  </div>
-                  <p className="text-sm text-text-muted">{text}</p>
-                  <p className="mt-2 text-xs text-text-muted">{idx === 0 ? timeAgo(merchant?.date_modified || merchant?.date_created) : '5 mins ago'}</p>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-border/60 p-4 text-right">
-              <button className="rounded-full border border-border px-5 py-2 text-sm text-text-secondary hover:bg-card-hover">
-                View All Notes
-              </button>
-            </div>
-          </Card>
         </div>
       </div>
     </div>
