@@ -10,6 +10,11 @@ export async function getCustomers(params = {}) {
   return data
 }
 
+export async function getCustomer(identifier) {
+  const { data } = await api.get(`/customers/${identifier}`)
+  return data
+}
+
 export async function getCustomerWallets(identifier, params = {}) {
   const { data } = await api.get(`/customers/${identifier}/wallets`, { params })
   return data

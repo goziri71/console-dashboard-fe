@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Building2,
@@ -123,6 +123,7 @@ function buildDisputes(customers) {
 
 export default function MerchantDetailsPage() {
   const { accountKey } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
 
   const canMutate = CAN_MUTATE.includes(user?.role)
@@ -280,6 +281,9 @@ export default function MerchantDetailsPage() {
       iconCls: 'bg-[#eff4ff] text-[#2970ff]',
     })),
   ].slice(0, 6)
+
+  const getCustomerIdentifier = (customer) =>
+    customer?.identifier || customer?.customer_identifier || customer?.customer_key || customer?.account_key || customer?.id
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -506,7 +510,15 @@ export default function MerchantDetailsPage() {
                   <tbody>
                     {customers.length > 0 ? (
                       customers.slice(0, 8).map((customer, idx) => (
-                        <tr key={customer.id || idx} className="border-t border-border/60 text-sm">
+                        <tr
+                          key={customer.id || idx}
+                          className="cursor-pointer border-t border-border/60 text-sm hover:bg-card-hover/30"
+                          onClick={() => {
+                            const identifier = getCustomerIdentifier(customer)
+                            if (!identifier) return
+                            navigate(`/merchants/${accountKey}/customers/${encodeURIComponent(String(identifier))}`)
+                          }}
+                        >
                           <td className="px-4 py-2.5 text-text-secondary">
                             {[customer.first_name, customer.surname].filter(Boolean).join(' ') || '--'}
                           </td>
