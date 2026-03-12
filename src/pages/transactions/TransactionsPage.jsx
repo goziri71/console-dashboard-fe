@@ -108,7 +108,6 @@ export default function TransactionsPage() {
   const [selectedTx, setSelectedTx] = useState(null)
 
   const abortRef = useRef(null)
-  const inFlightKeyRef = useRef('')
 
   const selectedTab = useMemo(
     () => TAB_ITEMS.find((item) => item.key === activeTab) || TAB_ITEMS[0],
@@ -131,11 +130,6 @@ export default function TransactionsPage() {
     if (query.search) params.search = query.search
     if (query.status) params.status = query.status
     if (query.currency_code) params.currency_code = query.currency_code
-
-    const queryKey = JSON.stringify({ activeTab, ...params })
-    if (queryKey === inFlightKeyRef.current) return
-
-    inFlightKeyRef.current = queryKey
     abortRef.current?.abort?.()
     const controller = new AbortController()
     abortRef.current = controller
@@ -162,7 +156,6 @@ export default function TransactionsPage() {
       setTotal(0)
       setTotalPages(1)
     } finally {
-      inFlightKeyRef.current = ''
       setLoading(false)
     }
   }, [activeTab, page, query, selectedTab])
