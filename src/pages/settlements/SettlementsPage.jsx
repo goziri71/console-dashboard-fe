@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownCircle,
   ArrowUpDown,
@@ -12,24 +12,10 @@ import {
   XCircle,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
-import { cn, formatNumber } from '../../lib/utils'
+import { cn, formatBalance } from '../../lib/utils'
+import { getSettlementBatches, getSettlementSummary } from '../../services/settlements'
 
 const TABLE_LIMIT = 10
-
-const MOCK_ROWS = [
-  { id: 'FY-PLM8912KTB3245D', type: 'External Audit Review', gross: 150250, fees: 45.3, net: 150250, status: 'processing', date: '2024-10-03' },
-  { id: 'XZ-MNB4567JKGH2189F', type: 'Quarterly Tax Assessment', gross: 500000, fees: 80.9, net: 500000, status: 'completed', date: '2024-10-04' },
-  { id: 'QP-TRD998KJGH4561A', type: 'Year-End Financial Review', gross: 750500, fees: 90.25, net: 750500, status: 'pending', date: '2024-10-05' },
-  { id: 'DL-OPQ1234TYX6780Q', type: 'Client Payment Reconciliation', gross: 200000, fees: 50, net: 200000, status: 'completed', date: '2024-10-06' },
-  { id: 'AB-RFT2345GHIJ9087M', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-  { id: 'MN-VBX4567CDFG1234Z', type: 'Vendor Payment Verification', gross: 120000, fees: 25.5, net: 120000, status: 'failed', date: '2024-10-08' },
-  { id: 'AB-RFT2345GHIJ9087N', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-  { id: 'AB-RFT2345GHIJ9087P', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-  { id: 'AB-RFT2345GHIJ9087Q', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-  { id: 'AB-RFT2345GHIJ9087R', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-  { id: 'AB-RFT2345GHIJ9087S', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-  { id: 'AB-RFT2345GHIJ9087T', type: 'Budget Allocation Review', gross: 300000, fees: 75, net: 300000, status: 'completed', date: '2024-10-07' },
-]
 
 function statusBadge(status) {
   if (status === 'completed') return 'bg-success-bg text-success'
@@ -38,8 +24,34 @@ function statusBadge(status) {
   return 'bg-warning-bg text-warning'
 }
 
-function currency(value) {
-  return `₦ ${formatNumber(Number(value || 0).toFixed(2))}`
+function currency(value, currencyCode = 'NGN') {
+  return formatBalance(Number(value || 0), currencyCode)
+}
+
+function formatDate(value) {
+  if (!value) return '--'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('en-GB')
+}
+
+function normalizeSummary(payload) {
+  const summary = payload?.data || payload || {}
+  return {
+    pending_total: Number(summary.pending_total || 0),
+    processing_total: Number(summary.processing_total || 0),
+    failed_total: Number(summary.failed_total || 0),
+    settled_total: Number(summary.settled_total || 0),
+  }
+}
+
+function normalizeBatches(payload) {
+  const node = payload?.data || payload || {}
+  const records = node.records || node.batches || node.data || []
+  const pagination = node.pagination || {}
+  const total = Number(pagination.total ?? node.total ?? records.length)
+  const totalPages = Math.max(1, Number(pagination.total_pages || Math.ceil(total / TABLE_LIMIT) || 1))
+  return { records, total, totalPages }
 }
 
 function StatCard({ label, value, sub, icon: Icon, iconCls }) {
@@ -63,7 +75,7 @@ export default function SettlementsPage() {
   const [showFilter, setShowFilter] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [settlementType, setSettlementType] = useState('')
+  const [accountKey, setAccountKey] = useState('')
   const [currencyCode, setCurrencyCode] = useState('')
   const [statusFilters, setStatusFilters] = useState({
     completed: false,
@@ -71,33 +83,73 @@ export default function SettlementsPage() {
     pending: false,
     failed: false,
   })
+  const [summary, setSummary] = useState({
+    pending_total: 0,
+    processing_total: 0,
+    failed_total: 0,
+    settled_total: 0,
+  })
+  const [rows, setRows] = useState([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return MOCK_ROWS.filter((row) => {
-      const matchesSearch = !q || row.id.toLowerCase().includes(q) || row.type.toLowerCase().includes(q)
-      const matchesType = !settlementType || row.type === settlementType
-      const matchesCurrency = !currencyCode || currencyCode === 'NGN'
-      const activeStatuses = Object.entries(statusFilters).filter(([, v]) => v).map(([k]) => k)
-      const matchesStatus = activeStatuses.length === 0 || activeStatuses.includes(row.status)
-      const afterFrom = !fromDate || row.date >= fromDate
-      const beforeTo = !toDate || row.date <= toDate
-      return matchesSearch && matchesType && matchesCurrency && matchesStatus && afterFrom && beforeTo
-    })
-  }, [search, settlementType, currencyCode, statusFilters, fromDate, toDate])
+  const activeStatuses = useMemo(() => {
+    return Object.entries(statusFilters)
+      .filter(([, enabled]) => enabled)
+      .map(([status]) => status)
+  }, [statusFilters])
 
-  const total = filtered.length
-  const totalPages = Math.max(1, Math.ceil(total / TABLE_LIMIT))
-  const start = (page - 1) * TABLE_LIMIT
-  const rows = filtered.slice(start, start + TABLE_LIMIT)
-
-  const stats = useMemo(() => {
-    const processing = MOCK_ROWS.filter((x) => x.status === 'processing').reduce((sum, x) => sum + x.net, 0)
-    const pending = MOCK_ROWS.filter((x) => x.status === 'pending').reduce((sum, x) => sum + x.net, 0)
-    const failed = MOCK_ROWS.filter((x) => x.status === 'failed').reduce((sum, x) => sum + x.net, 0)
-    const settled = MOCK_ROWS.filter((x) => x.status === 'completed').reduce((sum, x) => sum + x.net, 0)
-    return { processing, pending, failed, settled }
+  useEffect(() => {
+    let active = true
+    getSettlementSummary()
+      .then((res) => {
+        if (!active) return
+        setSummary(normalizeSummary(res))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
   }, [])
+
+  const fetchBatches = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const params = {
+        page,
+        limit: TABLE_LIMIT,
+        search: search.trim(),
+        status: activeStatuses.join(','),
+        account_key: accountKey.trim(),
+        currency_code: currencyCode,
+        from_date: fromDate,
+        to_date: toDate,
+      }
+      const res = await getSettlementBatches(params)
+      const normalized = normalizeBatches(res)
+      setRows(normalized.records)
+      setTotal(normalized.total)
+      setTotalPages(normalized.totalPages)
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to load settlement batches.')
+      setRows([])
+      setTotal(0)
+      setTotalPages(1)
+    } finally {
+      setLoading(false)
+    }
+  }, [page, search, activeStatuses, accountKey, currencyCode, fromDate, toDate])
+
+  useEffect(() => {
+    fetchBatches()
+  }, [fetchBatches])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, accountKey, currencyCode, fromDate, toDate, activeStatuses])
 
   return (
     <div>
@@ -117,28 +169,28 @@ export default function SettlementsPage() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <StatCard
           label="Pending Settlements"
-          value={currency(stats.pending)}
+          value={currency(summary.pending_total)}
           sub="Total value awaiting approval"
           icon={ArrowUpDown}
           iconCls="bg-warning-bg text-warning"
         />
         <StatCard
           label="Processing Settlements"
-          value={currency(stats.processing)}
+          value={currency(summary.processing_total)}
           sub="Batches currently sent to bank or partner"
           icon={RefreshCw}
           iconCls="bg-[#072a66] text-[#2970ff]"
         />
         <StatCard
           label="Failed Settlements"
-          value={currency(stats.failed)}
+          value={currency(summary.failed_total)}
           sub="Total batches requiring intervention"
           icon={XCircle}
           iconCls="bg-error-bg text-error"
         />
         <StatCard
           label="Settled"
-          value={currency(stats.settled)}
+          value={currency(summary.settled_total)}
           sub="Total value successfully disbursed"
           icon={CheckCircle2}
           iconCls="bg-success-bg text-success"
@@ -153,7 +205,7 @@ export default function SettlementsPage() {
             <input
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Search wallets..."
+              placeholder="Search by batch ID..."
               className="h-10 w-full rounded-xl border border-border bg-page pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/40"
             />
           </div>
@@ -187,23 +239,37 @@ export default function SettlementsPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length > 0 ? (
+              {loading ? (
+                [...Array(TABLE_LIMIT)].map((_, idx) => (
+                  <tr key={idx} className="border-t border-border/60">
+                    <td colSpan={9} className="px-4 py-2.5">
+                      <div className="h-8 w-full animate-pulse rounded-md bg-card-hover" />
+                    </td>
+                  </tr>
+                ))
+              ) : error ? (
+                <tr className="border-t border-border/60">
+                  <td colSpan={9} className="px-4 py-8 text-center text-sm text-error">
+                    {error}
+                  </td>
+                </tr>
+              ) : rows.length > 0 ? (
                 rows.map((row, idx) => (
-                  <tr key={`${row.id}-${idx}`} className="border-t border-border/60">
+                  <tr key={`${row.batch_id || idx}-${idx}`} className="border-t border-border/60">
                     <td className="px-3 py-2.5">
                       <div className="h-4 w-2.5 rounded-full bg-[#b7e07a]" />
                     </td>
-                    <td className="px-3 py-2.5 text-text-secondary">{row.id}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{row.type}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.gross)}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.fees)}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.net)}</td>
+                    <td className="px-3 py-2.5 text-text-secondary">{row.batch_id || '--'}</td>
+                    <td className="px-3 py-2.5 text-text-secondary">{row.settlement_type || '--'}</td>
+                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.gross_amount, row.currency_code)}</td>
+                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.fees_deducted, row.currency_code)}</td>
+                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.net_payable, row.currency_code)}</td>
                     <td className="px-3 py-2.5">
-                      <span className={cn('inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium', statusBadge(row.status))}>
-                        {row.status[0].toUpperCase() + row.status.slice(1)}
+                      <span className={cn('inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium', statusBadge(row.status || 'pending'))}>
+                        {(row.status || 'pending').replace(/^./, (ch) => ch.toUpperCase())}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-text-secondary">{row.date}</td>
+                    <td className="px-3 py-2.5 text-text-secondary">{formatDate(row.date_created)}</td>
                     <td className="px-3 py-2.5 text-right">
                       <button className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary">
                         <MoreVertical size={14} />
@@ -267,17 +333,14 @@ export default function SettlementsPage() {
               </div>
 
               <label className="block text-xs text-text-muted">
-                Settlement Type
-                <select
-                  value={settlementType}
-                  onChange={(e) => setSettlementType(e.target.value)}
+                Account Key
+                <input
+                  type="text"
+                  value={accountKey}
+                  onChange={(e) => setAccountKey(e.target.value)}
+                  placeholder="Filter by account key..."
                   className="mt-1 h-10 w-full rounded-xl border border-border bg-page px-3 text-sm text-text-secondary outline-none"
-                >
-                  <option value="">All Settlement Types</option>
-                  {[...new Set(MOCK_ROWS.map((row) => row.type))].map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
+                />
               </label>
 
               <label className="block text-xs text-text-muted">
@@ -319,7 +382,7 @@ export default function SettlementsPage() {
                 onClick={() => {
                   setFromDate('')
                   setToDate('')
-                  setSettlementType('')
+                  setAccountKey('')
                   setCurrencyCode('')
                   setStatusFilters({ completed: false, processing: false, pending: false, failed: false })
                   setPage(1)
