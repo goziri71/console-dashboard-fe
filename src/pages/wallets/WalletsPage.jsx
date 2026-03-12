@@ -31,7 +31,6 @@ export default function WalletsPage() {
   const [page, setPage] = useState(1)
 
   const abortRef = useRef(null)
-  const inFlightKeyRef = useRef('')
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -49,11 +48,6 @@ export default function WalletsPage() {
     if (debouncedQuery.search) params.search = debouncedQuery.search
     if (debouncedQuery.status) params.status = debouncedQuery.status
     if (debouncedQuery.currency_code) params.currency_code = debouncedQuery.currency_code
-
-    const queryKey = JSON.stringify(params)
-    if (queryKey === inFlightKeyRef.current) return
-
-    inFlightKeyRef.current = queryKey
     abortRef.current?.abort?.()
     const controller = new AbortController()
     abortRef.current = controller
@@ -79,7 +73,6 @@ export default function WalletsPage() {
       setTotal(0)
       setTotalPages(1)
     } finally {
-      inFlightKeyRef.current = ''
       setLoading(false)
     }
   }, [debouncedQuery, page])
