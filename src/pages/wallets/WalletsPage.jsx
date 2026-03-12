@@ -190,7 +190,7 @@ export default function WalletsPage() {
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Currency</th>
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Status</th>
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Date Created</th>
-                  <th className="px-4 py-3 text-xs font-medium text-text-muted">Last Activity</th>
+                  <th className="px-4 py-3 text-xs font-medium text-text-muted">Environment</th>
                   <th className="px-4 py-3 text-xs font-medium text-text-muted text-right">Actions</th>
                 </tr>
               </thead>
@@ -222,7 +222,7 @@ export default function WalletsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-text-secondary">{row.date_created ? row.date_created.slice(0, 10) : '--'}</td>
-                      <td className="px-4 py-2.5 text-text-secondary">{row.last_activity_at ? timeAgo(row.last_activity_at) : '--'}</td>
+                      <td className="px-4 py-2.5 text-text-secondary">{row.environment || '--'}</td>
                       <td className="px-4 py-2.5 text-right">
                         <button className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary">
                           <MoreVertical size={14} />
