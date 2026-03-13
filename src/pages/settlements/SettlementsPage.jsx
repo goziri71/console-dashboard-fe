@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownCircle,
   ArrowUpDown,
@@ -16,6 +16,12 @@ import { cn, formatBalance } from '../../lib/utils'
 import { getSettlementBatches, getSettlementSummary } from '../../services/settlements'
 
 const TABLE_LIMIT = 10
+const DEFAULT_SETTLEMENT_TYPES = [
+  'Partner Settlement',
+  'Bank Settlement',
+  'Internal Ledger Settlement',
+  'Escrow Release',
+]
 
 function statusBadge(status) {
   if (status === 'completed') return 'bg-success-bg text-success'
@@ -75,8 +81,11 @@ export default function SettlementsPage() {
   const [showFilter, setShowFilter] = useState(false)
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [accountKey, setAccountKey] = useState('')
+  const [settlementType, setSettlementType] = useState('')
+  const [showSettlementTypeMenu, setShowSettlementTypeMenu] = useState(false)
   const [currencyCode, setCurrencyCode] = useState('')
+  const [showCurrencyMenu, setShowCurrencyMenu] = useState(false)
+  const [currencySearch, setCurrencySearch] = useState('')
   const [statusFilters, setStatusFilters] = useState({
     completed: false,
     processing: false,
@@ -94,6 +103,8 @@ export default function SettlementsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const settlementTypeRef = useRef(null)
+  const currencyRef = useRef(null)
 
   const activeStatuses = useMemo(() => {
     return Object.entries(statusFilters)
@@ -123,11 +134,11 @@ export default function SettlementsPage() {
         limit: TABLE_LIMIT,
         search: search.trim(),
         status: activeStatuses.join(','),
-        account_key: accountKey.trim(),
         currency_code: currencyCode,
         from_date: fromDate,
         to_date: toDate,
       }
+      if (settlementType) params.settlement_type = settlementType
       const res = await getSettlementBatches(params)
       const normalized = normalizeBatches(res)
       setRows(normalized.records)
@@ -141,7 +152,7 @@ export default function SettlementsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, search, activeStatuses, accountKey, currencyCode, fromDate, toDate])
+  }, [page, search, activeStatuses, currencyCode, fromDate, toDate, settlementType])
 
   useEffect(() => {
     fetchBatches()
@@ -149,7 +160,53 @@ export default function SettlementsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, accountKey, currencyCode, fromDate, toDate, activeStatuses])
+  }, [search, settlementType, currencyCode, fromDate, toDate, activeStatuses])
+
+  useEffect(() => {
+    if (!showSettlementTypeMenu) return
+    const handleOutside = (event) => {
+      if (!settlementTypeRef.current?.contains(event.target)) {
+        setShowSettlementTypeMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+    }
+  }, [showSettlementTypeMenu])
+
+  useEffect(() => {
+    if (!showCurrencyMenu) return
+    const handleOutside = (event) => {
+      if (!currencyRef.current?.contains(event.target)) {
+        setShowCurrencyMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+    }
+  }, [showCurrencyMenu])
+
+  useEffect(() => {
+    if (!showFilter) {
+      setShowSettlementTypeMenu(false)
+      setShowCurrencyMenu(false)
+    }
+  }, [showFilter])
+
+  const settlementTypeOptions = useMemo(() => {
+    const dynamicTypes = rows.map((row) => row.settlement_type).filter(Boolean)
+    return [...new Set([...DEFAULT_SETTLEMENT_TYPES, ...dynamicTypes])]
+  }, [rows])
+
+  const currencyOptions = useMemo(() => ['NGN', 'USD'], [])
+
+  const filteredCurrencyOptions = useMemo(() => {
+    const q = currencySearch.trim().toUpperCase()
+    if (!q) return currencyOptions
+    return currencyOptions.filter((code) => code.includes(q))
+  }, [currencyOptions, currencySearch])
 
   return (
     <div>
@@ -299,103 +356,202 @@ export default function SettlementsPage() {
 
       {showFilter && (
         <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm">
-          <div className="absolute left-1/2 top-1/2 w-[380px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
-              <h3 className="text-base text-text-primary">Filters</h3>
+          <div className="absolute left-1/2 top-1/2 w-[384px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border/50 px-4 py-3.5">
+              <h3 className="text-sm font-medium text-text-secondary">Filters</h3>
               <button
                 onClick={() => setShowFilter(false)}
                 className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
               >
-                <X size={18} />
+                <X size={13} />
               </button>
             </div>
 
             <div className="space-y-4 p-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <label className="text-xs text-text-muted">
-                  From Date
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-border bg-page px-3 text-sm text-text-secondary outline-none"
-                  />
+                  From
+                  <div className="relative mt-1">
+                    <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type={fromDate ? 'date' : 'text'}
+                      value={fromDate}
+                      onFocus={(e) => { e.target.type = 'date' }}
+                      onBlur={(e) => { if (!e.target.value) e.target.type = 'text' }}
+                      placeholder="Select date"
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-border/60 bg-page px-3 pr-9 text-sm text-text-secondary outline-none placeholder:text-text-muted"
+                    />
+                  </div>
                 </label>
                 <label className="text-xs text-text-muted">
-                  To Date
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-border bg-page px-3 text-sm text-text-secondary outline-none"
-                  />
+                  To
+                  <div className="relative mt-1">
+                    <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input
+                      type={toDate ? 'date' : 'text'}
+                      value={toDate}
+                      onFocus={(e) => { e.target.type = 'date' }}
+                      onBlur={(e) => { if (!e.target.value) e.target.type = 'text' }}
+                      placeholder="Select date"
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-border/60 bg-page px-3 pr-9 text-sm text-text-secondary outline-none placeholder:text-text-muted"
+                    />
+                  </div>
                 </label>
               </div>
 
               <label className="block text-xs text-text-muted">
-                Account Key
-                <input
-                  type="text"
-                  value={accountKey}
-                  onChange={(e) => setAccountKey(e.target.value)}
-                  placeholder="Filter by account key..."
-                  className="mt-1 h-10 w-full rounded-xl border border-border bg-page px-3 text-sm text-text-secondary outline-none"
-                />
+                Settlement Type
+                <div ref={settlementTypeRef} className="relative mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowSettlementTypeMenu((prev) => !prev)}
+                    className="flex h-11 w-full items-center justify-between rounded-xl border border-border/60 bg-page px-3 text-left text-sm text-text-secondary"
+                  >
+                    <span className={cn(!settlementType && 'text-text-muted')}>
+                      {settlementType || 'Select settlement type'}
+                    </span>
+                    <ChevronDown size={14} className={cn('text-text-muted transition-transform', showSettlementTypeMenu && 'rotate-180')} />
+                  </button>
+                  {showSettlementTypeMenu && (
+                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 max-h-44 overflow-y-auto rounded-xl border border-border/60 bg-card p-1 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSettlementType('')
+                          setShowSettlementTypeMenu(false)
+                        }}
+                        className={cn(
+                          'w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-card-hover',
+                          settlementType === '' ? 'bg-card-hover text-text-primary' : 'text-text-secondary'
+                        )}
+                      >
+                        Select settlement type
+                      </button>
+                      {settlementTypeOptions.map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setSettlementType(type)
+                            setShowSettlementTypeMenu(false)
+                          }}
+                          className={cn(
+                            'w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-card-hover',
+                            settlementType === type ? 'bg-card-hover text-text-primary' : 'text-text-secondary'
+                          )}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </label>
 
               <label className="block text-xs text-text-muted">
                 Currency
-                <select
-                  value={currencyCode}
-                  onChange={(e) => setCurrencyCode(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-border bg-page px-3 text-sm text-text-secondary outline-none"
-                >
-                  <option value="">All Currencies</option>
-                  <option value="NGN">NGN</option>
-                </select>
+                <div ref={currencyRef} className="relative mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrencyMenu((prev) => !prev)}
+                    className="flex h-11 w-full items-center justify-between rounded-xl border border-border/60 bg-page px-3 text-left text-sm text-text-secondary"
+                  >
+                    <span className={cn(!currencyCode && 'text-text-muted')}>
+                      {currencyCode || 'Select currency'}
+                    </span>
+                    <ChevronDown size={14} className={cn('text-text-muted transition-transform', showCurrencyMenu && 'rotate-180')} />
+                  </button>
+                  {showCurrencyMenu && (
+                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-border/60 bg-card p-1 shadow-xl">
+                      <div className="px-1 pb-1">
+                        <input
+                          value={currencySearch}
+                          onChange={(e) => setCurrencySearch(e.target.value)}
+                          placeholder="Search currency"
+                          className="h-9 w-full rounded-lg border border-border/60 bg-page px-3 text-sm text-text-secondary outline-none placeholder:text-text-muted"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrencyCode('')
+                          setShowCurrencyMenu(false)
+                        }}
+                        className={cn(
+                          'w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-card-hover',
+                          currencyCode === '' ? 'bg-card-hover text-text-primary' : 'text-text-secondary'
+                        )}
+                      >
+                        Select currency
+                      </button>
+                      {filteredCurrencyOptions.map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => {
+                            setCurrencyCode(code)
+                            setShowCurrencyMenu(false)
+                          }}
+                          className={cn(
+                            'w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-card-hover',
+                            currencyCode === code ? 'bg-card-hover text-text-primary' : 'text-text-secondary'
+                          )}
+                        >
+                          {code}
+                        </button>
+                      ))}
+                      {filteredCurrencyOptions.length === 0 && (
+                        <p className="px-3 py-2 text-sm text-text-muted">No currency found</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </label>
 
-              <div>
-                <p className="mb-2 text-xs text-text-muted">Status</p>
-                <div className="grid grid-cols-2 gap-2 text-sm text-text-secondary">
-                  {[
-                    ['completed', 'Completed'],
-                    ['processing', 'Processing'],
-                    ['pending', 'Pending'],
-                    ['failed', 'Failed'],
-                  ].map(([key, label]) => (
-                    <label key={key} className="inline-flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={statusFilters[key]}
-                        onChange={(e) => setStatusFilters((prev) => ({ ...prev, [key]: e.target.checked }))}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
+              <div className="grid grid-cols-2 gap-2 text-sm text-text-secondary">
+                {[
+                  ['completed', 'Completed'],
+                  ['processing', 'Processing'],
+                  ['pending', 'Pending'],
+                  ['failed', 'Failed'],
+                ].map(([key, label]) => (
+                  <label key={key} className="inline-flex h-10 items-center gap-2 rounded-full border border-border/60 px-3">
+                    <input
+                      type="checkbox"
+                      checked={statusFilters[key]}
+                      onChange={(e) => setStatusFilters((prev) => ({ ...prev, [key]: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border bg-transparent"
+                    />
+                    <span className="text-[13px] font-normal text-text-muted">{label}</span>
+                  </label>
+                ))}
               </div>
             </div>
 
-            <div className="flex items-center gap-3 border-t border-border/70 p-4">
+            <div className="flex items-center gap-3 border-t border-border/50 p-4">
               <button
                 onClick={() => {
                   setFromDate('')
                   setToDate('')
-                  setAccountKey('')
+                  setSettlementType('')
+                  setShowSettlementTypeMenu(false)
                   setCurrencyCode('')
+                  setCurrencySearch('')
+                  setShowCurrencyMenu(false)
                   setStatusFilters({ completed: false, processing: false, pending: false, failed: false })
                   setPage(1)
                 }}
-                className="h-11 flex-1 rounded-xl border border-border text-sm text-text-secondary hover:bg-card-hover"
+                className="h-10 flex-1 rounded-full border border-border/60 text-sm text-text-muted hover:bg-card-hover"
               >
-                Clear All
+                Clear Filters
               </button>
               <button
                 onClick={() => { setPage(1); setShowFilter(false) }}
-                className="h-11 flex-1 rounded-xl bg-accent text-sm font-medium text-black hover:bg-accent/90"
+                className="h-10 flex-1 rounded-full bg-accent text-sm font-medium text-black shadow-[0_0_0_1px_rgba(187,212,47,0.45)] hover:bg-accent/90"
               >
-                Apply Filter
+                Apply Filters
               </button>
             </div>
           </div>
