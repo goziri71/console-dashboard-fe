@@ -4,6 +4,7 @@ import {
   ArrowUpDown,
   CheckCircle2,
   ChevronDown,
+  Copy,
   MoreVertical,
   RefreshCw,
   Search,
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
 import { cn, formatBalance } from '../../lib/utils'
-import { getSettlementBatches, getSettlementSummary } from '../../services/settlements'
+import { getSettlementBatch, getSettlementBatches, getSettlementSummary } from '../../services/settlements'
 
 const TABLE_LIMIT = 10
 const DEFAULT_SETTLEMENT_TYPES = [
@@ -60,6 +61,30 @@ function normalizeBatches(payload) {
   return { records, total, totalPages }
 }
 
+function getByPath(obj, path) {
+  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj)
+}
+
+function pickFirst(obj, paths, fallback = '--') {
+  for (const path of paths) {
+    const value = getByPath(obj, path)
+    if (value !== undefined && value !== null && value !== '') return value
+  }
+  return fallback
+}
+
+function formatDateTime(value) {
+  if (!value) return '--'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return `${date.toLocaleDateString('en-GB')} | ${date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })}`
+}
+
 function StatCard({ label, value, sub, icon: Icon, iconCls }) {
   return (
     <div className="rounded-card border border-border/70 bg-card p-4">
@@ -103,6 +128,9 @@ export default function SettlementsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedBatch, setSelectedBatch] = useState(null)
+  const [selectedBatchDetails, setSelectedBatchDetails] = useState(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
   const settlementTypeRef = useRef(null)
   const currencyRef = useRef(null)
 
@@ -207,6 +235,32 @@ export default function SettlementsPage() {
     if (!q) return currencyOptions
     return currencyOptions.filter((code) => code.includes(q))
   }, [currencyOptions, currencySearch])
+
+  const selectedNode = selectedBatchDetails || selectedBatch
+  const selectedStatus = String(pickFirst(selectedNode, ['status'], 'pending')).toLowerCase()
+  const selectedCurrency = pickFirst(selectedNode, ['currency_code'], 'NGN')
+  const selectedAmount = pickFirst(selectedNode, ['net_payable', 'amount'], 0)
+  const selectedCreated = pickFirst(selectedNode, ['date_created', 'created_at'], '')
+  const referenceCode = pickFirst(selectedNode, ['batch_id', 'reference', 'external_reference_code'], '--')
+
+  async function openBatchDetails(row) {
+    setSelectedBatch(row)
+    setSelectedBatchDetails(null)
+    setDetailsLoading(true)
+    try {
+      const res = await getSettlementBatch(row.batch_id)
+      setSelectedBatchDetails(res?.data || res)
+    } catch {
+      setSelectedBatchDetails(null)
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  function copyToClipboard(value) {
+    if (!value || value === '--') return
+    navigator.clipboard?.writeText(String(value)).catch(() => {})
+  }
 
   return (
     <div>
@@ -328,7 +382,10 @@ export default function SettlementsPage() {
                     </td>
                     <td className="px-3 py-2.5 text-text-secondary">{formatDate(row.date_created)}</td>
                     <td className="px-3 py-2.5 text-right">
-                      <button className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary">
+                      <button
+                        onClick={() => openBatchDetails(row)}
+                        className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
+                      >
                         <MoreVertical size={14} />
                       </button>
                     </td>
@@ -555,6 +612,111 @@ export default function SettlementsPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {selectedBatch && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+          <aside className="absolute right-4 top-4 h-[calc(100%-32px)] w-full max-w-[420px] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl">
+            <div className="border-b border-border/60 px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-[#0a0a0a]">
+                  <span className="text-base leading-none">🧾</span>
+                </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <p className="truncate text-sm font-semibold text-text-primary">{pickFirst(selectedNode, ['batch_id'], '--')}</p>
+                  <p className={cn(
+                    'mt-0.5 text-[11px] font-medium uppercase tracking-wide',
+                    selectedStatus.includes('completed') ? 'text-success' : selectedStatus.includes('failed') ? 'text-error' : 'text-warning'
+                  )}>
+                    {selectedStatus}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedBatch(null)
+                    setSelectedBatchDetails(null)
+                  }}
+                  className="shrink-0 rounded-full p-1 text-text-muted hover:bg-card-hover"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="h-[calc(100%-72px)] overflow-y-auto p-4">
+              <div className="mb-4 text-center">
+                <p className="text-xs text-text-muted">Amount</p>
+                <p className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-text-primary">{currency(selectedAmount, selectedCurrency)}</p>
+                <p className="mt-1.5 text-xs text-text-muted">{formatDateTime(selectedCreated)}</p>
+              </div>
+
+              {detailsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, idx) => (
+                    <div key={idx} className="h-28 animate-pulse rounded-xl border border-border/60 bg-card-hover/40" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
+                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">Batch Summary</div>
+                    {[
+                      ['Batch ID', referenceCode, true],
+                      ['Settlement Type', pickFirst(selectedNode, ['settlement_type'], '--')],
+                      ['Currency', pickFirst(selectedNode, ['currency_name', 'currency', 'currency_code'], selectedCurrency)],
+                      ['Created At', formatDateTime(pickFirst(selectedNode, ['date_created', 'created_at'], ''))],
+                      ['Approved At', formatDateTime(pickFirst(selectedNode, ['date_approved', 'approved_at'], ''))],
+                      ['Charge', currency(pickFirst(selectedNode, ['charges', 'charge', 'fees_deducted'], 0), selectedCurrency)],
+                      ['VAT', currency(pickFirst(selectedNode, ['vat', 'tax_amount'], 0), selectedCurrency)],
+                    ].map(([label, value, allowCopy], idx) => (
+                      <div key={label} className={cn('flex items-center gap-2 px-4 py-2', idx < 6 && 'border-b border-border/60')}>
+                        <span className="min-w-0 flex-1 text-xs text-text-muted">{label}</span>
+                        <span className="flex max-w-[55%] items-center justify-end gap-1.5 text-right text-xs text-text-primary">
+                          <span className="truncate">{value}</span>
+                          {allowCopy && (
+                            <button type="button" onClick={() => copyToClipboard(value)} className="shrink-0 rounded-full border border-border/70 bg-[#313131] p-1">
+                              <Copy size={12} className="text-accent" />
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
+                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">Financial Breakdown</div>
+                    {[
+                      ['Total Gross Amount', currency(pickFirst(selectedNode, ['gross_amount', 'total_gross_amount'], 0), selectedCurrency)],
+                      ['Total Fees', currency(pickFirst(selectedNode, ['fees_deducted', 'total_fees'], 0), selectedCurrency)],
+                      ['Tax', currency(pickFirst(selectedNode, ['tax', 'tax_amount', 'vat'], 0), selectedCurrency)],
+                      ['Net Payable', currency(pickFirst(selectedNode, ['net_payable'], 0), selectedCurrency)],
+                    ].map(([label, value], idx) => (
+                      <div key={label} className={cn('flex items-center gap-2 px-4 py-2', idx < 3 && 'border-b border-border/60')}>
+                        <span className="min-w-0 flex-1 text-xs text-text-muted">{label}</span>
+                        <span className="max-w-[55%] truncate text-right text-xs text-text-primary">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
+                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">Destination Details</div>
+                    {[
+                      ['Partner / Merchant Name', pickFirst(selectedNode, ['partner_name', 'merchant_name', 'destination.partner_name'], '--')],
+                      ['Bank Name', pickFirst(selectedNode, ['bank_name', 'destination.bank_name'], '--')],
+                      ['Settlement Channel', pickFirst(selectedNode, ['settlement_channel', 'channel'], '--')],
+                      ['External Reference Code', pickFirst(selectedNode, ['external_reference_code', 'reference'], '--')],
+                    ].map(([label, value], idx) => (
+                      <div key={label} className={cn('flex items-center gap-2 px-4 py-2', idx < 3 && 'border-b border-border/60')}>
+                        <span className="min-w-0 flex-1 text-xs text-text-muted">{label}</span>
+                        <span className="max-w-[55%] truncate text-right text-xs text-text-primary">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       )}
     </div>
