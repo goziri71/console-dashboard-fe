@@ -48,11 +48,11 @@ export default function LoginPage() {
       </div>
 
       {/* Right Panel — Login Form */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-[#000000] px-8">
+      <div className="flex flex-1 flex-col items-center justify-center bg-[#000000] px-4 py-8 sm:px-8">
         <div className="animate-fade-in-up w-full max-w-[500px]" style={{ animationDelay: '100ms' }}>
           {/* Welcome heading */}
           <div className="mb-8 text-center">
-            <h1 className="text-[42px] font-bold leading-tight text-text-primary">
+            <h1 className="text-3xl font-bold leading-tight text-text-primary sm:text-[42px]">
               Welcome back 👋
             </h1>
             <p className="mt-3 text-base leading-relaxed text-text-secondary">

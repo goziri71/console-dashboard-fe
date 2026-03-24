@@ -108,7 +108,7 @@ export default function WalletsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-6">
         <MetricCard
           label="Total Wallets"
           value={formatNumber(stats.totalWallets)}
@@ -140,22 +140,22 @@ export default function WalletsPage() {
       </div>
 
       <div className="mt-6 rounded-card border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-4 py-4">
+        <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <h3 className="text-base font-medium text-text-primary">All Wallets</h3>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative min-w-0 flex-1 sm:min-w-[200px] sm:max-w-md">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search wallets..."
-                className="h-9 w-80 rounded-lg border border-border bg-page pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50"
+                className="h-9 w-full rounded-lg border border-border bg-page pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 rounded-lg border border-border bg-page px-3 text-sm text-text-secondary outline-none focus:border-accent/50"
+              className="h-9 w-full shrink-0 rounded-lg border border-border bg-page px-3 text-sm text-text-secondary outline-none focus:border-accent/50 sm:w-auto"
             >
               <option value="">All Status</option>
               <option value="all">All</option>
@@ -166,7 +166,7 @@ export default function WalletsPage() {
               value={currencyCode}
               onChange={(e) => setCurrencyCode(e.target.value)}
               placeholder="Currency (e.g. NGN)"
-              className="h-9 w-44 rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50"
+              className="h-9 w-full shrink-0 rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50 sm:w-44"
             />
           </div>
         </div>

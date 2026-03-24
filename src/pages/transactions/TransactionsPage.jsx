@@ -309,7 +309,7 @@ export default function TransactionsPage() {
       </div>
 
       <div className="overflow-hidden rounded-card border border-border bg-card">
-        <div className="grid grid-cols-5 border-b border-border bg-page">
+        <div className="flex overflow-x-auto border-b border-border bg-page [-ms-overflow-style:none] [scrollbar-width:none] lg:grid lg:grid-cols-5 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
           {TAB_ITEMS.map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.key
@@ -318,7 +318,8 @@ export default function TransactionsPage() {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  'flex h-[62px] items-center justify-center gap-2 border-r border-border px-4 text-sm transition-colors last:border-r-0',
+                  'flex h-[62px] min-w-[42%] shrink-0 items-center justify-center gap-2 border-r border-border px-4 text-sm transition-colors last:border-r-0 sm:min-w-[33%] md:min-w-[28%]',
+                  'lg:min-w-0',
                   active ? 'bg-card-hover text-text-primary' : 'text-text-secondary hover:bg-card-hover/60 hover:text-text-primary'
                 )}
               >
@@ -329,10 +330,10 @@ export default function TransactionsPage() {
           })}
         </div>
 
-        <div className="flex items-center gap-4 border-b border-border px-4 py-4">
-          <h3 className="flex-1 text-base text-text-primary">{selectedTab.label} Statement</h3>
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 xl:flex-row xl:items-center xl:gap-4">
+          <h3 className="min-w-0 text-base text-text-primary xl:flex-1">{selectedTab.label} Statement</h3>
 
-          <div className="relative w-[320px]">
+          <div className="relative w-full min-w-0 xl:w-[320px] xl:shrink-0">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               value={search}
@@ -342,6 +343,7 @@ export default function TransactionsPage() {
             />
           </div>
 
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
           <FilterPill
             icon={Filter}
             label="All Status"
@@ -365,6 +367,7 @@ export default function TransactionsPage() {
             Export
             <ChevronDown size={14} />
           </button>
+          </div>
         </div>
 
         {loading ? (
@@ -443,11 +446,11 @@ export default function TransactionsPage() {
       {selectedTx && (
         <div
           className={cn(
-            'fixed inset-0 z-40 flex justify-end bg-black/45 p-6 backdrop-blur-sm',
+            'fixed inset-0 z-40 flex justify-end bg-black/45 p-3 backdrop-blur-sm sm:p-6',
             modalState === 'failed' ? 'items-start' : 'items-center'
           )}
         >
-          <div className="h-[934px] max-h-[calc(100vh-48px)] w-[532px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="h-[934px] max-h-[calc(100dvh-24px)] w-full max-w-[532px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100vh-48px)]">
             <div className="relative border-b border-border px-6 pb-6 pt-6">
               <button
                 onClick={() => setSelectedTx(null)}

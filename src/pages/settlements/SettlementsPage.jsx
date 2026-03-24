@@ -264,14 +264,14 @@ export default function SettlementsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-text-primary">Settlements</h1>
           <p className="mt-1 max-w-3xl text-sm text-text-secondary">
             Manage payout obligations, process settlement batches, reconcile financial records, and monitor disbursement status across the Sterllo platform.
           </p>
         </div>
-        <button className="inline-flex h-12 items-center gap-2 rounded-full bg-accent px-5 text-sm font-medium text-black hover:bg-accent/90">
+        <button className="inline-flex h-12 shrink-0 items-center gap-2 self-start rounded-full bg-accent px-5 text-sm font-medium text-black hover:bg-accent/90 sm:self-auto">
           <ArrowDownCircle size={16} />
           Export Settlement Report
         </button>
@@ -309,9 +309,9 @@ export default function SettlementsPage() {
       </div>
 
       <div className="mt-4 overflow-hidden rounded-card border border-border/70 bg-card">
-        <div className="flex items-center gap-3 border-b border-border/70 p-3">
-          <h3 className="mr-auto text-base text-text-primary">Settlement Batches</h3>
-          <div className="relative w-[320px]">
+        <div className="flex flex-col gap-3 border-b border-border/70 p-3 lg:flex-row lg:items-center">
+          <h3 className="text-base text-text-primary lg:mr-auto">Settlement Batches</h3>
+          <div className="relative min-w-0 w-full lg:w-[320px] lg:shrink-0">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               value={search}
@@ -320,6 +320,7 @@ export default function SettlementsPage() {
               className="h-10 w-full rounded-xl border border-border bg-page pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/40"
             />
           </div>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button className="inline-flex h-10 items-center gap-2 rounded-full bg-[#494949] px-4 text-xs text-text-secondary">
             <ArrowUpDown size={14} />
             Sort By: Newest
@@ -332,6 +333,7 @@ export default function SettlementsPage() {
             <SlidersHorizontal size={14} />
             Filter
           </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto p-2">
@@ -413,7 +415,7 @@ export default function SettlementsPage() {
 
       {showFilter && (
         <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm">
-          <div className="absolute left-1/2 top-1/2 w-[384px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl">
+          <div className="absolute left-1/2 top-1/2 flex max-h-[calc(100vh-24px)] w-[384px] max-w-[calc(100%-24px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-border/50 px-4 py-3.5">
               <h3 className="text-sm font-medium text-text-secondary">Filters</h3>
               <button
@@ -424,7 +426,7 @@ export default function SettlementsPage() {
               </button>
             </div>
 
-            <div className="space-y-4 p-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
               <div className="grid grid-cols-2 gap-2.5">
                 <label className="text-xs text-text-muted">
                   From
@@ -587,7 +589,7 @@ export default function SettlementsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 border-t border-border/50 p-4">
+            <div className="flex shrink-0 items-center gap-3 border-t border-border/50 p-4">
               <button
                 onClick={() => {
                   setFromDate('')
@@ -617,7 +619,7 @@ export default function SettlementsPage() {
 
       {selectedBatch && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-          <aside className="absolute right-4 top-4 h-[calc(100%-32px)] w-full max-w-[420px] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl">
+          <aside className="absolute left-2 right-2 top-2 h-[calc(100%-16px)] w-auto max-w-none overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl sm:left-auto sm:right-4 sm:top-4 sm:h-[calc(100%-32px)] sm:w-full sm:max-w-[420px]">
             <div className="border-b border-border/60 px-4 py-3">
               <div className="flex items-start gap-2.5">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-[#0a0a0a]">

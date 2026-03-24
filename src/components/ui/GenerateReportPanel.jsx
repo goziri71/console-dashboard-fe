@@ -145,7 +145,7 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
     >
       <div
         ref={panelRef}
-        className={`flex h-full w-[532px] flex-col overflow-hidden rounded-l-[40px] bg-card transition-transform duration-300 ease-out ${
+        className={`flex h-full w-full max-w-full flex-col overflow-hidden rounded-t-[28px] bg-card transition-transform duration-300 ease-out sm:max-w-[532px] sm:rounded-none sm:rounded-l-[40px] ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

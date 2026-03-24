@@ -50,11 +50,11 @@ export default function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-between border-t border-border px-4 py-3">
+    <div className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
       <span className="text-xs text-text-muted">
         Showing {Math.min((page - 1) * limit + 1, total)}–{Math.min(page * limit, total)} of {total} {label}
       </span>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => onPageChange(page - 1)}

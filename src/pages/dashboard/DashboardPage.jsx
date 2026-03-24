@@ -65,14 +65,14 @@ export default function DashboardPage() {
     <div>
       {/* Page Header */}
       <Stagger delay={0}>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-text-primary">Dashboard</h1>
             <p className="mt-1 text-sm text-text-secondary">
               Welcome back. Here's a real-time overview of Sterllo wallet infrastructure operations.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
             <button
               onClick={() => setShowReportPanel(true)}
               className="rounded-[2em] bg-accent px-5 py-2.5 text-sm font-medium text-page transition-all hover:opacity-90 hover:cursor-pointer active:scale-[0.97]"
@@ -92,7 +92,7 @@ export default function DashboardPage() {
       </Stagger>
 
       {/* Two-Column Content Grid */}
-      <div className="mt-6 grid grid-cols-[1fr_470px] gap-6">
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_470px]">
         {/* Left Column */}
         <div className="flex flex-col gap-6">
           <Stagger delay={120}>

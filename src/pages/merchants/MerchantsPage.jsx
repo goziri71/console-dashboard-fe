@@ -10,7 +10,7 @@ const LIMIT = 20
 
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-6">
       {[...Array(4)].map((_, i) => (
         <div key={i} className="h-[140px] skeleton rounded-card" />
       ))}
@@ -154,7 +154,7 @@ export default function MerchantsPage() {
       {statsLoading ? (
         <StatsSkeleton />
       ) : stats ? (
-        <div className="animate-fade-in-up grid grid-cols-4 gap-6" style={{ animationDelay: '60ms' }}>
+        <div className="animate-fade-in-up grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-6" style={{ animationDelay: '60ms' }}>
           {statCards.map((card) => (
             <SummaryCard
               key={card.label}
@@ -169,8 +169,8 @@ export default function MerchantsPage() {
       ) : null}
 
       <div className="animate-fade-in-up mt-6 overflow-hidden rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
-        <div className="flex items-center justify-between border-b border-border px-4 py-4">
-          <h3 className="text-base font-medium text-text-primary">All Merchants</h3>
+        <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <h3 className="shrink-0 text-base font-medium text-text-primary">All Merchants</h3>
           <MerchantToolbar
             search={search}
             onSearchChange={setSearch}

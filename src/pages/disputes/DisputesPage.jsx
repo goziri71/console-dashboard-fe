@@ -749,7 +749,7 @@ export default function DisputesPage() {
 
       {selected && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-          <aside className="absolute right-4 top-4 h-[calc(100%-32px)] w-full max-w-[420px] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl">
+          <aside className="absolute left-2 right-2 top-2 h-[calc(100%-16px)] w-auto max-w-none overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl sm:left-auto sm:right-4 sm:top-4 sm:h-[calc(100%-32px)] sm:w-full sm:max-w-[420px]">
             <div className="border-b border-border/60 px-4 py-3">
               <div className="flex items-start gap-2.5">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-[#0a0a0a]">

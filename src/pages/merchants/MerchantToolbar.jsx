@@ -69,15 +69,15 @@ export default function MerchantToolbar({
   const currentStatus = STATUS_OPTIONS.find((o) => o.value === statusFilter)
 
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="relative">
+    <div className="flex w-full min-w-0 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="relative min-w-0 flex-1 sm:min-w-[200px] sm:max-w-[300px]">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           type="text"
           placeholder="Search..."
           value={localSearch}
           onChange={(e) => handleSearchInput(e.target.value)}
-          className="h-9 w-[300px] rounded-xl border border-border bg-page py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+          className="h-9 w-full rounded-xl border border-border bg-page py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
         />
       </div>
 
