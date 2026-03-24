@@ -4,12 +4,10 @@ import {
   CheckCircle2,
   ChevronDown,
   Copy,
-  FileText,
   Loader2,
   MoreVertical,
   ScanLine,
   Search,
-  Trash2,
   Upload,
   X,
   XCircle,
@@ -199,6 +197,8 @@ export default function DisputesPage() {
   const [userKey, setUserKey] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [minAmount, setMinAmount] = useState('')
+  const [maxAmount, setMaxAmount] = useState('')
 
   const [showFilter, setShowFilter] = useState(false)
   const [showSortMenu, setShowSortMenu] = useState(false)
@@ -209,7 +209,6 @@ export default function DisputesPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [patchStatus, setPatchStatus] = useState('')
   const [patchSettlementStatus, setPatchSettlementStatus] = useState('')
-  const [resolutionNote, setResolutionNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [patchError, setPatchError] = useState('')
 
@@ -333,7 +332,6 @@ export default function DisputesPage() {
     setPatchError('')
     setPatchStatus(row.status || '')
     setPatchSettlementStatus(row.settlement_status || '')
-    setResolutionNote('')
     setDetailLoading(true)
     try {
       const res = await getDispute(ref)
@@ -341,7 +339,6 @@ export default function DisputesPage() {
       setDetail(data)
       setPatchStatus(data.status ?? row.status ?? '')
       setPatchSettlementStatus(data.settlement_status ?? row.settlement_status ?? '')
-      setResolutionNote(data.resolution_note ?? data.resolution ?? '')
     } catch {
       setDetail(row)
     } finally {
@@ -371,31 +368,6 @@ export default function DisputesPage() {
   }
 
   const d = detail || selected
-  const normalizedStatus = String(d?.status || '').replace(/_/g, ' ').toUpperCase() || 'OPEN'
-  const evidenceItems = Array.isArray(d?.evidence)
-    ? d.evidence
-    : Array.isArray(d?.attachments)
-      ? d.attachments
-      : [
-          { name: 'Screenshot....png', size: '123KB' },
-          { name: 'Receipt. jpg', size: '930KB' },
-        ]
-  const timelineItems = Array.isArray(d?.activity_log)
-    ? d.activity_log
-    : Array.isArray(d?.timeline)
-      ? d.timeline
-      : [
-          {
-            date: 'April 15, 2024',
-            actor: 'Tosin Kara',
-            message: 'Please review the attached lodge of the duplicated charge on the customer statement.',
-          },
-          {
-            date: 'April 15, 2024',
-            actor: 'Tosin Kara',
-            message: 'Please review the attached evidence of the duplicate charge on the customer’s statement.',
-          },
-        ]
 
   const cellCls =
     'border-r border-[#0a0a0a] px-4 py-2 text-[14px] font-normal leading-[22.4px] tracking-[-0.28px] text-[#a2a2a2]'
@@ -635,88 +607,130 @@ export default function DisputesPage() {
 
       {showFilter && (
         <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm">
-          <div className="absolute left-1/2 top-1/2 w-[400px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-[#313131] bg-[#181818] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[#313131] px-4 py-3">
-              <h3 className="text-sm font-medium text-[#f7f7f7]">Filters</h3>
+          <div className="absolute left-1/2 top-1/2 flex w-[380px] max-w-[calc(100%-24px)] max-h-[calc(100vh-24px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[16px] border border-[#313131] bg-[#181818] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#313131] px-4 py-4">
+              <h3 className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#c0c0c0]">Filters</h3>
               <button
                 type="button"
                 onClick={() => setShowFilter(false)}
-                className="rounded-md p-1 text-[#717171] hover:bg-[#252525]"
+                className="rounded-md p-1 text-[#a2a2a2] hover:bg-[#252525]"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
-            <div className="space-y-3 p-4">
-              <label className="block text-xs text-[#717171]">
-                Status
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+              <div className="relative">
+                <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#494949]" />
                 <input
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  placeholder="Filter by status"
-                  className="mt-1 h-10 w-full rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm text-[#c0c0c0] outline-none"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by customers name, dispute ID...."
+                  className="h-[43px] w-full rounded-xl border border-[#313131] bg-[#181818] pl-9 pr-3 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
                 />
-              </label>
-              <label className="block text-xs text-[#717171]">
-                Settlement status
-                <input
-                  value={settlementStatus}
-                  onChange={(e) => setSettlementStatus(e.target.value)}
-                  placeholder="Filter by settlement status"
-                  className="mt-1 h-10 w-full rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm text-[#c0c0c0] outline-none"
-                />
-              </label>
-              <label className="block text-xs text-[#717171]">
-                Account key
-                <input
-                  value={accountKey}
-                  onChange={(e) => setAccountKey(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm text-[#c0c0c0] outline-none"
-                />
-              </label>
-              <label className="block text-xs text-[#717171]">
-                User key
-                <input
-                  value={userKey}
-                  onChange={(e) => setUserKey(e.target.value)}
-                  className="mt-1 h-10 w-full rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm text-[#c0c0c0] outline-none"
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs text-[#717171]">
-                  From
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[14px] leading-[20px] text-[#8b8f97]">Status</span>
+                <div className="relative">
                   <input
-                    type="date"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    placeholder="Select status"
+                    className="h-[43px] w-full rounded-xl border border-[#313131] bg-[#181818] px-3 pr-9 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
+                  />
+                  <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#717171]" />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[14px] leading-[20px] text-[#8b8f97]">Type</span>
+                <div className="relative">
+                  <input
+                    value={settlementStatus}
+                    onChange={(e) => setSettlementStatus(e.target.value)}
+                    placeholder="Select type"
+                    className="h-[43px] w-full rounded-xl border border-[#313131] bg-[#181818] px-3 pr-9 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
+                  />
+                  <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#717171]" />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-[14px] leading-[20px] text-[#8b8f97]">Assigned Admin</span>
+                <div className="relative">
+                  <input
+                    value={userKey}
+                    onChange={(e) => setUserKey(e.target.value)}
+                    placeholder="Select admin"
+                    className="h-[43px] w-full rounded-xl border border-[#313131] bg-[#181818] px-3 pr-9 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
+                  />
+                  <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#717171]" />
+                </div>
+              </label>
+
+              <div>
+                <span className="mb-1.5 block text-[14px] leading-[20px] text-[#8b8f97]">Date Range</span>
+                <div className="grid h-[55px] grid-cols-[1fr_31px_1fr] overflow-hidden rounded-card border border-[#313131]">
+                  <input
+                    type="text"
                     value={fromDate}
+                    onFocus={(e) => { e.target.type = 'date' }}
+                    onBlur={(e) => { if (!e.target.value) e.target.type = 'text' }}
                     onChange={(e) => setFromDate(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm outline-none"
+                    placeholder="Start"
+                    className="h-full bg-transparent px-3 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
                   />
-                </label>
-                <label className="text-xs text-[#717171]">
-                  To
+                  <div className="flex items-center justify-center bg-[#1f1f1f] text-[#494949]">...</div>
                   <input
-                    type="date"
+                    type="text"
                     value={toDate}
+                    onFocus={(e) => { e.target.type = 'date' }}
+                    onBlur={(e) => { if (!e.target.value) e.target.type = 'text' }}
                     onChange={(e) => setToDate(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm outline-none"
+                    placeholder="End"
+                    className="h-full bg-transparent px-3 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
                   />
-                </label>
+                </div>
+              </div>
+
+              <div>
+                <span className="mb-1.5 block text-[14px] leading-[20px] text-[#8b8f97]">Amount Range</span>
+                <div className="grid h-[55px] grid-cols-2 overflow-hidden rounded-card border border-[#313131]">
+                  <input
+                    type="number"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                    placeholder="Min amount"
+                    className="h-full border-r border-[#313131] bg-transparent px-3 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
+                  />
+                  <input
+                    type="number"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                    placeholder="Max amount"
+                    className="h-full bg-transparent px-3 text-[13px] text-[#a2a2a2] outline-none placeholder:text-[#494949]"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex gap-3 border-t border-[#313131] p-4">
+            <div className="flex shrink-0 gap-4 p-4">
               <button
                 type="button"
                 onClick={() => {
+                  setSearch('')
                   setStatus('')
                   setSettlementStatus('')
                   setAccountKey('')
                   setUserKey('')
                   setFromDate('')
                   setToDate('')
+                  setMinAmount('')
+                  setMaxAmount('')
                   setPage(1)
                 }}
-                className="h-10 flex-1 rounded-xl border border-[#313131] text-sm text-[#a2a2a2] hover:bg-[#252525]"
+                className="h-[49px] flex-1 rounded-full border border-[#313131] text-sm text-[#717171] hover:bg-[#252525]"
               >
-                Clear
+                Clear Filters
               </button>
               <button
                 type="button"
@@ -724,9 +738,9 @@ export default function DisputesPage() {
                   setPage(1)
                   setShowFilter(false)
                 }}
-                className="h-10 flex-1 rounded-xl bg-accent text-sm font-medium text-[#121505] hover:bg-accent/90"
+                className="h-[49px] flex-1 rounded-full bg-accent text-sm font-medium text-[#121505] hover:bg-accent/90"
               >
-                Apply
+                Apply Filters
               </button>
             </div>
           </div>
@@ -735,70 +749,73 @@ export default function DisputesPage() {
 
       {selected && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-          <aside className="absolute right-0 top-0 h-full w-full max-w-[532px] overflow-hidden rounded-[40px] border border-[#313131] bg-[#181818] shadow-xl">
-            <div className="flex items-center gap-3 border-b border-[#313131] px-6 py-4">
-              <div className="relative flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full border border-[#313131] bg-[#0a0a0a]">
-                <FileText size={20} className="text-[#a2a2a2]" />
-                <CheckCircle2 size={12} className="absolute left-[15px] top-[17px] text-[#17b26a]" />
+          <aside className="absolute right-4 top-4 h-[calc(100%-32px)] w-full max-w-[420px] overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl">
+            <div className="border-b border-border/60 px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-[#0a0a0a]">
+                  <span className="text-base leading-none">⚖️</span>
+                </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <p className="truncate text-sm font-semibold text-text-primary">{d?.dispute_id ?? disputeRef(d) ?? '--'}</p>
+                  <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                    {String(d?.status || 'open').replace(/_/g, ' ')}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[20px] font-semibold leading-7 tracking-[0.2px] text-[#717171]">
-                  {(d?.customer_name || 'JOHN OKAFOR').toUpperCase()} - {d?.customer_reference || '122345678'}
-                </p>
-                <p className="text-[14px] leading-[22.4px] tracking-[-0.28px] text-[#067647]">{normalizedStatus}</p>
-              </div>
+            </div>
+            <div className="h-[calc(100%-72px)] overflow-y-auto p-4">
               <button
                 type="button"
                 onClick={() => {
                   setSelected(null)
                   setDetail(null)
                 }}
-                className="rounded-full p-1 text-[#717171] hover:bg-[#252525]"
+                className="absolute right-6 top-6 rounded-full p-1 text-text-muted hover:bg-card-hover"
               >
                 <X size={18} />
               </button>
-            </div>
-            <div className="h-[calc(100%-92px)] overflow-y-auto p-6">
+
               {detailLoading ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="animate-spin text-accent" size={28} />
                 </div>
               ) : (
                 <>
-                  <div className="mb-6 flex flex-col items-center gap-3 text-center">
-                    <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#494949]">Amount</p>
-                    <p className="text-[42px] font-semibold leading-[50px] tracking-[0.32px] text-[#a2a2a2]">
+                  <div className="mb-4 text-center">
+                    <p className="text-xs text-text-muted">Amount</p>
+                    <p className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-text-primary">
                       {formatDisputeAmount(d)}
                     </p>
-                    <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#494949]">
+                    <p className="mt-1.5 text-xs text-text-muted">
                       {formatDateRaised(d?.transaction_date)} | {String(d?.date_created || '').slice(11, 19) || '--:--:--'}
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-[#313131]">
-                    <div className="px-6 py-3">
-                      <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#c0c0c0]">Dispute Details</p>
+                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
+                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">
+                      Dispute Details
                     </div>
-                    <dl className="pb-3">
+                    <dl>
                       {[
                         ['Dispute ID', d.dispute_id ?? disputeRef(d), true],
                         ['Dispute Type', d.dispute_type || '--', false],
                         ['Account Number', d.customer_reference || '--', false],
                         ['Assigned To', d.assigned_to || '--', false],
+                        ['Environment', d.environment || '--', false],
                         ['Created At', `${formatDateRaised(d.date_created)} | ${String(d?.date_created || '').slice(11, 19) || '--:--:--'}`, false],
                         ['Resolved At', `${formatDateRaised(d.date_modified)} | ${String(d?.date_modified || '').slice(11, 19) || '--:--:--'}`, false],
                       ].map(([k, v, canCopy]) => (
-                        <div key={k} className="flex items-center gap-3 px-6 py-3">
-                          <dt className="min-w-0 flex-1 text-[16px] leading-[25.6px] tracking-[0.024px] text-[#717171]">{k}</dt>
-                          <dd className="text-right text-[16px] leading-[25.6px] tracking-[0.024px] text-[#717171]">{v}</dd>
+                        <div key={k} className="flex items-center gap-2 border-b border-border/60 px-4 py-2 last:border-b-0">
+                          <dt className="min-w-0 flex-1 text-xs text-text-muted">{k}</dt>
+                          <dd className="max-w-[55%] truncate text-right text-xs text-text-primary">{v}</dd>
                           {canCopy ? (
                             <button
                               type="button"
                               onClick={() => navigator.clipboard?.writeText(String(v || ''))}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#494949] bg-[#313131] text-[#bad133] hover:bg-[#3a3a3a]"
+                              className="shrink-0 rounded-full border border-border/70 bg-[#313131] p-1 text-accent"
                               aria-label="Copy dispute id"
                             >
-                              <Copy size={18} />
+                              <Copy size={12} />
                             </button>
                           ) : null}
                         </div>
@@ -806,88 +823,29 @@ export default function DisputesPage() {
                     </dl>
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-[#313131]">
-                    <div className="px-6 py-3">
-                      <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#c0c0c0]">Attached Evidence</p>
+                  <div className="mt-3 overflow-hidden rounded-xl border border-border/70 bg-card/80">
+                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">
+                      Update
                     </div>
-                    <div className="flex flex-col gap-3 px-5 pb-5">
-                      {evidenceItems.slice(0, 2).map((item, idx) => (
-                        <div key={`${item.name || 'evidence'}-${idx}`} className="flex items-center justify-between rounded-[10px] bg-[#1d1d1d] px-4 py-2.5">
-                          <div className="flex items-center gap-5">
-                            <FileText size={20} className="text-[#717171]" />
-                            <div>
-                              <p className="text-[16px] leading-[25.6px] tracking-[0.024px] text-[#717171]">{item.name || `evidence-${idx + 1}.png`}</p>
-                              <p className="text-[14px] leading-[22.4px] tracking-[-0.28px] text-[#494949]">{item.size || 'N/A'}</p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#313131] bg-[#181818] text-[#717171] hover:bg-[#252525]"
-                            aria-label="Remove evidence"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-[#313131]">
-                    <div className="px-6 py-3">
-                      <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#c0c0c0]">Timeline / Activity Log</p>
-                    </div>
-                    <div className="flex flex-col gap-3 px-6 pb-5">
-                      {timelineItems.slice(0, 2).map((entry, idx) => (
-                        <div key={`${entry.date || 'entry'}-${idx}`} className="flex gap-3">
-                          <img
-                            src="https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=Tosin"
-                            alt=""
-                            className="h-[51px] w-[51px] rounded-full"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-[16px] leading-[25.6px] tracking-[0.024px] text-[#717171]">
-                              {entry.date || 'April 15, 2024'} - {entry.actor || 'Tosin Kara'}
-                            </p>
-                            <p className="text-[18px] leading-[24px] tracking-[0.024px] text-[#717171]">
-                              {entry.message || 'No activity note.'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl border border-[#313131]">
-                    <div className="px-6 py-3">
-                      <p className="text-[18px] font-semibold leading-[25.2px] tracking-[0.18px] text-[#c0c0c0]">Resolution Field</p>
-                    </div>
-                    <div className="px-6 pb-5">
-                      <textarea
-                        value={resolutionNote}
-                        onChange={(e) => setResolutionNote(e.target.value)}
-                        placeholder="Resolution details....."
-                        className="h-[43px] w-full resize-none rounded-[14px] border border-[#313131] bg-[#181818] px-4 py-3 text-[14px] leading-[22.4px] tracking-[-0.28px] text-[#717171] outline-none placeholder:text-[#494949]"
+                    <div className="space-y-2.5 p-4">
+                      {patchError && <p className="text-xs text-error">{patchError}</p>}
+                      <input
+                        value={patchStatus}
+                        onChange={(e) => setPatchStatus(e.target.value)}
+                        placeholder="Status"
+                        className="h-10 w-full rounded-lg border border-border/70 bg-page px-3 text-sm text-text-secondary outline-none"
                       />
-                      {patchError && <p className="mt-2 text-xs text-error">{patchError}</p>}
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <input
-                          value={patchStatus}
-                          onChange={(e) => setPatchStatus(e.target.value)}
-                          placeholder="Status"
-                          className="h-10 rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm text-[#c0c0c0] outline-none"
-                        />
-                        <input
-                          value={patchSettlementStatus}
-                          onChange={(e) => setPatchSettlementStatus(e.target.value)}
-                          placeholder="Settlement status"
-                          className="h-10 rounded-xl border border-[#313131] bg-[#0a0a0a] px-3 text-sm text-[#c0c0c0] outline-none"
-                        />
-                      </div>
+                      <input
+                        value={patchSettlementStatus}
+                        onChange={(e) => setPatchSettlementStatus(e.target.value)}
+                        placeholder="Settlement status"
+                        className="h-10 w-full rounded-lg border border-border/70 bg-page px-3 text-sm text-text-secondary outline-none"
+                      />
                       <button
                         type="button"
                         disabled={saving}
                         onClick={handleSavePatch}
-                        className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-lg bg-accent text-sm font-medium text-[#121505] hover:bg-accent/90 disabled:opacity-50"
+                        className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-accent text-sm font-medium text-black hover:bg-accent/90 disabled:opacity-50"
                       >
                         {saving ? <Loader2 className="animate-spin" size={16} /> : 'Save changes'}
                       </button>
