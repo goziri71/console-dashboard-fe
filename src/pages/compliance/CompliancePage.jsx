@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Activity,
   AlertCircle,
+  Bell,
   CheckCircle2,
   Clock3,
   FileText,
+  Flag,
+  Info,
+  LayoutGrid,
+  ListChecks,
+  ShieldCheck,
   ShieldAlert,
+  SlidersHorizontal,
   UserMinus,
 } from 'lucide-react'
 import {
@@ -30,14 +38,14 @@ import {
 import { cn, formatNumber, timeAgo } from '../../lib/utils'
 
 const SIDEBAR_ITEMS = [
-  'Overview',
-  'Alerts',
-  'KYC Verifications',
-  'Suspicious Transactions',
-  'Reports',
-  'Rules & Limits',
-  'Activity Log',
-  'Insights',
+  { label: 'Overview', icon: LayoutGrid },
+  { label: 'Alerts', icon: Bell },
+  { label: 'KYC Verifications', icon: ShieldCheck },
+  { label: 'Suspicious Transactions', icon: Flag },
+  { label: 'Reports', icon: FileText },
+  { label: 'Rules & Limits', icon: SlidersHorizontal },
+  { label: 'Activity Log', icon: Activity },
+  { label: 'Insights', icon: Info },
 ]
 
 function toArray(payload) {
@@ -265,40 +273,40 @@ export default function CompliancePage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Compliance</h1>
-          <p className="mt-1 text-sm text-text-secondary">Monitor verification, risks, and regulatory compliance.</p>
-        </div>
-      </div>
-
       {error && (
         <div className="mb-4 rounded-card border border-error/40 bg-error-bg px-4 py-3 text-sm text-error">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[160px_1fr]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[200px_1fr]">
         <aside className="hidden xl:block">
           <div className="overflow-hidden rounded-card border border-border/70 bg-card">
+            <div className="border-b border-border/60 px-4 py-4">
+              <h3 className="text-2xl font-semibold leading-tight tracking-[0.2px] text-text-primary">Compliance</h3>
+              <p className="mt-1 max-w-[160px] text-sm leading-5 text-text-muted">
+                Monitor verification, risks, and regulatory compliance.
+              </p>
+            </div>
             {SIDEBAR_ITEMS.map((item) => (
               <button
-                key={item}
+                key={item.label}
                 type="button"
                 className={cn(
-                  'flex h-12 w-full items-center border-b border-border/50 px-4 text-left text-sm last:border-b-0',
-                  item === 'Overview'
+                  'flex h-12 w-full items-center gap-2.5 border-b border-border/50 px-4 text-left text-sm last:border-b-0',
+                  item.label === 'Overview'
                     ? 'bg-[#171a10] text-text-primary'
                     : 'text-text-muted hover:bg-card-hover hover:text-text-secondary'
                 )}
               >
-                {item}
+                <item.icon size={14} />
+                <span>{item.label}</span>
               </button>
             ))}
           </div>
         </aside>
 
-        <section>
-          <div className="mb-4">
-            <h2 className="text-[28px] leading-tight text-text-primary">Compliance Overview</h2>
+        <section className="pt-1">
+          <div className="mb-4 px-1">
+            <h2 className="text-[20px] leading-tight text-text-primary">Compliance Overview</h2>
             <p className="mt-1 text-sm text-text-secondary">Monitor verification, risks, and regulatory compliance.</p>
           </div>
 
