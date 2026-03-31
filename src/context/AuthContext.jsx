@@ -112,9 +112,18 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    await authService.logout()
-    setToken(null)
-    setUser(null)
+    try {
+      await authService.logout()
+    } finally {
+      setToken(null)
+      setUser(null)
+      // Force a full page refresh so the app fully resets to login.
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login')
+      } else {
+        window.location.reload()
+      }
+    }
   }
 
   return (
