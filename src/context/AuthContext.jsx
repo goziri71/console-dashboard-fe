@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import * as authService from '../services/auth'
 
 const AuthContext = createContext(null)
-const IDLE_TIMEOUT_MS = 10 * 60 * 1000
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
