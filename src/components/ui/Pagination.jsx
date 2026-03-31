@@ -27,7 +27,7 @@ export default function Pagination({
             type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
-            className="rounded-full border border-[#494949] px-4 py-2 text-[12px] leading-[14.4px] tracking-[0.12px] text-[#494949] disabled:pointer-events-none disabled:opacity-30"
+            className="motion-surface rounded-full border border-[#494949] px-4 py-2 text-[12px] leading-[14.4px] tracking-[0.12px] text-[#494949] hover:border-[#717171] hover:bg-[#202020] disabled:pointer-events-none disabled:opacity-30"
           >
             Previous
           </button>
@@ -40,7 +40,7 @@ export default function Pagination({
             type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
-            className="rounded-full border border-[#494949] px-4 py-2 text-[12px] leading-[14.4px] tracking-[0.12px] text-[#494949] disabled:pointer-events-none disabled:opacity-30"
+            className="motion-surface rounded-full border border-[#494949] px-4 py-2 text-[12px] leading-[14.4px] tracking-[0.12px] text-[#494949] hover:border-[#717171] hover:bg-[#202020] disabled:pointer-events-none disabled:opacity-30"
           >
             Next
           </button>
@@ -59,7 +59,7 @@ export default function Pagination({
           type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1}
-          className="flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-secondary transition-all duration-200 hover:bg-card-hover hover:text-text-primary active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
+          className="motion-surface flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-card-hover hover:text-text-primary active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
         >
           <ChevronLeft size={14} />
           Previous
@@ -75,7 +75,7 @@ export default function Pagination({
           type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages}
-          className="flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-secondary transition-all duration-200 hover:bg-card-hover hover:text-text-primary active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
+          className="motion-surface flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-secondary hover:bg-card-hover hover:text-text-primary active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
         >
           Next
           <ChevronRight size={14} />

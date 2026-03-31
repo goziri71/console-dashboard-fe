@@ -48,10 +48,10 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
             end={item.path === '/'}
             onClick={() => onNavigate?.()}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 ${
+              `motion-surface flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium ${
                 isActive
                   ? 'bg-[#252A09] text-[#F7F7F7] shadow-md shadow-accent/20'
-                  : 'text-text-secondary hover:bg-card-hover hover:text-text-primary hover:translate-x-0.5 active:scale-[0.98]'
+                  : 'text-text-secondary hover:translate-x-0.5 hover:bg-card-hover hover:text-text-primary active:scale-[0.98]'
               }`
             }
           >

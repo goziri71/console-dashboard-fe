@@ -11,7 +11,7 @@ const iconColorMap = {
 
 export default function MetricCard({ label, value, comparison, iconColor = 'accent', icon: Icon }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-card p-4 transition-all duration-200 hover:border-border/80 hover:bg-card-hover hover:shadow-lg hover:shadow-black/10 hover:-translate-y-0.5">
+    <div className="motion-surface flex flex-col gap-3 rounded-card border border-border bg-card p-4 hover:-translate-y-0.5 hover:border-border/80 hover:bg-card-hover hover:shadow-lg hover:shadow-black/10">
       <div className="flex items-center gap-2">
         {Icon && (
           <div className={cn('flex h-8 w-8 items-center justify-center rounded-full', iconColorMap[iconColor])}>
