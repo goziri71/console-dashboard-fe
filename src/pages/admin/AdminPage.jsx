@@ -17,6 +17,8 @@ import {
   canManageRbac,
   canReadFinancial,
   isManagementRoleSlug,
+  sanitizePermissionKeysForRole,
+  validateRolePermissionKeysForSave,
 } from '../../lib/permissions'
 import {
   assignUserRole,
@@ -292,6 +294,9 @@ export default function AdminPage() {
     'rounded-xl border border-border bg-card px-4 py-3 text-sm text-text-primary placeholder-text-muted outline-none transition-all duration-200 focus:border-accent/50 focus:ring-1 focus:ring-accent/20'
 
   function toggleDraftKey(key, checked) {
+    if (checked && key === PERMISSION_ALL && editPathId) {
+      return
+    }
     setDraftKeys((prev) => {
       const next = new Set(prev)
       if (checked) next.add(key)
@@ -301,6 +306,9 @@ export default function AdminPage() {
   }
 
   function toggleCreateKey(key, checked) {
+    if (checked && key === PERMISSION_ALL) {
+      return
+    }
     setCreateKeys((prev) => {
       const next = new Set(prev)
       if (checked) next.add(key)
@@ -372,6 +380,11 @@ export default function AdminPage() {
       })
       return
     }
+    const patchValidation = validateRolePermissionKeysForSave(role.slug, draftKeys)
+    if (!patchValidation.ok) {
+      setBanner({ type: 'error', text: patchValidation.message })
+      return
+    }
     setPending('patch')
     setBanner(null)
     try {
@@ -407,7 +420,12 @@ export default function AdminPage() {
       })
       return
     }
-    const permission_keys = [...createKeys]
+    const permission_keys = [...createKeys].filter((k) => k !== PERMISSION_ALL)
+    const createValidation = validateRolePermissionKeysForSave(slug, permission_keys)
+    if (!createValidation.ok) {
+      setBanner({ type: 'error', text: createValidation.message })
+      return
+    }
     setPending('create')
     try {
       await createRbacRole({ slug, label, permission_keys })
@@ -445,7 +463,9 @@ export default function AdminPage() {
               ? 'border-error/40 bg-error-bg text-error'
               : banner.type === 'success'
                 ? 'border-success/40 bg-success-bg text-success'
-                : 'border-border bg-card text-text-secondary'
+                : banner.type === 'info'
+                  ? 'border-accent/30 bg-accent-bg/40 text-text-secondary'
+                  : 'border-border bg-card text-text-secondary'
           )}
         >
           {banner.text}
@@ -830,9 +850,11 @@ export default function AdminPage() {
           <p className="mt-1 text-sm text-text-secondary">
             Loaded from <code className="text-text-muted">GET /rbac/roles</code>. Edit uses{' '}
             <code className="text-text-muted">PATCH /rbac/roles/:roleId/permissions</code> with a JSON body{' '}
-            <code className="text-text-muted">{`{ "permission_keys": [...] }`}</code>. Only the{' '}
-            <code className="text-text-muted">management</code> role is blocked from edits; other seeded roles
-            can be updated.
+            <code className="text-text-muted">{`{ "permission_keys": [...] }`}</code> (snake_case — not{' '}
+            <code className="text-text-muted">permissionKeys</code>). Only the{' '}
+            <code className="text-text-muted">management</code> slug is blocked from PATCH here; other roles
+            can be updated. Only <code className="text-text-muted">management</code> may include{' '}
+            <code className="text-text-muted">*</code>; all other roles must use concrete keys only.
           </p>
         </div>
 
@@ -879,7 +901,14 @@ export default function AdminPage() {
                           setDraftKeys([])
                         } else {
                           setEditPathId(role.pathId)
-                          setDraftKeys([...role.permission_keys])
+                          const sanitized = sanitizePermissionKeysForRole(role.slug, role.permission_keys)
+                          setDraftKeys(sanitized)
+                          if (sanitized.length < role.permission_keys.length) {
+                            setBanner({
+                              type: 'info',
+                              text: 'The "*" permission was removed from this draft — only the management role may include it.',
+                            })
+                          }
                         }
                       }}
                       className={cn(
@@ -917,11 +946,22 @@ export default function AdminPage() {
                     <div className="mt-3 space-y-3">
                       <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-border/80 p-3">
                         {catalog.length ? (
-                          catalog.map((p) => (
-                            <label key={p.key} className="flex cursor-pointer gap-2 text-sm">
+                          catalog.map((p) => {
+                            const starLocked = p.key === PERMISSION_ALL && editPathId
+                            return (
+                            <label
+                              key={p.key}
+                              className={cn('flex gap-2 text-sm', starLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')}
+                            >
                               <input
                                 type="checkbox"
                                 className="mt-1 accent-accent"
+                                disabled={starLocked}
+                                title={
+                                  starLocked
+                                    ? 'Only the management role may include "*".'
+                                    : undefined
+                                }
                                 checked={draftKeys.includes(p.key)}
                                 onChange={(e) => toggleDraftKey(p.key, e.target.checked)}
                               />
@@ -932,7 +972,8 @@ export default function AdminPage() {
                                 ) : null}
                               </span>
                             </label>
-                          ))
+                            )
+                          })
                         ) : (
                           <p className="text-xs text-text-muted">
                             No permission catalog loaded. PATCH still accepts keys you type on the server —
@@ -981,7 +1022,8 @@ export default function AdminPage() {
               <code className="text-text-muted">slug</code>, <code className="text-text-muted">label</code>, and{' '}
               <code className="text-text-muted">permission_keys</code>. Include{' '}
               <code className="text-text-muted">financial.read</code> for roles that should see balances and
-              amounts.
+              amounts. Do not include <code className="text-text-muted">*</code> on new roles — only
+              management may use it.
             </p>
           </div>
           <form onSubmit={handleCreateRole} className="flex flex-col gap-4 p-4 lg:p-6">
@@ -1020,11 +1062,18 @@ export default function AdminPage() {
                     <code className="text-text-secondary">GET /rbac/permissions</code> succeeds.
                   </p>
                 ) : (
-                  catalog.map((p) => (
-                    <label key={`create-${p.key}`} className="flex cursor-pointer gap-2 text-sm">
+                  catalog.map((p) => {
+                    const starLocked = p.key === PERMISSION_ALL
+                    return (
+                    <label
+                      key={`create-${p.key}`}
+                      className={cn('flex gap-2 text-sm', starLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer')}
+                    >
                       <input
                         type="checkbox"
                         className="mt-1 accent-accent"
+                        disabled={starLocked}
+                        title={starLocked ? 'Only the management role may include "*".' : undefined}
                         checked={createKeys.has(p.key)}
                         onChange={(e) => toggleCreateKey(p.key, e.target.checked)}
                       />
@@ -1035,7 +1084,8 @@ export default function AdminPage() {
                         ) : null}
                       </span>
                     </label>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
