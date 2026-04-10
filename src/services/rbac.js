@@ -23,6 +23,27 @@ export async function listRbacRoles() {
 }
 
 /**
+ * List console / team users (requires rbac.manage or *).
+ *
+ * @param {{ page?: number, limit?: number, search?: string, role_slug?: string }} [params]
+ * @returns {Promise<{ records: Record<string, unknown>[], pagination: Record<string, unknown> }>}
+ */
+export async function listRbacUsers(params = {}) {
+  const { page = 1, limit = 20, search, role_slug } = params
+  const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20))
+  const safePage = Math.max(1, Number(page) || 1)
+  const query = { page: safePage, limit: safeLimit }
+  if (search && String(search).trim()) query.search = String(search).trim()
+  if (role_slug && String(role_slug).trim()) query.role_slug = String(role_slug).trim()
+
+  const { data } = await api.get('/rbac/users', { params: query })
+  const records = Array.isArray(data?.records) ? data.records : []
+  const pagination =
+    data?.pagination != null && typeof data.pagination === 'object' ? data.pagination : {}
+  return { records, pagination }
+}
+
+/**
  * @param {{ slug: string, label: string, permission_keys: string[] }} body
  */
 export async function createRbacRole(body) {

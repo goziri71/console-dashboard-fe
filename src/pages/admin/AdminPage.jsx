@@ -9,7 +9,8 @@ import {
   UserMinus,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { cn } from '../../lib/utils'
+import Pagination from '../../components/ui/Pagination'
+import { cn, formatDate } from '../../lib/utils'
 import {
   PERMISSION_ALL,
   PERMISSION_FINANCIAL_READ,
@@ -22,6 +23,7 @@ import {
   createRbacRole,
   listRbacPermissions,
   listRbacRoles,
+  listRbacUsers,
   patchRolePermissions,
   revokeUserRole,
 } from '../../services/rbac'
@@ -44,6 +46,23 @@ function normalizeRole(r) {
     slug: String(slug),
     label: String((r.label ?? r.name ?? slug) || 'Role'),
     permission_keys: Array.isArray(keys) ? keys.map(String) : [],
+  }
+}
+
+function normalizeTeamUser(row) {
+  const roleRows = Array.isArray(row.roles) ? row.roles : []
+  return {
+    id: row.id,
+    email: String(row.email ?? ''),
+    userKey: String(row.user_key ?? row.userKey ?? ''),
+    firstName: String(row.first_name ?? ''),
+    lastName: String(row.last_name ?? ''),
+    dateCreated: row.date_created,
+    lastLogin: row.last_login,
+    roles: roleRows.map((r) => ({
+      slug: String(r.slug ?? ''),
+      label: String(r.label ?? r.slug ?? ''),
+    })),
   }
 }
 
@@ -101,6 +120,16 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [rbacError, setRbacError] = useState(null)
 
+  const [teamUsers, setTeamUsers] = useState([])
+  const [teamPagination, setTeamPagination] = useState(null)
+  const [teamUsersLoading, setTeamUsersLoading] = useState(false)
+  const [teamUsersError, setTeamUsersError] = useState(null)
+  const [teamPage, setTeamPage] = useState(1)
+  const [teamLimit, setTeamLimit] = useState(20)
+  const [teamSearch, setTeamSearch] = useState('')
+  const [debouncedTeamSearch, setDebouncedTeamSearch] = useState('')
+  const [teamRoleFilter, setTeamRoleFilter] = useState('')
+
   const [assignUserKey, setAssignUserKey] = useState('')
   const [assignRoleSlug, setAssignRoleSlug] = useState('')
   const [revokeUserKey, setRevokeUserKey] = useState('')
@@ -147,6 +176,68 @@ export default function AdminPage() {
   }, [loadRbac])
 
   useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedTeamSearch(teamSearch.trim()), 400)
+    return () => window.clearTimeout(t)
+  }, [teamSearch])
+
+  useEffect(() => {
+    setTeamPage(1)
+  }, [debouncedTeamSearch, teamRoleFilter, teamLimit])
+
+  const loadTeamUsers = useCallback(async () => {
+    if (!manage) {
+      setTeamUsers([])
+      setTeamPagination(null)
+      setTeamUsersError(null)
+      setTeamUsersLoading(false)
+      return
+    }
+    setTeamUsersLoading(true)
+    setTeamUsersError(null)
+    try {
+      const lim = Math.min(100, Math.max(1, teamLimit))
+      const { records, pagination } = await listRbacUsers({
+        page: teamPage,
+        limit: lim,
+        ...(debouncedTeamSearch ? { search: debouncedTeamSearch } : {}),
+        ...(teamRoleFilter ? { role_slug: teamRoleFilter } : {}),
+      })
+      setTeamUsers(records.map(normalizeTeamUser))
+      const limFromApi =
+        Number.isFinite(Number(pagination.limit)) && Number(pagination.limit) > 0
+          ? Number(pagination.limit)
+          : lim
+      const total = Number.isFinite(Number(pagination.total))
+        ? Number(pagination.total)
+        : records.length
+      let totalPages = Number(pagination.total_pages)
+      if (!Number.isFinite(totalPages) || totalPages < 1) {
+        totalPages = total === 0 ? 0 : Math.max(1, Math.ceil(total / limFromApi))
+      }
+      setTeamPagination({
+        total,
+        page: Number.isFinite(Number(pagination.page)) ? Number(pagination.page) : teamPage,
+        limit: limFromApi,
+        total_pages: totalPages,
+        has_next: pagination.has_next,
+        has_prev: pagination.has_prev,
+      })
+    } catch (err) {
+      const msg =
+        err.response?.data?.message || err.message || 'Failed to load team members.'
+      setTeamUsersError(msg)
+      setTeamUsers([])
+      setTeamPagination(null)
+    } finally {
+      setTeamUsersLoading(false)
+    }
+  }, [manage, teamPage, teamLimit, debouncedTeamSearch, teamRoleFilter])
+
+  useEffect(() => {
+    loadTeamUsers()
+  }, [loadTeamUsers])
+
+  useEffect(() => {
     const current = rolesList.find((r) => r.pathId === editPathId)
     if (current && isManagementRoleSlug(current.slug)) {
       setEditPathId(null)
@@ -168,8 +259,14 @@ export default function AdminPage() {
     () => [
       {
         label: 'Console users',
-        value: '—',
-        hint: 'No list-users endpoint in RBAC; use user key from your identity system.',
+        value: !manage
+          ? '—'
+          : teamUsersLoading
+            ? '…'
+            : String(teamPagination?.total ?? 0),
+        hint: !manage
+          ? 'Requires rbac.manage or * to list team via GET /rbac/users.'
+          : 'From GET /rbac/users (pagination total).',
         icon: Users,
         iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-accent-bg text-accent',
       },
@@ -188,7 +285,7 @@ export default function AdminPage() {
         iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-success-bg text-success',
       },
     ],
-    [loading, rolesList.length, catalog.length]
+    [loading, rolesList.length, catalog.length, manage, teamUsersLoading, teamPagination?.total]
   )
 
   const inputCls =
@@ -230,7 +327,7 @@ export default function AdminPage() {
       setBanner({ type: 'success', text: 'Role assigned. Ask the user to refresh profile or re-login.' })
       setAssignUserKey('')
       setAssignRoleSlug('')
-      await loadRbac()
+      await Promise.all([loadRbac(), loadTeamUsers()])
     } catch (err) {
       setBanner({
         type: 'error',
@@ -255,7 +352,7 @@ export default function AdminPage() {
       setBanner({ type: 'success', text: 'Role revoked.' })
       setRevokeUserKey('')
       setRevokeRoleSlug('')
-      await loadRbac()
+      await Promise.all([loadRbac(), loadTeamUsers()])
     } catch (err) {
       setBanner({
         type: 'error',
@@ -432,32 +529,173 @@ export default function AdminPage() {
         style={{ animationDelay: '120ms' }}
       >
         <div className="overflow-hidden rounded-card border border-border bg-card">
-          <div className="border-b border-border px-4 py-4">
-            <h2 className="text-base font-medium text-text-primary">Console team</h2>
-            <p className="mt-1 text-sm text-text-secondary">
-              RBAC does not expose a full user directory here. Use the user key from your auth/admin system
-              in the panel on the right to assign or revoke roles.
-            </p>
+          <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-base font-medium text-text-primary">Console team</h2>
+              <p className="mt-1 text-sm text-text-secondary">
+                From <code className="text-text-muted">GET /rbac/users</code>. Use a row’s{' '}
+                <code className="text-text-muted">user_key</code> for assign / revoke on the right.
+              </p>
+            </div>
+            {manage && (
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
+                <input
+                  type="search"
+                  value={teamSearch}
+                  onChange={(e) => setTeamSearch(e.target.value)}
+                  placeholder="Search email or name…"
+                  className={cn(inputCls, 'min-w-[200px] flex-1 sm:max-w-[260px]')}
+                  aria-label="Search team"
+                />
+                <select
+                  value={teamRoleFilter}
+                  onChange={(e) => setTeamRoleFilter(e.target.value)}
+                  className={cn(inputCls, 'min-w-[160px] sm:w-[200px]')}
+                  aria-label="Filter by role"
+                >
+                  <option value="">All roles</option>
+                  {rolesList.map((r) => (
+                    <option key={`filter-${r.slug}`} value={r.slug}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={String(teamLimit)}
+                  onChange={(e) => setTeamLimit(Number(e.target.value))}
+                  className={cn(inputCls, 'w-full min-w-[100px] sm:w-[120px]')}
+                  aria-label="Rows per page"
+                >
+                  {[10, 20, 50, 100].map((n) => (
+                    <option key={n} value={n}>
+                      {n} / page
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
+
+          {teamUsersError && (
+            <div className="border-b border-border px-4 py-3 text-sm text-error">
+              {teamUsersError}
+              <button
+                type="button"
+                onClick={() => loadTeamUsers()}
+                className="ml-2 inline rounded-md border border-border bg-card px-2 py-0.5 text-xs text-text-primary hover:bg-card-hover"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-text-muted">
                   <th className="px-4 py-3 font-medium">User</th>
+                  <th className="px-4 py-3 font-medium">User key</th>
                   <th className="px-4 py-3 font-medium">Roles</th>
-                  <th className="px-4 py-3 font-medium">Financial access</th>
-                  <th className="px-4 py-3 font-medium">Last active</th>
+                  <th className="px-4 py-3 font-medium">Last login</th>
+                  <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td colSpan={4} className="px-4 py-16 text-center text-sm text-text-muted">
-                    Connect a users list API separately if you need a directory table.
-                  </td>
-                </tr>
+                {!manage ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-text-muted">
+                      Team directory requires <code className="text-text-secondary">rbac.manage</code> or{' '}
+                      <code className="text-text-secondary">*</code>.
+                    </td>
+                  </tr>
+                ) : teamUsersLoading ? (
+                  [...Array(6)].map((_, i) => (
+                    <tr key={i} className="border-b border-border/50">
+                      <td colSpan={5} className="px-4 py-3">
+                        <div className="skeleton h-9 w-full rounded-lg" />
+                      </td>
+                    </tr>
+                  ))
+                ) : !teamUsers.length ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-16 text-center text-sm text-text-muted">
+                      No users match this filter.
+                    </td>
+                  </tr>
+                ) : (
+                  teamUsers.map((row) => (
+                    <tr key={String(row.id ?? row.userKey)} className="border-b border-border/50">
+                      <td className="px-4 py-3 align-top">
+                        <p className="font-medium text-text-primary">{row.email || '—'}</p>
+                        <p className="text-xs text-text-muted">
+                          {[row.firstName, row.lastName].filter(Boolean).join(' ') || '—'}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <code className="break-all text-[11px] text-text-secondary">{row.userKey || '—'}</code>
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex max-w-[220px] flex-wrap gap-1">
+                          {row.roles.length ? (
+                            row.roles.map((r) => (
+                              <span
+                                key={`${row.userKey}-${r.slug}`}
+                                className="rounded-full bg-card-hover px-2 py-0.5 text-[11px] text-text-secondary"
+                              >
+                                {r.label || r.slug}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-text-muted">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 align-top text-xs text-text-secondary">
+                        {row.lastLogin ? formatDate(row.lastLogin) : '—'}
+                      </td>
+                      <td className="px-4 py-3 align-top text-right">
+                        <div className="flex flex-col items-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssignUserKey(row.userKey)
+                              setBanner(null)
+                            }}
+                            disabled={!row.userKey}
+                            className="rounded-lg border border-border bg-card px-2 py-1 text-[11px] font-medium text-text-secondary hover:border-accent/40 hover:text-text-primary disabled:opacity-40"
+                          >
+                            Use for assign
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRevokeUserKey(row.userKey)
+                              setBanner(null)
+                            }}
+                            disabled={!row.userKey}
+                            className="rounded-lg border border-border/60 bg-card px-2 py-1 text-[11px] text-text-muted hover:text-text-secondary disabled:opacity-40"
+                          >
+                            Use for revoke
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
+
+          {manage && teamPagination && teamPagination.total_pages > 0 && (
+            <Pagination
+              page={teamPagination.page}
+              totalPages={teamPagination.total_pages}
+              total={teamPagination.total}
+              label="users"
+              limit={teamPagination.limit}
+              onPageChange={setTeamPage}
+            />
+          )}
         </div>
 
         <div className="flex flex-col gap-6">
