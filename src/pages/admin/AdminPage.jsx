@@ -11,9 +11,11 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { cn } from '../../lib/utils'
 import {
+  PERMISSION_ALL,
   PERMISSION_FINANCIAL_READ,
   canManageRbac,
   canReadFinancial,
+  isManagementRoleSlug,
 } from '../../lib/permissions'
 import {
   assignUserRole,
@@ -144,6 +146,14 @@ export default function AdminPage() {
     loadRbac()
   }, [loadRbac])
 
+  useEffect(() => {
+    const current = rolesList.find((r) => r.pathId === editPathId)
+    if (current && isManagementRoleSlug(current.slug)) {
+      setEditPathId(null)
+      setDraftKeys([])
+    }
+  }, [rolesList, editPathId])
+
   const roleSummary = useMemo(() => {
     if (!Array.isArray(roles) || !roles.length) return 'No roles on profile'
     return roles.join(', ')
@@ -258,6 +268,13 @@ export default function AdminPage() {
 
   async function handleSaveRolePermissions(role) {
     if (!manage || !editPathId) return
+    if (isManagementRoleSlug(role.slug)) {
+      setBanner({
+        type: 'error',
+        text: 'The management role cannot be edited via PATCH; the API blocks permission changes for that role only.',
+      })
+      return
+    }
     setPending('patch')
     setBanner(null)
     try {
@@ -284,6 +301,13 @@ export default function AdminPage() {
     const label = createLabel.trim()
     if (!slug || !label) {
       setBanner({ type: 'error', text: 'Enter both slug and label for the new role.' })
+      return
+    }
+    if (isManagementRoleSlug(slug)) {
+      setBanner({
+        type: 'error',
+        text: 'The management role is seeded by the system; choose a different slug.',
+      })
       return
     }
     const permission_keys = [...createKeys]
@@ -369,6 +393,12 @@ export default function AdminPage() {
             <p className="mt-2 text-xs text-text-secondary">
               Roles: <span className="text-text-primary">{roleSummary}</span>
             </p>
+            {user?.role != null && String(user.role).length > 0 && (
+              <p className="mt-1 text-xs text-text-secondary">
+                Primary role (display):{' '}
+                <span className="font-mono text-text-primary">{user.role}</span>
+              </p>
+            )}
             <p className="mt-1 text-xs text-text-secondary">
               {permSummary}
               {seesMoney ? (
@@ -561,7 +591,10 @@ export default function AdminPage() {
           <h2 className="text-base font-medium text-text-primary">Roles & permission keys</h2>
           <p className="mt-1 text-sm text-text-secondary">
             Loaded from <code className="text-text-muted">GET /rbac/roles</code>. Edit uses{' '}
-            <code className="text-text-muted">PATCH /rbac/roles/:roleId/permissions</code>.
+            <code className="text-text-muted">PATCH /rbac/roles/:roleId/permissions</code> with a JSON body{' '}
+            <code className="text-text-muted">{`{ "permission_keys": [...] }`}</code>. Only the{' '}
+            <code className="text-text-muted">management</code> role is blocked from edits; other seeded roles
+            can be updated.
           </p>
         </div>
 
@@ -577,6 +610,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2 lg:gap-5 lg:p-6">
             {rolesList.map((role) => {
               const editing = editPathId === role.pathId
+              const patchLocked = isManagementRoleSlug(role.slug)
               return (
                 <div
                   key={role.pathId}
@@ -586,11 +620,22 @@ export default function AdminPage() {
                     <div>
                       <p className="text-sm font-semibold text-text-primary">{role.label}</p>
                       <p className="font-mono text-[11px] text-text-muted">{role.slug}</p>
+                      {patchLocked && (
+                        <p className="mt-1 max-w-[240px] text-[11px] leading-snug text-text-muted">
+                          Permission keys for this role are fixed on the server (management role).
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
-                      disabled={!manage}
+                      disabled={!manage || patchLocked}
+                      title={
+                        patchLocked
+                          ? 'API does not allow PATCH permission edits for the management role.'
+                          : undefined
+                      }
                       onClick={() => {
+                        if (patchLocked) return
                         if (editing) {
                           setEditPathId(null)
                           setDraftKeys([])
@@ -601,7 +646,7 @@ export default function AdminPage() {
                       }}
                       className={cn(
                         'shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                        manage
+                        manage && !patchLocked
                           ? 'border-border text-text-secondary hover:border-accent/40 hover:text-text-primary'
                           : 'cursor-not-allowed border-border/50 text-text-muted'
                       )}
@@ -615,7 +660,11 @@ export default function AdminPage() {
                         role.permission_keys.map((k) => (
                           <PermChip
                             key={k}
-                            highlight={k === PERMISSION_FINANCIAL_READ || k === 'rbac.manage'}
+                            highlight={
+                              k === PERMISSION_FINANCIAL_READ ||
+                              k === 'rbac.manage' ||
+                              k === PERMISSION_ALL
+                            }
                             title={catalogByKey.get(k)?.description || undefined}
                           >
                             {permissionChipLabel(k, catalogByKey)}

@@ -31,11 +31,18 @@ export async function createRbacRole(body) {
 }
 
 /**
+ * Replace role permission keys. Body must be JSON `{ permission_keys: string[] }` with
+ * `Content-Type: application/json`. The management role slug is blocked on the server.
+ *
  * @param {string | number} roleId
  * @param {{ permission_keys: string[] }} body
  */
 export async function patchRolePermissions(roleId, body) {
-  const { data } = await api.patch(`/rbac/roles/${encodeURIComponent(String(roleId))}/permissions`, body)
+  const { data } = await api.patch(
+    `/rbac/roles/${encodeURIComponent(String(roleId))}/permissions`,
+    body,
+    { headers: { 'Content-Type': 'application/json' } }
+  )
   return data
 }
 

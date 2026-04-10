@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import * as authService from '../services/auth'
+import {
+  extractTokenFromAuthPayload,
+  extractUserFromProfilePayload,
+} from '../lib/authUser'
 
 const AuthContext = createContext(null)
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000
@@ -13,26 +16,70 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('sterllo_token'))
   const [loading, setLoading] = useState(!!localStorage.getItem('sterllo_token'))
 
-  useEffect(() => {
-    if (token && !user) {
-      authService
-        .getProfile()
-        .then((res) => {
-          const profile = res.data || res
-          setUser(profile)
-          localStorage.setItem('sterllo_user', JSON.stringify(profile))
-        })
-        .catch(() => {
-          localStorage.removeItem('sterllo_token')
-          localStorage.removeItem('sterllo_user')
-          setToken(null)
-          setUser(null)
-        })
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout()
+    } finally {
+      setToken(null)
+      setUser(null)
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login')
+      } else {
+        window.location.reload()
+      }
     }
   }, [])
+
+  const login = async (email, password) => {
+    const res = await authService.login(email, password)
+    const jwt = extractTokenFromAuthPayload(res)
+    if (!jwt) {
+      throw new Error('No token in login response.')
+    }
+    localStorage.setItem('sterllo_token', jwt)
+    setToken(jwt)
+    // Profile (roles, permissions, role) is loaded in the token effect via GET /auth/profile.
+    return res
+  }
+
+  /** Whenever a token exists, GET /auth/profile is the source of truth for roles & permissions (guide §0.1). */
+  useEffect(() => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+
+    authService
+      .getProfile()
+      .then((res) => {
+        if (cancelled) return
+        const profile = extractUserFromProfilePayload(res)
+        if (profile) {
+          setUser(profile)
+          localStorage.setItem('sterllo_user', JSON.stringify(profile))
+        } else {
+          setUser(null)
+          localStorage.removeItem('sterllo_user')
+        }
+      })
+      .catch(() => {
+        if (cancelled) return
+        localStorage.removeItem('sterllo_token')
+        localStorage.removeItem('sterllo_user')
+        setToken(null)
+        setUser(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [token])
 
   useEffect(() => {
     if (!token) return
@@ -61,7 +108,6 @@ export function AuthProvider({ children }) {
 
     const resetTimer = () => {
       const now = Date.now()
-      // Prevent excessive timer churn on noisy events.
       if (now - lastResetAt < 500) return
       lastResetAt = now
       clearTimer()
@@ -88,43 +134,7 @@ export function AuthProvider({ children }) {
       window.removeEventListener('focus', resetTimer)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
-  }, [token])
-
-  const login = async (email, password) => {
-    const res = await authService.login(email, password)
-    const jwt = res.token || res.data?.token
-    const profile = res.user || res.data?.user || res.data
-
-    localStorage.setItem('sterllo_token', jwt)
-    setToken(jwt)
-
-    if (profile) {
-      localStorage.setItem('sterllo_user', JSON.stringify(profile))
-      setUser(profile)
-    } else {
-      const profileRes = await authService.getProfile()
-      const userData = profileRes.data || profileRes
-      localStorage.setItem('sterllo_user', JSON.stringify(userData))
-      setUser(userData)
-    }
-
-    return res
-  }
-
-  const logout = async () => {
-    try {
-      await authService.logout()
-    } finally {
-      setToken(null)
-      setUser(null)
-      // Force a full page refresh so the app fully resets to login.
-      if (window.location.pathname !== '/login') {
-        window.location.replace('/login')
-      } else {
-        window.location.reload()
-      }
-    }
-  }
+  }, [token, logout])
 
   return (
     <AuthContext.Provider value={{ user, token, loading, login, logout }}>
