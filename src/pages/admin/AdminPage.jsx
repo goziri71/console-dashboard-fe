@@ -7,6 +7,7 @@ import {
   UserPlus,
   Users,
   UserMinus,
+  X,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import Pagination from '../../components/ui/Pagination'
@@ -29,6 +30,8 @@ import {
   patchRolePermissions,
   revokeUserRole,
 } from '../../services/rbac'
+
+const BANNER_AUTO_DISMISS_MS = 5000
 
 function normalizePermission(p) {
   const key = p.key ?? p.permission_key ?? p.slug ?? p.id
@@ -176,6 +179,12 @@ export default function AdminPage() {
   useEffect(() => {
     loadRbac()
   }, [loadRbac])
+
+  useEffect(() => {
+    if (!banner) return
+    const t = window.setTimeout(() => setBanner(null), BANNER_AUTO_DISMISS_MS)
+    return () => window.clearTimeout(t)
+  }, [banner])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedTeamSearch(teamSearch.trim()), 400)
@@ -350,8 +359,12 @@ export default function AdminPage() {
     e.preventDefault()
     if (!manage) return
     setBanner(null)
-    if (!revokeUserKey.trim() || !revokeRoleSlug) {
-      setBanner({ type: 'error', text: 'Enter user key and role to revoke.' })
+    if (!revokeUserKey.trim()) {
+      setBanner({ type: 'error', text: 'Enter the user key (identifier your API expects).' })
+      return
+    }
+    if (!revokeRoleSlug) {
+      setBanner({ type: 'error', text: 'Select a role to revoke.' })
       return
     }
     setPending('revoke')
@@ -457,18 +470,31 @@ export default function AdminPage() {
 
       {banner && (
         <div
-          className={cn(
-            'animate-fade-in-up mb-4 rounded-card border px-4 py-3 text-sm',
-            banner.type === 'error'
-              ? 'border-error/40 bg-error-bg text-error'
-              : banner.type === 'success'
-                ? 'border-success/40 bg-success-bg text-success'
-                : banner.type === 'info'
-                  ? 'border-accent/30 bg-accent-bg/40 text-text-secondary'
-                  : 'border-border bg-card text-text-secondary'
-          )}
+          className="fixed inset-x-0 top-[76px] z-50 flex justify-center px-3 pt-3 sm:px-6 lg:pl-[248px]"
+          role="alert"
         >
-          {banner.text}
+          <div
+            className={cn(
+              'animate-fade-in-up flex w-full max-w-2xl items-start gap-3 rounded-card border px-4 py-3 text-sm shadow-lg shadow-black/10',
+              banner.type === 'error'
+                ? 'border-error/40 bg-error-bg text-error'
+                : banner.type === 'success'
+                  ? 'border-success/40 bg-success-bg text-success'
+                  : banner.type === 'info'
+                    ? 'border-accent/30 bg-accent-bg/40 text-text-secondary'
+                    : 'border-border bg-card text-text-secondary'
+            )}
+          >
+            <p className="min-w-0 flex-1 leading-snug">{banner.text}</p>
+            <button
+              type="button"
+              onClick={() => setBanner(null)}
+              className="shrink-0 rounded-md p-1 text-current opacity-70 transition-opacity hover:bg-black/10 hover:opacity-100"
+              aria-label="Dismiss notification"
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
+          </div>
         </div>
       )}
 
