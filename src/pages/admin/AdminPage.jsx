@@ -534,7 +534,7 @@ export default function AdminPage() {
             <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Signed in as</p>
             <p className="mt-1 text-sm font-medium text-text-primary">{user?.email || user?.username || '—'}</p>
             <p className="mt-2 text-xs text-text-secondary">
-              Roles: <span className="text-text-primary">{roleSummary}</span>
+              Role: <span className="text-text-primary">{roleSummary}</span>
             </p>
             {user?.role != null && String(user.role).length > 0 && (
               <p className="mt-1 text-xs text-text-secondary">
