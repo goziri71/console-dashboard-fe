@@ -1,21 +1,25 @@
 import { useNavigate } from 'react-router-dom'
-import { Building2, MoreVertical } from 'lucide-react'
-import { formatDate, cn } from '../../lib/utils'
+import { MoreVertical } from 'lucide-react'
+import { formatDate, formatNumber, cn } from '../../lib/utils'
+import {
+  countryToFlagEmoji,
+  typeLabel,
+  normalizeKycKey,
+  normalizeAccountStatusKey,
+  tierLabel,
+} from './merchantUi'
 
 const kycBadge = {
   verified: { label: 'Verified', cls: 'bg-success-bg text-success' },
-  pending:  { label: 'Pending',  cls: 'bg-warning-bg text-warning' },
-  none:     { label: 'None',     cls: 'bg-card-hover text-text-muted' },
+  pending: { label: 'Pending', cls: 'bg-warning-bg text-warning' },
+  rejected: { label: 'Rejected', cls: 'bg-error-bg text-error' },
+  none: { label: 'None', cls: 'bg-card-hover text-text-muted' },
 }
 
 const statusBadge = {
   active: { label: 'Active', cls: 'bg-success-bg text-success' },
-}
-
-const riskBadge = {
-  low:    { label: 'Low',    cls: 'bg-[#1a3a2a] text-[#4ade80]' },
-  medium: { label: 'Medium', cls: 'bg-warning-bg text-warning' },
-  high:   { label: 'High',   cls: 'bg-error-bg text-error' },
+  inactive: { label: 'Inactive', cls: 'bg-card-hover text-text-muted' },
+  suspended: { label: 'Suspended', cls: 'bg-error-bg text-error' },
 }
 
 function Badge({ config, value }) {
@@ -27,29 +31,16 @@ function Badge({ config, value }) {
   )
 }
 
-function deriveMerchantKyc(merchant) {
-  if (merchant.customer_count > 3) return 'verified'
-  if (merchant.customer_count > 0) return 'pending'
-  return 'none'
-}
-
-function deriveMerchantRisk(merchant) {
-  if (merchant.settlement_count === 0 && merchant.customer_count === 0) return 'high'
-  if (merchant.settlement_count === 0) return 'medium'
-  return 'low'
-}
-
 const COLUMNS = [
-  { key: 'flag',    label: '',               width: 'w-[52px]' },
-  { key: 'name',    label: 'Name',           width: 'min-w-[200px]' },
-  { key: 'type',    label: 'Type',           width: 'w-[100px]' },
-  { key: 'tier',    label: 'Tier Level',     width: 'w-[92px]' },
-  { key: 'kyc',     label: 'KYC Status',     width: 'w-[120px]' },
-  { key: 'status',  label: 'Account Status', width: 'w-[140px]' },
-  { key: 'balance', label: 'Balance',        width: 'min-w-[150px]' },
-  { key: 'risk',    label: 'Risk Level',     width: 'w-[100px]' },
-  { key: 'last',    label: 'Last Activity',  width: 'min-w-[170px]' },
-  { key: 'actions', label: '',               width: 'w-[56px]' },
+  { key: 'flag', label: '', width: 'w-[52px]' },
+  { key: 'name', label: 'Name', width: 'min-w-[200px]' },
+  { key: 'type', label: 'Type', width: 'w-[100px]' },
+  { key: 'tier', label: 'Tier Level', width: 'w-[92px]' },
+  { key: 'kyc', label: 'KYC Status', width: 'w-[120px]' },
+  { key: 'status', label: 'Account Status', width: 'w-[140px]' },
+  { key: 'customers', label: 'Number Of Customers', width: 'min-w-[140px]' },
+  { key: 'last', label: 'Last Activity', width: 'min-w-[170px]' },
+  { key: 'actions', label: '', width: 'w-[56px]' },
 ]
 
 export default function MerchantTable({ merchants }) {
@@ -77,9 +68,9 @@ export default function MerchantTable({ merchants }) {
           </thead>
           <tbody>
             {merchants.map((merchant, idx) => {
-              const kyc  = deriveMerchantKyc(merchant)
-              const risk = deriveMerchantRisk(merchant)
-              const currencies = merchant.currencies || []
+              const kyc = normalizeKycKey(merchant)
+              const acct = normalizeAccountStatusKey(merchant)
+              const flag = countryToFlagEmoji(merchant.country_code ?? merchant.country)
               return (
                 <tr
                   key={merchant.account_key || merchant.id || idx}
@@ -87,8 +78,14 @@ export default function MerchantTable({ merchants }) {
                   onClick={() => navigate(`/merchants/${merchant.account_key}`)}
                 >
                   <td className="px-4 py-2.5">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-card-hover text-text-muted">
-                      <Building2 size={14} />
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-card-hover text-base leading-none">
+                      {flag ? (
+                        <span title={merchant.country_code || ''} aria-hidden>
+                          {flag}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-text-muted">—</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
@@ -97,26 +94,25 @@ export default function MerchantTable({ merchants }) {
                       <span className="mt-0.5 block text-[11px] text-text-muted">{merchant.trade_name}</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-text-secondary">Business</td>
-                  <td className="px-4 py-2.5 text-text-secondary">Tier {merchant.default_kyc_tier ?? 1}</td>
-                  <td className="px-4 py-2.5"><Badge config={kycBadge} value={kyc} /></td>
-                  <td className="px-4 py-2.5"><Badge config={statusBadge} value="active" /></td>
-                  <td className="px-4 py-2.5 text-text-primary">
-                    {currencies.length > 0
-                      ? currencies.join(', ')
-                      : <span className="text-text-muted">--</span>}
-                    {merchant.ledger_count > 0 && (
-                      <span className="ml-1.5 text-[11px] text-text-muted">
-                        ({merchant.ledger_count} ledger{merchant.ledger_count > 1 ? 's' : ''})
-                      </span>
-                    )}
+                  <td className="px-4 py-2.5 text-text-secondary">{typeLabel(merchant)}</td>
+                  <td className="px-4 py-2.5 text-text-secondary">{tierLabel(merchant)}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge config={kycBadge} value={kyc} />
                   </td>
-                  <td className="px-4 py-2.5"><Badge config={riskBadge} value={risk} /></td>
+                  <td className="px-4 py-2.5">
+                    <Badge config={statusBadge} value={acct} />
+                  </td>
+                  <td className="px-4 py-2.5 tabular-nums text-text-primary">
+                    {formatNumber(merchant.customer_count ?? 0)}
+                  </td>
                   <td className="px-4 py-2.5 text-xs text-text-secondary">
                     {formatDate(merchant.date_modified || merchant.date_created)}
                   </td>
                   <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                    <button className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary active:scale-90">
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary active:scale-90"
+                    >
                       <MoreVertical size={16} />
                     </button>
                   </td>
