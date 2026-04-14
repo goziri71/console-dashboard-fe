@@ -135,6 +135,7 @@ export default function MerchantToolbar({
                 }`}
               >
                 {opt.label}
+                
               </button>
             ))
           }
@@ -143,7 +144,7 @@ export default function MerchantToolbar({
         <button
           type="button"
           onClick={onExport}
-          className="flex h-9 items-center gap-2 rounded-full border border-transparent bg-accent px-3.5 text-xs font-medium text-[#1a1c12] shadow-sm transition-colors hover:brightness-105 active:scale-[0.97]"
+          className="flex h-9 items-center gap-2 rounded-full border border-transparent bg-[#F7F7F7] px-3.5 text-xs font-medium text-[#1a1c12] shadow-sm transition-colors hover:brightness-105 active:scale-[0.97]"
         >
           <Download size={14} />
           Export

@@ -46,80 +46,64 @@ function SummaryCard({ label, value, icon, iconWrapCls, comparison }) {
   )
 }
 
-/** Unwrap stats whether the API returns the body or `{ data: {...} }`. */
 function unwrapStats(payload) {
   if (payload == null) return null
-  if (typeof payload === 'object' && payload.data !== undefined && typeof payload.data === 'object') {
-    return payload.data
-  }
+  if (payload.data != null && typeof payload.data === 'object') return payload.data
   return payload
+}
+
+/** Number from API, or `{ count: n }` if the backend ever sends that shape. */
+function asNumber(v) {
+  if (v == null) return 0
+  if (typeof v === 'object' && 'count' in v) return Number(v.count) || 0
+  return Number(v) || 0
+}
+
+function trendFrom(field, stats, key) {
+  if (field && typeof field === 'object' && field.change_pct != null) return field.change_pct
+  return stats?.[key] ?? null
 }
 
 function buildStatCards(stats) {
   const tm = stats?.total_merchants
   const tc = stats?.total_customers
-  const tcCount = typeof tc === 'object' && tc != null && 'count' in tc ? tc.count : tc
-  const tcChange =
-    typeof tc === 'object' && tc != null && tc.change_pct != null
-      ? tc.change_pct
-      : stats?.total_customers_change_pct
-
   const kyc = stats?.kyc_pending ?? stats?.kyc_pending_count
-  const kycCount = typeof kyc === 'object' && kyc != null && 'count' in kyc ? kyc.count : kyc
-  const kycChange =
-    typeof kyc === 'object' && kyc != null && kyc.change_pct != null
-      ? kyc.change_pct
-      : stats?.kyc_pending_change_pct
-
   const ra = stats?.restricted_accounts ?? stats?.restricted_accounts_count
-  const raCount = typeof ra === 'object' && ra != null && 'count' in ra ? ra.count : ra
+
+  const tmPct = trendFrom(tm, stats, 'total_merchants_change_pct')
+  const tcPct = trendFrom(tc, stats, 'total_customers_change_pct')
+  const kycPct = trendFrom(kyc, stats, 'kyc_pending_change_pct')
+
+  const cmp = (pct, label) =>
+    pct != null
+      ? { value: Math.abs(pct), direction: pct >= 0 ? 'up' : 'down', label }
+      : null
 
   return [
     {
       label: 'Total Merchants',
-      value: formatNumber(tm?.count ?? stats?.merchant_count ?? 0),
+      value: formatNumber(asNumber(tm)),
       icon: Building2,
       iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-accent-bg text-accent',
-      comparison:
-        tm?.change_pct != null
-          ? {
-              value: Math.abs(tm.change_pct),
-              direction: tm.change_pct >= 0 ? 'up' : 'down',
-              label: 'Compared to last month',
-            }
-          : null,
+      comparison: cmp(tmPct, 'Compared to last month'),
     },
     {
       label: 'Total Customers',
-      value: formatNumber(Number(tcCount) || 0),
+      value: formatNumber(asNumber(tc)),
       icon: Users,
       iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-success-bg text-success',
-      comparison:
-        tcChange != null
-          ? {
-              value: Math.abs(tcChange),
-              direction: tcChange >= 0 ? 'up' : 'down',
-              label: 'Compared to last month',
-            }
-          : null,
+      comparison: cmp(tcPct, 'Compared to last month'),
     },
     {
       label: 'KYC Pending',
-      value: formatNumber(Number(kycCount) || 0),
+      value: formatNumber(asNumber(kyc)),
       icon: Clock,
       iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-warning-bg text-warning',
-      comparison:
-        kycChange != null
-          ? {
-              value: Math.abs(kycChange),
-              direction: kycChange >= 0 ? 'up' : 'down',
-              label: 'Compared to yesterday',
-            }
-          : null,
+      comparison: cmp(kycPct, 'Compared to yesterday'),
     },
     {
       label: 'Restricted Accounts',
-      value: formatNumber(Number(raCount) || 0),
+      value: formatNumber(asNumber(ra)),
       icon: ShieldAlert,
       iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-error-bg text-error',
       comparison: null,
