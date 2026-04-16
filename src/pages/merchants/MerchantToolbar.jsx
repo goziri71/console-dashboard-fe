@@ -1,13 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, SlidersHorizontal, ArrowUpDown, Download, ChevronDown } from 'lucide-react'
 import { cn } from '../../lib/utils'
-
-const SORT_OPTIONS = [
-  { value: '', label: 'All' },
-  { value: 'date_created', label: 'Date Created' },
-  { value: 'name', label: 'Name' },
-  { value: 'trade_name', label: 'Trade Name' },
-]
+import { MERCHANT_SORT_OPTIONS } from './merchantToolbarOptions'
 
 const FILTER_OPTIONS = [
   { value: '', label: 'All' },
@@ -62,6 +56,9 @@ export default function MerchantToolbar({
   statusFilter,
   onStatusChange,
   onExport,
+  searchPlaceholder = 'Search merchants...',
+  sortOptions = MERCHANT_SORT_OPTIONS,
+  filterOptions = FILTER_OPTIONS,
 }) {
   const [localSearch, setLocalSearch] = useState(search)
   const timerRef = useRef(null)
@@ -77,8 +74,8 @@ export default function MerchantToolbar({
   }
 
   const effectiveSort = sortBy || ''
-  const currentSort = SORT_OPTIONS.find((o) => o.value === effectiveSort) || SORT_OPTIONS[0]
-  const currentStatus = FILTER_OPTIONS.find((o) => o.value === statusFilter)
+  const currentSort = sortOptions.find((o) => o.value === effectiveSort) || sortOptions[0]
+  const currentStatus = filterOptions.find((o) => o.value === statusFilter)
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
@@ -86,7 +83,7 @@ export default function MerchantToolbar({
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           type="search"
-          placeholder="Search merchants..."
+          placeholder={searchPlaceholder}
           value={localSearch}
           onChange={(e) => handleSearchInput(e.target.value)}
           className="h-10 w-full rounded-xl border border-border bg-page py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
@@ -96,7 +93,7 @@ export default function MerchantToolbar({
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
         <Dropdown trigger={<><ArrowUpDown size={14} /> Sort by: {currentSort.label}</>}>
           {(close) =>
-            SORT_OPTIONS.map((opt) => (
+            sortOptions.map((opt) => (
               <button
                 key={opt.value || 'all'}
                 type="button"
@@ -122,7 +119,7 @@ export default function MerchantToolbar({
 
         <Dropdown trigger={<><SlidersHorizontal size={14} /> Filter{currentStatus?.value ? `: ${currentStatus.label}` : ''}</>}>
           {(close) =>
-            FILTER_OPTIONS.map((opt) => (
+            filterOptions.map((opt) => (
               <button
                 key={opt.value || 'all'}
                 type="button"
