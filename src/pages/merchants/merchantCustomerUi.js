@@ -46,3 +46,16 @@ export function customerWalletCount(c) {
   if (n != null && n !== '') return Number(n) || 0
   return 0
 }
+
+/** Canonical id for API paths and `/transactions/statement?identifier=`. */
+export function getCustomerIdentifier(customer) {
+  if (customer == null || typeof customer !== 'object') return ''
+  return (
+    customer.identifier ??
+    customer.customer_identifier ??
+    customer.customer_key ??
+    customer.account_key ??
+    customer.id ??
+    ''
+  )
+}

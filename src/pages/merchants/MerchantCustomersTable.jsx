@@ -9,6 +9,7 @@ import {
   customerKycKey,
   customerAccountStatusKey,
   customerWalletCount,
+  getCustomerIdentifier,
 } from './merchantCustomerUi'
 
 const kycBadge = {
@@ -44,16 +45,6 @@ const COLUMNS = [
   { key: 'last', label: 'Last Activity', width: 'min-w-[170px]' },
   { key: 'actions', label: '', width: 'w-[56px]' },
 ]
-
-function getCustomerIdentifier(customer) {
-  return (
-    customer?.identifier ??
-    customer?.customer_identifier ??
-    customer?.customer_key ??
-    customer?.account_key ??
-    customer?.id
-  )
-}
 
 export default function MerchantCustomersTable({ customers }) {
   const navigate = useNavigate()

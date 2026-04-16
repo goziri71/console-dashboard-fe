@@ -20,7 +20,7 @@ import {
   getCustomerWalletLedger,
   patchCustomer,
 } from '../../services/customers'
-import { getStatementTransactions } from '../../services/transactions'
+import { getMerchantCustomerTransactions } from '../../services/merchants'
 import { getDisputes, getDisputesSummary } from '../../services/disputes'
 import { useAuth } from '../../context/AuthContext'
 import { canReadFinancial } from '../../lib/permissions'
@@ -40,11 +40,14 @@ import {
   customerKycKey,
   customerAccountStatusKey,
   customerTypeLabel,
+  getCustomerIdentifier,
 } from './merchantCustomerUi'
 
 const CAN_MUTATE = ['operations', 'compliance']
 const WALLET_PAGE_SIZE = 8
 const LEDGER_PAGE_SIZE = 15
+/** Statement lists all wallets for the customer; larger page = fewer round-trips vs API default caps. */
+const STATEMENT_PAGE_SIZE = 100
 
 function unwrapPayload(payload) {
   if (payload == null) return null
@@ -58,6 +61,9 @@ function pickRecords(res) {
   const body = res == null ? null : typeof res === 'object' ? res : null
   const inner = unwrapPayload(body) ?? body
   if (Array.isArray(inner?.records)) return inner.records
+  if (Array.isArray(inner?.transactions)) return inner.transactions
+  if (Array.isArray(inner?.items)) return inner.items
+  if (Array.isArray(inner?.results)) return inner.results
   if (Array.isArray(inner?.data)) return inner.data
   if (Array.isArray(inner)) return inner
   return []
@@ -65,7 +71,33 @@ function pickRecords(res) {
 
 function pickPagination(res) {
   const inner = unwrapPayload(res) ?? res ?? {}
-  return inner.pagination ?? inner.meta?.pagination ?? {}
+  const nested =
+    inner.pagination ??
+    inner.meta?.pagination ??
+    (inner.meta && typeof inner.meta === 'object' && (inner.meta.total != null || inner.meta.last_page != null) ? inner.meta : null) ??
+    {}
+  const rootHints = {
+    total: inner.total ?? inner.count,
+    total_pages: inner.total_pages ?? inner.totalPages ?? inner.last_page ?? inner.lastPage,
+    last_page: inner.last_page ?? inner.lastPage,
+  }
+  const merged = { ...rootHints, ...nested }
+  if ((merged.total_pages == null || merged.total_pages === '') && merged.last_page != null) {
+    const lp = Number(merged.last_page)
+    if (Number.isFinite(lp) && lp > 0) merged.total_pages = lp
+  }
+  return merged
+}
+
+function inferTotalPagesFromResponse(res, limit, currentPage) {
+  const rows = pickRecords(res)
+  const pag = pickPagination(res)
+  const tp = Number(pag.total_pages ?? pag.last_page ?? pag.lastPage)
+  const total = Number(pag.total ?? pag.count)
+  if (Number.isFinite(tp) && tp > 0) return tp
+  if (Number.isFinite(total) && total > 0) return Math.max(1, Math.ceil(total / limit))
+  if (rows.length < limit) return Math.max(1, currentPage)
+  return Math.max(currentPage + 1, 2)
 }
 
 function normalizeDisputesSummary(payload) {
@@ -159,6 +191,14 @@ export default function CustomerDetailsPage() {
   const customerId = useMemo(() => (identifierParam ? decodeURIComponent(identifierParam) : ''), [identifierParam])
 
   const [customer, setCustomer] = useState(null)
+
+  /** Canonical customer id for wallets, ledger, disputes, and GET /merchants/.../customers/.../transactions (all wallets). */
+  const statementIdentifier = useMemo(() => {
+    if (!customerId) return ''
+    if (!customer) return customerId
+    return getCustomerIdentifier(customer) || customerId
+  }, [customer, customerId])
+
   const [metrics, setMetrics] = useState({ total_wallets: 0, sub_accounts: 0, disputes: 0 })
   const [wallets, setWallets] = useState([])
   const [walletPage, setWalletPage] = useState(1)
@@ -168,6 +208,10 @@ export default function CustomerDetailsPage() {
   const [walletsLoading, setWalletsLoading] = useState(false)
 
   const [statementRows, setStatementRows] = useState([])
+  const [statementPage, setStatementPage] = useState(1)
+  const [statementTotalPages, setStatementTotalPages] = useState(1)
+  const [statementLoading, setStatementLoading] = useState(false)
+  const [statementFetchKey, setStatementFetchKey] = useState(0)
   const [disputeSummary, setDisputeSummary] = useState({ total: 0, in_review: 0, escalated: 0, resolved: 0 })
   const [disputeRows, setDisputeRows] = useState([])
   const [selectedWalletKey, setSelectedWalletKey] = useState(null)
@@ -186,6 +230,10 @@ export default function CustomerDetailsPage() {
   const ledgerScopeRef = useRef('')
 
   useEffect(() => {
+    setCustomer(null)
+  }, [customerId, accountKey])
+
+  useEffect(() => {
     const t = window.setTimeout(() => setWalletSearch(walletSearchInput), 400)
     return () => window.clearTimeout(t)
   }, [walletSearchInput])
@@ -195,10 +243,10 @@ export default function CustomerDetailsPage() {
   }, [walletSearch])
 
   const loadWallets = useCallback(async () => {
-    if (!customerId) return
+    if (!statementIdentifier) return
     setWalletsLoading(true)
     try {
-      const res = await getCustomerWallets(customerId, {
+      const res = await getCustomerWallets(statementIdentifier, {
         page: walletPage,
         limit: WALLET_PAGE_SIZE,
         search: walletSearch.trim() || undefined,
@@ -222,31 +270,27 @@ export default function CustomerDetailsPage() {
     } finally {
       setWalletsLoading(false)
     }
-  }, [customerId, walletPage, walletSearch])
+  }, [statementIdentifier, walletPage, walletSearch])
 
   const fetchCore = useCallback(async () => {
     if (!customerId) return
     setLoading(true)
     setError(null)
-    setStatementNote(null)
 
     try {
       const cRes = await getCustomer(customerId).catch(() => null)
       const customerPayload = unwrapPayload(cRes) ?? cRes
       setCustomer(customerPayload && typeof customerPayload === 'object' ? customerPayload : null)
 
-      const [metRes, sumRes, listRes, stmtRes] = await Promise.allSettled([
-        getCustomerMetrics(customerId),
-        getDisputesSummary({ identifier: customerId, account_key: accountKey }),
-        getDisputes({ identifier: customerId, account_key: accountKey, page: 1, limit: 25 }),
-        financial
-          ? getStatementTransactions({
-              identifier: customerId,
-              account_key: accountKey,
-              page: 1,
-              limit: 25,
-            })
-          : Promise.resolve(null),
+      const apiCustomerId =
+        customerPayload && typeof customerPayload === 'object'
+          ? getCustomerIdentifier(customerPayload) || customerId
+          : customerId
+
+      const [metRes, sumRes, listRes] = await Promise.allSettled([
+        getCustomerMetrics(apiCustomerId),
+        getDisputesSummary({ identifier: apiCustomerId, account_key: accountKey }),
+        getDisputes({ identifier: apiCustomerId, account_key: accountKey, page: 1, limit: 25 }),
       ])
 
       if (metRes.status === 'fulfilled') {
@@ -272,17 +316,6 @@ export default function CustomerDetailsPage() {
         setDisputeRows([])
       }
 
-      if (financial && stmtRes.status === 'fulfilled') {
-        setStatementRows(pickRecords(stmtRes.value))
-      } else {
-        setStatementRows([])
-        if (financial && stmtRes.status === 'rejected') {
-          setStatementNote('Unable to load transaction statement.')
-        } else if (!financial) {
-          setStatementNote('Financial statement requires financial.read permission.')
-        }
-      }
-
       if (!customerPayload || typeof customerPayload !== 'object') {
         setError('Customer profile not found.')
       }
@@ -291,26 +324,75 @@ export default function CustomerDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }, [accountKey, customerId, financial])
+  }, [accountKey, customerId])
 
   useEffect(() => {
     fetchCore()
   }, [fetchCore])
 
   useEffect(() => {
-    if (!customerId || !customer) return
+    if (!statementIdentifier || !customer) return
     loadWallets()
-  }, [customerId, customer, loadWallets])
+  }, [statementIdentifier, customer, loadWallets])
 
   useEffect(() => {
-    if (!customerId || !selectedWalletKey || !financial) {
+    setStatementPage(1)
+    setStatementRows([])
+  }, [customerId, accountKey, statementIdentifier])
+
+  useEffect(() => {
+    if (!statementIdentifier || !accountKey) {
+      setStatementRows([])
+      setStatementTotalPages(1)
+      setStatementNote(null)
+      setStatementLoading(false)
+      return
+    }
+    if (!financial) {
+      setStatementRows([])
+      setStatementTotalPages(1)
+      setStatementLoading(false)
+      setStatementNote('Financial statement requires financial.read permission.')
+      return
+    }
+
+    let cancelled = false
+    setStatementLoading(true)
+    setStatementNote(null)
+    getMerchantCustomerTransactions(accountKey, statementIdentifier, {
+      page: statementPage,
+      limit: STATEMENT_PAGE_SIZE,
+    })
+      .then((res) => {
+        if (cancelled) return
+        const rows = pickRecords(res)
+        setStatementRows(rows)
+        setStatementTotalPages(inferTotalPagesFromResponse(res, STATEMENT_PAGE_SIZE, statementPage))
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setStatementRows([])
+          setStatementTotalPages(1)
+          setStatementNote(e?.response?.data?.message || 'Unable to load transaction statement.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setStatementLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accountKey, financial, statementFetchKey, statementIdentifier, statementPage])
+
+  useEffect(() => {
+    if (!statementIdentifier || !selectedWalletKey || !financial) {
       setLedgerRows([])
       setLedgerTotalPages(1)
       ledgerScopeRef.current = ''
       return
     }
 
-    const scopeKey = `${customerId}:${selectedWalletKey}`
+    const scopeKey = `${statementIdentifier}:${selectedWalletKey}`
     if (ledgerScopeRef.current !== scopeKey) {
       ledgerScopeRef.current = scopeKey
       if (ledgerPage !== 1) {
@@ -321,25 +403,12 @@ export default function CustomerDetailsPage() {
 
     let cancelled = false
     setLedgerLoading(true)
-    getCustomerWalletLedger(customerId, selectedWalletKey, { page: ledgerPage, limit: LEDGER_PAGE_SIZE })
+    getCustomerWalletLedger(statementIdentifier, selectedWalletKey, { page: ledgerPage, limit: LEDGER_PAGE_SIZE })
       .then((res) => {
         if (cancelled) return
         const rows = pickRecords(res)
         setLedgerRows(rows)
-        const pag = pickPagination(res)
-        const tp = Number(pag.total_pages)
-        const total = Number(pag.total)
-        let pages = 1
-        if (Number.isFinite(tp) && tp > 0) {
-          pages = tp
-        } else if (Number.isFinite(total) && total > 0) {
-          pages = Math.max(1, Math.ceil(total / LEDGER_PAGE_SIZE))
-        } else if (rows.length < LEDGER_PAGE_SIZE) {
-          pages = Math.max(1, ledgerPage)
-        } else {
-          pages = Math.max(ledgerPage + 1, 2)
-        }
-        setLedgerTotalPages(pages)
+        setLedgerTotalPages(inferTotalPagesFromResponse(res, LEDGER_PAGE_SIZE, ledgerPage))
       })
       .catch(() => {
         if (!cancelled) {
@@ -353,7 +422,7 @@ export default function CustomerDetailsPage() {
     return () => {
       cancelled = true
     }
-  }, [customerId, selectedWalletKey, financial, ledgerPage])
+  }, [statementIdentifier, selectedWalletKey, financial, ledgerPage])
 
   const pushMsg = (type, text) => {
     setMsg({ type, text })
@@ -365,7 +434,7 @@ export default function CustomerDetailsPage() {
     if (!window.confirm(`Place post-no-debit restriction on ${displayName}?`)) return
     setMutating(true)
     try {
-      const res = await patchCustomer(customerId, { is_pnd: '1' })
+      const res = await patchCustomer(statementIdentifier || customerId, { is_pnd: '1' })
       const body = unwrapPayload(res) ?? res
       setCustomer((prev) => ({ ...prev, ...body }))
       pushMsg('success', 'Customer updated.')
@@ -383,7 +452,7 @@ export default function CustomerDetailsPage() {
     if (!window.confirm(`Upgrade ${displayName} to tier ${next}?`)) return
     setMutating(true)
     try {
-      const res = await patchCustomer(customerId, { tier: next })
+      const res = await patchCustomer(statementIdentifier || customerId, { tier: next })
       const body = unwrapPayload(res) ?? res
       setCustomer((prev) => ({ ...prev, ...body, tier: body?.tier ?? next }))
       pushMsg('success', `Tier updated to ${next}.`)
@@ -413,6 +482,14 @@ export default function CustomerDetailsPage() {
       })),
     ]
     exportToCsv(rows, `customer-${customerId.slice(0, 8)}.csv`)
+  }
+
+  const handleExportStatementRows = () => {
+    if (!statementRows.length) return
+    exportToCsv(
+      statementRows,
+      `customer-${String(statementIdentifier).slice(0, 8)}-transactions-page-${statementPage}.csv`
+    )
   }
 
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
@@ -493,8 +570,9 @@ export default function CustomerDetailsPage() {
           <button
             type="button"
             onClick={() => {
-              fetchCore()
-              loadWallets()
+              void fetchCore()
+              void loadWallets()
+              setStatementFetchKey((k) => k + 1)
             }}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs text-text-secondary hover:bg-card-hover disabled:opacity-50"
@@ -838,47 +916,90 @@ export default function CustomerDetailsPage() {
           {mainTab === 'transactions' && (
             <div>
               <div className="mb-3 flex justify-end">
-                <span className="text-sm font-medium text-accent">View All</span>
+                <button
+                  type="button"
+                  title="Download this page as CSV"
+                  disabled={!financial || !statementRows.length || statementLoading}
+                  onClick={handleExportStatementRows}
+                  className="text-sm font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+                >
+                  View All
+                </button>
               </div>
               {!financial ? (
                 <p className="py-8 text-center text-sm text-text-muted">{statementNote}</p>
+              ) : statementLoading && !statementRows.length ? (
+                <div className="flex items-center justify-center gap-2 py-16 text-sm text-text-muted">
+                  <Loader2 className="h-5 w-5 animate-spin text-accent" aria-hidden />
+                  Loading transactions…
+                </div>
               ) : statementRows.length ? (
-                <div className="overflow-x-auto rounded-xl border border-border/60">
-                  <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="bg-card-hover/60">
-                      <tr className="text-xs font-medium text-text-muted">
-                        <th className="px-3 py-3">Transaction ID</th>
-                        <th className="px-3 py-3">Amount</th>
-                        <th className="px-3 py-3">Type</th>
-                        <th className="px-3 py-3">Status</th>
-                        <th className="px-3 py-3">Date</th>
-                        <th className="w-10 px-3 py-3" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statementRows.map((tx, idx) => {
-                        const st = statementStatusKind(tx.status)
-                        const amt =
-                          tx.amount != null
-                            ? formatBalance(Number(String(tx.amount).replace(/,/g, '')), tx.currency_code || 'USD')
-                            : '—'
-                        return (
-                          <tr key={`${tx.reference}-${idx}`} className="border-t border-border/50">
-                            <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">{tx.reference || '—'}</td>
-                            <td className="px-3 py-2.5 tabular-nums text-text-secondary">{amt}</td>
-                            <td className="px-3 py-2.5 uppercase text-text-secondary">{tx.transaction_type || '—'}</td>
-                            <td className="px-3 py-2.5">{dotBadge(st.kind, st.label)}</td>
-                            <td className="px-3 py-2.5 text-xs text-text-muted">{formatDate(tx.date_created)}</td>
-                            <td className="px-3 py-2.5">
-                              <button type="button" className="rounded p-1 text-text-muted hover:bg-card-hover" aria-label="Row actions">
-                                <MoreVertical size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                <div className="flex flex-col gap-2">
+                  <div className="relative overflow-x-auto rounded-xl border border-border/60">
+                    {statementLoading ? (
+                      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-card/60 backdrop-blur-[1px]">
+                        <Loader2 className="h-6 w-6 animate-spin text-accent" aria-label="Loading" />
+                      </div>
+                    ) : null}
+                    <table className="w-full min-w-[720px] text-left text-sm">
+                      <thead className="bg-card-hover/60">
+                        <tr className="text-xs font-medium text-text-muted">
+                          <th className="px-3 py-3">Transaction ID</th>
+                          <th className="px-3 py-3">Amount</th>
+                          <th className="px-3 py-3">Type</th>
+                          <th className="px-3 py-3">Status</th>
+                          <th className="px-3 py-3">Date</th>
+                          <th className="w-10 px-3 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statementRows.map((tx, idx) => {
+                          const st = statementStatusKind(tx.status)
+                          const amt =
+                            tx.amount != null
+                              ? formatBalance(Number(String(tx.amount).replace(/,/g, '')), tx.currency_code || 'USD')
+                              : '—'
+                          return (
+                            <tr key={`${tx.reference}-${idx}`} className="border-t border-border/50">
+                              <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">{tx.reference || '—'}</td>
+                              <td className="px-3 py-2.5 tabular-nums text-text-secondary">{amt}</td>
+                              <td className="px-3 py-2.5 uppercase text-text-secondary">{tx.transaction_type || '—'}</td>
+                              <td className="px-3 py-2.5">{dotBadge(st.kind, st.label)}</td>
+                              <td className="px-3 py-2.5 text-xs text-text-muted">{formatDate(tx.date_created)}</td>
+                              <td className="px-3 py-2.5">
+                                <span className="inline-flex rounded p-1 text-text-muted" aria-hidden>
+                                  <ChevronRight size={16} />
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex shrink-0 items-center justify-between rounded-lg border border-border/50 bg-[#0b0d12] px-3 py-2 text-[10px] text-[#8e95a1]">
+                    <span>
+                      Page {statementPage} of {statementTotalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={statementPage <= 1 || statementLoading}
+                        onClick={() => setStatementPage((p) => Math.max(1, p - 1))}
+                        className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        disabled={statementPage >= statementTotalPages || statementLoading}
+                        onClick={() => setStatementPage((p) => p + 1)}
+                        className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <p className="py-8 text-center text-sm text-text-muted">{statementNote || 'No transactions.'}</p>

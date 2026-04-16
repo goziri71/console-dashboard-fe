@@ -42,6 +42,21 @@ export async function getMerchantCustomers(accountKey, params = {}) {
   return data
 }
 
+/**
+ * All transactions for a customer under this merchant (same payload shape as GET /transactions/statement).
+ * Path encodes `account_key` and `identifier`; pass `page`, `limit`, filters as query only.
+ * @param {string} accountKey
+ * @param {string} identifier Customer identifier
+ * @param {Record<string, string | number | undefined>} [params] page, limit, wallet_key, status, currency_code, search, from_date, to_date
+ * @param {AbortSignal} [signal]
+ */
+export async function getMerchantCustomerTransactions(accountKey, identifier, params = {}, signal) {
+  const ak = encodeURIComponent(String(accountKey))
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.get(`/merchants/${ak}/customers/${id}/transactions`, { params, signal })
+  return data
+}
+
 export async function getMerchantLedgers(accountKey, params = {}) {
   const { data } = await api.get(`/merchants/${accountKey}/ledgers`, { params })
   return data
