@@ -34,8 +34,9 @@ export function customerKycKey(c) {
 export function customerAccountStatusKey(c) {
   const raw = c?.account_status ?? c?.status ?? c?.lifecycle_status
   if (raw != null && raw !== '') {
-    const s = String(raw).toLowerCase()
-    if (['active', 'inactive', 'suspended'].includes(s)) return s
+    const s = String(raw).toLowerCase().replace(/\s+/g, '_')
+    if (['active', 'inactive', 'suspended', 'pending'].includes(s)) return s
+    if (s === 'frozen' || s === 'blocked') return 'suspended'
   }
   return 'active'
 }

@@ -11,11 +11,35 @@ export async function getCustomers(params = {}) {
 }
 
 export async function getCustomer(identifier) {
-  const { data } = await api.get(`/customers/${identifier}`)
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.get(`/customers/${id}`)
+  return data
+}
+
+/** operations, compliance — see API PATCH /customers/:identifier */
+export async function patchCustomer(identifier, payload) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.patch(`/customers/${id}`, payload)
   return data
 }
 
 export async function getCustomerWallets(identifier, params = {}) {
-  const { data } = await api.get(`/customers/${identifier}/wallets`, { params })
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.get(`/customers/${id}/wallets`, { params })
+  return data
+}
+
+/** Summary counts for profile metric cards (wallets, sub-accounts, disputes). */
+export async function getCustomerMetrics(identifier) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.get(`/customers/${id}/metrics`)
+  return data
+}
+
+/** Per-wallet ledger lines; backend may require `financial.read`. */
+export async function getCustomerWalletLedger(identifier, walletKey, params = {}) {
+  const id = encodeURIComponent(String(identifier))
+  const wk = encodeURIComponent(String(walletKey))
+  const { data } = await api.get(`/customers/${id}/wallets/${wk}/ledger`, { params })
   return data
 }
