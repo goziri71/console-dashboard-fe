@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  Download,
   Snowflake,
   TrendingUp,
   Loader2,
@@ -17,7 +16,7 @@ import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
 import { CUSTOMER_SORT_OPTIONS } from './merchantToolbarOptions'
 import MerchantCustomersTable from './MerchantCustomersTable'
-import { countryToFlagEmoji, normalizeAccountStatusKey, typeLabel } from './merchantUi'
+import { countryToFlagEmoji, normalizeAccountStatusKey, typeLabel, tierLabel } from './merchantUi'
 import {
   customerDisplayName,
   customerTypeLabel,
@@ -36,21 +35,23 @@ function unwrapPayload(payload) {
   return payload
 }
 
-function dotBadge(type, label) {
+/** Pills for the merchant profile banner (Figma node 8712-11162). */
+function profileBannerPill(kind, label) {
   const styles = {
-    active: 'bg-success-bg text-success border-success/20',
-    verified: 'bg-success-bg text-success border-success/20',
-    medium: 'bg-warning-bg text-warning border-warning/20',
-    business: 'bg-[#3f1d7a]/35 text-[#c084fc] border-[#6d28d9]/40',
-    processing: 'bg-[#072a66] text-[#2970ff] border-[#1d4ed8]/30',
-    inactive: 'bg-card-hover text-text-muted border-border',
-    suspended: 'bg-[#451a1a] text-[#f87171] border-[#7f1d1d]',
+    'status-active': 'border border-[#1b4d2e]/70 bg-[#0f2418] text-[#86efac]',
+    'status-suspended': 'border border-[#7f1d1d]/50 bg-[#2c1212] text-[#fca5a5]',
+    'status-inactive': 'border border-white/[0.08] bg-[#161a22] text-[#9ca3af]',
+    'type': 'border border-[#5b21b6]/35 bg-[#2d1248]/90 text-[#e9d5ff]',
   }
   return (
-    <span className={cn('inline-flex rounded-full border px-3 py-0.5 text-[11px] font-medium', styles[type] || styles.inactive)}>
+    <span className={cn('inline-flex rounded-full px-3 py-1 text-xs font-medium leading-none', styles[kind] || styles['status-inactive'])}>
       {label}
     </span>
   )
+}
+
+function ProfileDivider() {
+  return <span className="mx-3 hidden h-3.5 w-px shrink-0 bg-[#3f4552] sm:inline" aria-hidden />
 }
 
 export default function MerchantDetailsPage() {
@@ -240,6 +241,7 @@ export default function MerchantDetailsPage() {
   }
 
   const flag = countryToFlagEmoji(merchant.country_code ?? merchant.country)
+  const accountTypeLabel = typeStr === '—' ? '—' : `${String(typeStr).slice(0, 1).toUpperCase()}${String(typeStr).slice(1).toLowerCase()}`
 
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -302,10 +304,10 @@ export default function MerchantDetailsPage() {
         )}
       </div>
 
-      <section className="rounded-card border border-border bg-card p-5">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 flex-1 items-start gap-5">
-            <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-card-hover text-4xl leading-none">
+      <section className="overflow-hidden rounded-card border border-white/8 bg-black px-4 py-5 sm:px-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-6 xl:gap-10">
+          <div className="flex min-w-0 shrink-0 items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#14161c] text-[2.25rem] leading-none sm:h-[72px] sm:w-[72px] sm:text-[2.5rem]">
               {flag ? (
                 <span aria-hidden>{flag}</span>
               ) : (
@@ -313,31 +315,40 @@ export default function MerchantDetailsPage() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-semibold text-text-primary">{merchant.name || '—'}</h1>
-              <p className="mt-1 font-mono text-sm text-text-secondary">ID: {merchant.account_key || '—'}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-text-secondary">
-                <span>{phone || '—'}</span>
-                <span className="hidden h-4 w-px bg-border sm:inline" />
-                <span className="break-all">{email || '—'}</span>
-                <span className="hidden h-4 w-px bg-border sm:inline" />
-                <span>Tier {merchant.default_kyc_tier ?? 0}</span>
-              </div>
+              <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-white sm:text-xl">
+                {merchant.name || '—'}
+              </h1>
+              <p className="mt-1.5 font-mono text-[13px] leading-tight text-[#7d8087]">
+                ID: {merchant.account_key || '—'}
+              </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap gap-6 lg:justify-end">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Account Status</p>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center text-sm font-normal text-white sm:flex-nowrap">
+            <span className="shrink-0 tabular-nums">{phone || '—'}</span>
+            <ProfileDivider />
+            <span className="min-w-0 break-all">{email || '—'}</span>
+            <ProfileDivider />
+            <span className="shrink-0">{tierLabel(merchant)}</span>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-5 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:gap-8 sm:border-l sm:border-t-0 sm:pl-8 sm:pt-0 lg:pl-10">
+            <div className="min-w-[120px]">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6f747f]">Account Status</p>
               <div className="mt-2">
-                {dotBadge(
-                  accountStatusKey === 'active' ? 'active' : accountStatusKey === 'suspended' ? 'suspended' : 'inactive',
+                {profileBannerPill(
+                  accountStatusKey === 'active'
+                    ? 'status-active'
+                    : accountStatusKey === 'suspended'
+                      ? 'status-suspended'
+                      : 'status-inactive',
                   accountStatusKey === 'active' ? 'Active' : accountStatusKey === 'suspended' ? 'Suspended' : 'Inactive'
                 )}
               </div>
             </div>
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Account Type</p>
-              <div className="mt-2">{dotBadge('business', typeStr === '—' ? '—' : typeStr)}</div>
+            <div className="min-w-[120px]">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6f747f]">Account Type</p>
+              <div className="mt-2">{profileBannerPill('type', accountTypeLabel)}</div>
             </div>
           </div>
         </div>
