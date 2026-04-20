@@ -51,7 +51,7 @@ function profileBannerPill(kind, label) {
 }
 
 function ProfileDivider() {
-  return <span className="mx-3 hidden h-3.5 w-px shrink-0 bg-[#3f4552] sm:inline" aria-hidden />
+  return <span className="mx-2 hidden h-3.5 w-px shrink-0 bg-[#3f4552] md:inline" aria-hidden />
 }
 
 export default function MerchantDetailsPage() {
@@ -215,17 +215,17 @@ export default function MerchantDetailsPage() {
 
   if (merchantLoading && !merchant) {
     return (
-      <div className="animate-fade-in-up space-y-6">
-        <div className="h-6 w-48 skeleton rounded-lg" />
-        <div className="h-32 skeleton rounded-card" />
-        <div className="h-64 skeleton rounded-card" />
+      <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
+        <div className="h-6 w-48 max-w-full skeleton rounded-lg" />
+        <div className="h-28 w-full skeleton rounded-card sm:h-32" />
+        <div className="h-56 w-full skeleton rounded-card sm:h-64" />
       </div>
     )
   }
 
   if (merchantError || !merchant) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24">
+      <div className="mx-auto flex w-full max-w-[100vw] flex-col items-center justify-center gap-4 overflow-x-hidden px-4 py-16 sm:py-24">
         <AlertCircle className="text-error" size={36} />
         <p className="text-sm text-text-secondary">{merchantError || 'Merchant not found.'}</p>
         <button
@@ -244,11 +244,11 @@ export default function MerchantDetailsPage() {
   const accountTypeLabel = typeStr === '—' ? '—' : `${String(typeStr).slice(0, 1).toUpperCase()}${String(typeStr).slice(1).toLowerCase()}`
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
       {msg && (
         <div
           className={cn(
-            'rounded-card border px-4 py-2.5 text-sm',
+            'rounded-card border px-3 py-2.5 text-sm sm:px-4',
             msg.type === 'success' ? 'border-success/30 bg-success-bg text-success' : 'border-error/30 bg-error-bg text-error'
           )}
         >
@@ -256,45 +256,45 @@ export default function MerchantDetailsPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1 text-xs text-text-muted">
-          <Link to="/merchants" className="inline-flex items-center gap-1 hover:text-accent">
-            <ArrowLeft size={12} />
-            Merchants
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="inline-flex max-w-full min-w-0 items-center gap-2 self-start rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs text-text-muted sm:self-auto">
+          <Link to="/merchants" className="inline-flex min-w-0 items-center gap-1 hover:text-accent">
+            <ArrowLeft size={12} className="shrink-0" />
+            <span className="truncate">Merchants</span>
           </Link>
-          <span className="text-text-muted">›</span>
-          <span className="text-text-primary">Customer Details</span>
+          <span className="shrink-0 text-text-muted">›</span>
+          <span className="truncate text-text-primary">Merchant profile</span>
         </div>
         {canMutate && (
-          <div className="relative">
+          <div className="relative w-full sm:w-auto sm:self-auto">
             <button
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
-              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs text-text-secondary hover:bg-card-hover"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-3 py-2.5 text-xs text-text-secondary hover:bg-card-hover sm:w-auto sm:justify-center"
             >
               <MoreHorizontal size={16} />
               Actions
             </button>
             {menuOpen && (
               <>
-                <button type="button" className="fixed inset-0 z-10 cursor-default" aria-label="Close menu" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-full z-20 mt-1 min-w-[180px] overflow-hidden rounded-xl border border-border bg-page py-1 shadow-lg">
+                <button type="button" className="fixed inset-0 z-10 cursor-default bg-black/40" aria-label="Close menu" onClick={() => setMenuOpen(false)} />
+                <div className="absolute left-0 right-0 z-20 mt-1 max-h-[min(70vh,20rem)] overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-page py-1 shadow-lg sm:left-auto sm:right-0 sm:max-h-none sm:min-w-50 sm:max-w-none">
                   <button
                     type="button"
                     disabled={freezing}
                     onClick={handleFreeze}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-secondary hover:bg-card-hover"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-secondary hover:bg-card-hover sm:py-2"
                   >
-                    {freezing ? <Loader2 size={14} className="animate-spin" /> : <Snowflake size={14} />}
+                    {freezing ? <Loader2 size={14} className="animate-spin shrink-0" /> : <Snowflake size={14} className="shrink-0" />}
                     Freeze account
                   </button>
                   <button
                     type="button"
                     disabled={upgrading}
                     onClick={handleUpgradeTier}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-secondary hover:bg-card-hover"
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-secondary hover:bg-card-hover sm:py-2"
                   >
-                    {upgrading ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />}
+                    {upgrading ? <Loader2 size={14} className="animate-spin shrink-0" /> : <TrendingUp size={14} className="shrink-0" />}
                     Upgrade tier
                   </button>
                 </div>
@@ -304,36 +304,36 @@ export default function MerchantDetailsPage() {
         )}
       </div>
 
-      <section className="overflow-hidden rounded-card border border-white/8 bg-black px-4 py-5 sm:px-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-6 xl:gap-10">
-          <div className="flex min-w-0 shrink-0 items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#14161c] text-[2.25rem] leading-none sm:h-[72px] sm:w-[72px] sm:text-[2.5rem]">
+      <section className="overflow-hidden rounded-card border border-white/8 bg-black px-3 py-4 sm:px-5 sm:py-5 md:px-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-6 xl:gap-10">
+          <div className="flex min-w-0 shrink-0 items-center gap-3 sm:gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-[#14161c] text-[2rem] leading-none sm:h-[72px] sm:w-[72px] sm:text-[2.5rem]">
               {flag ? (
                 <span aria-hidden>{flag}</span>
               ) : (
-                <span className="text-xl text-text-muted">—</span>
+                <span className="text-lg text-text-muted sm:text-xl">—</span>
               )}
             </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold leading-tight tracking-tight text-white sm:text-xl">
+            <div className="min-w-0 flex-1">
+              <h1 className="min-w-0 text-balance text-base font-bold leading-tight tracking-tight text-white sm:text-lg md:text-xl">
                 {merchant.name || '—'}
               </h1>
-              <p className="mt-1.5 font-mono text-[13px] leading-tight text-[#7d8087]">
+              <p className="mt-1.5 break-all font-mono text-[11px] leading-snug text-[#7d8087] sm:text-[13px]">
                 ID: {merchant.account_key || '—'}
               </p>
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-1 flex-wrap items-center text-sm font-normal text-white sm:flex-nowrap">
+          <div className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-normal text-white md:flex-row md:flex-wrap md:items-center md:gap-x-1 md:text-sm">
             <span className="shrink-0 tabular-nums">{phone || '—'}</span>
             <ProfileDivider />
-            <span className="min-w-0 break-all">{email || '—'}</span>
+            <span className="min-w-0 wrap-break-word">{email || '—'}</span>
             <ProfileDivider />
             <span className="shrink-0">{tierLabel(merchant)}</span>
           </div>
 
-          <div className="flex shrink-0 flex-col gap-5 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:gap-8 sm:border-l sm:border-t-0 sm:pl-8 sm:pt-0 lg:pl-10">
-            <div className="min-w-[120px]">
+          <div className="grid shrink-0 grid-cols-2 gap-4 border-t border-white/10 pt-4 min-[480px]:flex min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-8 min-[480px]:border-l min-[480px]:border-t-0 min-[480px]:pl-6 min-[480px]:pt-0 lg:pl-8 xl:pl-10">
+            <div className="min-w-0 sm:min-w-30">
               <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6f747f]">Account Status</p>
               <div className="mt-2">
                 {profileBannerPill(
@@ -346,7 +346,7 @@ export default function MerchantDetailsPage() {
                 )}
               </div>
             </div>
-            <div className="min-w-[120px]">
+            <div className="min-w-0 sm:min-w-30">
               <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6f747f]">Account Type</p>
               <div className="mt-2">{profileBannerPill('type', accountTypeLabel)}</div>
             </div>
@@ -355,7 +355,7 @@ export default function MerchantDetailsPage() {
       </section>
 
       <div className="overflow-hidden rounded-card border border-border bg-card">
-        <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:gap-6">
+        <div className="flex flex-col gap-4 border-b border-border px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:gap-6">
           <h2 className="shrink-0 text-base font-medium text-text-primary">All Customers</h2>
           <div className="min-w-0 flex-1">
             <MerchantToolbar

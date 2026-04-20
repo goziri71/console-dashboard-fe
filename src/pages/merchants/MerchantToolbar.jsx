@@ -28,7 +28,7 @@ function Dropdown({ trigger, children, align = 'right' }) {
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className="flex h-9 items-center gap-2 rounded-full border border-border bg-page px-3.5 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-[0.97]"
+        className="flex h-9 min-w-0 max-w-full items-center gap-2 rounded-full border border-border bg-page px-2.5 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary active:scale-[0.97] sm:px-3.5"
       >
         {trigger}
         <ChevronDown size={14} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
@@ -36,8 +36,8 @@ function Dropdown({ trigger, children, align = 'right' }) {
       {open && (
         <div
           className={cn(
-            'absolute top-full z-20 mt-1.5 min-w-[170px] overflow-hidden rounded-xl border border-border bg-page shadow-xl shadow-black/30',
-            align === 'right' ? 'right-0' : 'left-0'
+            'absolute top-full z-20 mt-1.5 max-w-[min(100vw-1rem,20rem)] overflow-hidden rounded-xl border border-border bg-page shadow-xl shadow-black/30 sm:min-w-[170px] sm:max-w-none',
+            align === 'right' ? 'right-0 left-auto' : 'left-0 right-auto'
           )}
         >
           {children(setOpen)}
@@ -78,8 +78,8 @@ export default function MerchantToolbar({
   const currentStatus = filterOptions.find((o) => o.value === statusFilter)
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:gap-3">
-      <div className="relative min-w-0 flex-1 lg:max-w-none">
+    <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-3">
+      <div className="relative min-w-0 w-full flex-1 md:max-w-none">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           type="search"
@@ -90,8 +90,8 @@ export default function MerchantToolbar({
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-        <Dropdown trigger={<><ArrowUpDown size={14} /> Sort by: {currentSort.label}</>}>
+      <div className="flex w-full min-w-0 flex-wrap items-stretch gap-2 sm:justify-end md:w-auto md:flex-nowrap">
+        <Dropdown trigger={<><ArrowUpDown size={14} className="shrink-0" /><span className="min-w-0 truncate">Sort: {currentSort.label}</span></>}>
           {(close) =>
             sortOptions.map((opt) => (
               <button
@@ -117,7 +117,7 @@ export default function MerchantToolbar({
           }
         </Dropdown>
 
-        <Dropdown trigger={<><SlidersHorizontal size={14} /> Filter{currentStatus?.value ? `: ${currentStatus.label}` : ''}</>}>
+        <Dropdown trigger={<><SlidersHorizontal size={14} className="shrink-0" /><span className="min-w-0 truncate">Filter{currentStatus?.value ? `: ${currentStatus.label}` : ''}</span></>}>
           {(close) =>
             filterOptions.map((opt) => (
               <button
@@ -141,11 +141,10 @@ export default function MerchantToolbar({
         <button
           type="button"
           onClick={onExport}
-          className="flex h-9 items-center gap-2 rounded-full border border-transparent bg-[#F7F7F7] px-3.5 text-xs font-medium text-[#1a1c12] shadow-sm transition-colors hover:brightness-105 active:scale-[0.97]"
+          className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-full border border-transparent bg-[#F7F7F7] px-3 text-xs font-medium text-[#1a1c12] shadow-sm transition-colors hover:brightness-105 active:scale-[0.97] sm:px-3.5"
         >
-          <Download size={14} />
-          Export
-          <ChevronDown size={13} className="opacity-70" />
+          <Download size={14} className="shrink-0" />
+          <span>Export</span>
         </button>
       </div>
     </div>
