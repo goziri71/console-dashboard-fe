@@ -368,6 +368,10 @@ export default function CustomerDetailsPage() {
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
   const displayNameUpper = useMemo(() => (displayName === '—' ? '—' : displayName.toUpperCase()), [displayName])
   const flag = countryToFlagEmoji(customer?.country_code ?? customer?.country)
+  const selectedWallet = useMemo(
+    () => wallets.find((w) => (w.wallet_key || w.wallet_id) === selectedWalletKey) || null,
+    [wallets, selectedWalletKey]
+  )
   const kycKey = customer ? customerKycKey(customer) : 'none'
   const acctKey = customer ? customerAccountStatusKey(customer) : 'active'
   const tierLine = customer ? customerTierLabel(customer) : '—'
@@ -385,6 +389,30 @@ export default function CustomerDetailsPage() {
   const phone = customer?.phone_number ?? customer?.phone ?? '—'
   const email = customer?.email_address ?? customer?.email ?? '—'
   const idLine = customer?.identifier ?? customer?.id ?? customerId
+  const selectedWalletBankDetails = Array.isArray(selectedWallet?.ngn_deposit_accounts)
+    ? selectedWallet.ngn_deposit_accounts[0]
+    : null
+  const selectedWalletCryptoDetails = Array.isArray(selectedWallet?.crypto_deposit_addresses)
+    ? selectedWallet.crypto_deposit_addresses[0]
+    : null
+  const selectedWalletAccountNumber =
+    selectedWalletBankDetails?.account_number ??
+    selectedWallet?.account_number ??
+    selectedWallet?.bank_account_number ??
+    selectedWallet?.virtual_account_number ??
+    ''
+  const selectedWalletBankSlug = selectedWalletBankDetails?.bank_slug ?? selectedWallet?.bank_slug ?? selectedWallet?.bank_code ?? ''
+  const selectedWalletCryptoAddress =
+    selectedWalletCryptoDetails?.address ??
+    selectedWalletCryptoDetails?.wallet_address ??
+    selectedWalletCryptoDetails?.deposit_address ??
+    selectedWallet?.wallet_address ??
+    ''
+  const selectedWalletCurrency = String(selectedWallet?.currency_code || '').toUpperCase()
+  const isCryptoWallet = selectedWalletCurrency !== 'NGN'
+  const walletMetaLine = isCryptoWallet
+    ? `Wallet: ${selectedWalletKey || '—'} | Address: ${selectedWalletCryptoAddress || '—'}`
+    : `Wallet: ${selectedWalletKey || '—'} | Acct: ${selectedWalletAccountNumber || '—'} | Bank: ${selectedWalletBankSlug || '—'}`
 
   if (loading && !customer) {
     return (
@@ -467,7 +495,12 @@ export default function CustomerDetailsPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold uppercase tracking-wide text-white sm:text-2xl">{displayNameUpper}</h1>
-              <p className="mt-1.5 font-mono text-[13px] text-[#888888]">ID: {idLine}</p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <p className="font-mono text-[13px] text-[#888888]">ID: {idLine}</p>
+              </div>
+              <p className="mt-1 break-all text-[11px] text-[#BAD133]">
+                {walletMetaLine}
+              </p>
             </div>
           </div>
           {canMutate ? (
