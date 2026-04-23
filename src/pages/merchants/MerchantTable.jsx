@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom'
 import { MoreVertical } from 'lucide-react'
 import { formatDate, formatNumber, cn } from '../../lib/utils'
 import {
-  countryToFlagEmoji,
   typeLabel,
   normalizeKycKey,
   normalizeAccountStatusKey,
@@ -32,7 +31,7 @@ function Badge({ config, value }) {
 }
 
 const COLUMNS = [
-  { key: 'flag', label: '', width: 'w-[52px]' },
+  { key: 'index', label: '#', width: 'w-[52px]' },
   { key: 'name', label: 'Name', width: 'min-w-[200px]' },
   { key: 'type', label: 'Type', width: 'w-[100px]' },
   { key: 'tier', label: 'Tier Level', width: 'w-[92px]' },
@@ -43,8 +42,9 @@ const COLUMNS = [
   { key: 'actions', label: '', width: 'w-[56px]' },
 ]
 
-export default function MerchantTable({ merchants }) {
+export default function MerchantTable({ merchants, page = 1, limit = 20 }) {
   const navigate = useNavigate()
+  const rowOffset = (page - 1) * limit
   if (!merchants || merchants.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 text-sm text-text-muted">
@@ -70,7 +70,7 @@ export default function MerchantTable({ merchants }) {
             {merchants.map((merchant, idx) => {
               const kyc = normalizeKycKey(merchant)
               const acct = normalizeAccountStatusKey(merchant)
-              const flag = countryToFlagEmoji(merchant.country_code ?? merchant.country)
+              const rowNum = rowOffset + idx + 1
               return (
                 <tr
                   key={merchant.account_key || merchant.id || idx}
@@ -78,14 +78,8 @@ export default function MerchantTable({ merchants }) {
                   onClick={() => navigate(`/merchants/${merchant.account_key}`)}
                 >
                   <td className="px-4 py-2.5">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-card-hover text-base leading-none">
-                      {flag ? (
-                        <span title={merchant.country_code || ''} aria-hidden>
-                          {flag}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-text-muted">—</span>
-                      )}
+                    <div className="flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-card-hover px-1.5 text-[11px] font-medium tabular-nums leading-none text-text-muted">
+                      {rowNum}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">

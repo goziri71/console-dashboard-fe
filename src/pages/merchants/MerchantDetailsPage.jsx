@@ -318,6 +318,9 @@ export default function MerchantDetailsPage() {
               <h1 className="min-w-0 text-balance text-base font-bold leading-tight tracking-tight text-white sm:text-lg md:text-xl">
                 {merchant.name || '—'}
               </h1>
+              <p className="mt-1 break-all text-xs text-text-secondary sm:text-sm">
+                {email || '—'}
+              </p>
               <p className="mt-1.5 break-all font-mono text-[11px] leading-snug text-[#7d8087] sm:text-[13px]">
                 ID: {merchant.account_key || '—'}
               </p>
@@ -326,8 +329,6 @@ export default function MerchantDetailsPage() {
 
           <div className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-normal text-white md:flex-row md:flex-wrap md:items-center md:gap-x-1 md:text-sm">
             <span className="shrink-0 tabular-nums">{phone || '—'}</span>
-            <ProfileDivider />
-            <span className="min-w-0 wrap-break-word">{email || '—'}</span>
             <ProfileDivider />
             <span className="shrink-0">{tierLabel(merchant)}</span>
           </div>

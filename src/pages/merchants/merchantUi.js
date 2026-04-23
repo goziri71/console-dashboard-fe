@@ -20,13 +20,15 @@ export function normalizeMerchantType(merchant) {
 }
 
 /**
- * Type column: show exactly what the API sends (`baas`, `saas`, etc.), no relabeling.
+ * Type column: API values like `baas` / `saas`; `baas` is shown as "Merchant" in the UI.
  */
 export function typeLabel(merchant) {
   if (merchant == null) return '—'
   const raw = merchant.merchant_type ?? merchant.type ?? merchant.account_type
   if (raw == null || raw === '') return '—'
-  return String(raw).trim()
+  const s = String(raw).trim()
+  if (s.toLowerCase() === 'baas') return 'Merchant'
+  return s
 }
 
 export function normalizeKycKey(merchant) {

@@ -250,7 +250,7 @@ export default function MerchantsPage() {
             </button>
           </div>
         ) : (
-          <MerchantTable merchants={merchants} />
+          <MerchantTable merchants={merchants} page={page} limit={LIMIT} />
         )}
 
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} label="Merchants" onPageChange={setPage} />

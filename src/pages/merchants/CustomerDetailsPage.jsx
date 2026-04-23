@@ -20,8 +20,6 @@ import {
   getCustomerWalletLedger,
   patchCustomer,
 } from '../../services/customers'
-import { getMerchantCustomerTransactions } from '../../services/merchants'
-import { getDisputes, getDisputesSummary } from '../../services/disputes'
 import { useAuth } from '../../context/AuthContext'
 import { canReadFinancial } from '../../lib/permissions'
 import {
@@ -46,8 +44,6 @@ import {
 const CAN_MUTATE = ['operations', 'compliance']
 const WALLET_PAGE_SIZE = 8
 const LEDGER_PAGE_SIZE = 15
-/** Statement lists all wallets for the customer; larger page = fewer round-trips vs API default caps. */
-const STATEMENT_PAGE_SIZE = 100
 
 function unwrapPayload(payload) {
   if (payload == null) return null
@@ -100,34 +96,6 @@ function inferTotalPagesFromResponse(res, limit, currentPage) {
   return Math.max(currentPage + 1, 2)
 }
 
-function normalizeDisputesSummary(payload) {
-  const d = unwrapPayload(payload) ?? payload ?? {}
-  return {
-    total: Number(d.total ?? 0),
-    in_review: Number(d.in_review ?? 0),
-    escalated: Number(d.escalated ?? 0),
-    resolved: Number(d.resolved ?? 0),
-  }
-}
-
-function dotBadge(type, label) {
-  const styles = {
-    active: 'bg-success-bg text-success border-success/20',
-    verified: 'bg-success-bg text-success border-success/20',
-    medium: 'bg-warning-bg text-warning border-warning/20',
-    processing: 'bg-[#072a66] text-[#2970ff] border-[#1d4ed8]/30',
-    completed: 'bg-success-bg text-success border-success/20',
-    failed: 'bg-[#5b1f1f] text-[#fca5a5] border-[#ef4444]/30',
-    inactive: 'bg-card-hover text-text-muted border-border',
-    pending: 'bg-warning-bg text-warning border-warning/20',
-  }
-  return (
-    <span className={cn('inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium', styles[type] || styles.inactive)}>
-      {label}
-    </span>
-  )
-}
-
 function ledgerStatusKind(status) {
   const s = String(status || '')
     .toLowerCase()
@@ -153,22 +121,10 @@ function ledgerStatusPill(kind, label) {
   )
 }
 
-function statementStatusKind(status) {
-  const s = String(status || '')
-    .toLowerCase()
-    .trim()
-  if (s.includes('fail') || s.includes('declin')) return { kind: 'failed', label: 'Failed' }
-  if (s.includes('success') || s === 'completed') return { kind: 'completed', label: 'Completed' }
-  if (s.includes('inactive') || s.includes('void')) return { kind: 'inactive', label: 'Inactive' }
-  if (s.includes('pend') || s.includes('process')) return { kind: 'processing', label: 'Processing' }
-  return { kind: 'processing', label: status || 'Processing' }
-}
-
 function walletDisplayId(w) {
-  const id = w.wallet_id || w.wallet_key
+  const id = w.wallet_key
   if (!id) return '—'
-  if (String(id).length <= 24) return String(id)
-  return `${String(id).slice(0, 10)}…${String(id).slice(-6)}`
+  return String(id)
 }
 
 function formatWalletBalance(w, financial) {
@@ -192,7 +148,7 @@ export default function CustomerDetailsPage() {
 
   const [customer, setCustomer] = useState(null)
 
-  /** Canonical customer id for wallets, ledger, disputes, and GET /merchants/.../customers/.../transactions (all wallets). */
+  /** Canonical customer id for wallets and ledger calls. */
   const statementIdentifier = useMemo(() => {
     if (!customerId) return ''
     if (!customer) return customerId
@@ -207,23 +163,14 @@ export default function CustomerDetailsPage() {
   const [walletSearch, setWalletSearch] = useState('')
   const [walletsLoading, setWalletsLoading] = useState(false)
 
-  const [statementRows, setStatementRows] = useState([])
-  const [statementPage, setStatementPage] = useState(1)
-  const [statementTotalPages, setStatementTotalPages] = useState(1)
-  const [statementLoading, setStatementLoading] = useState(false)
-  const [statementFetchKey, setStatementFetchKey] = useState(0)
-  const [disputeSummary, setDisputeSummary] = useState({ total: 0, in_review: 0, escalated: 0, resolved: 0 })
-  const [disputeRows, setDisputeRows] = useState([])
   const [selectedWalletKey, setSelectedWalletKey] = useState(null)
   const [ledgerRows, setLedgerRows] = useState([])
   const [ledgerPage, setLedgerPage] = useState(1)
   const [ledgerTotalPages, setLedgerTotalPages] = useState(1)
   const [ledgerLoading, setLedgerLoading] = useState(false)
-  const [statementNote, setStatementNote] = useState(null)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [mainTab, setMainTab] = useState('transactions')
   const [msg, setMsg] = useState(null)
   const [mutating, setMutating] = useState(false)
 
@@ -287,14 +234,9 @@ export default function CustomerDetailsPage() {
           ? getCustomerIdentifier(customerPayload) || customerId
           : customerId
 
-      const [metRes, sumRes, listRes] = await Promise.allSettled([
-        getCustomerMetrics(apiCustomerId),
-        getDisputesSummary({ identifier: apiCustomerId, account_key: accountKey }),
-        getDisputes({ identifier: apiCustomerId, account_key: accountKey, page: 1, limit: 25 }),
-      ])
-
-      if (metRes.status === 'fulfilled') {
-        const m = unwrapPayload(metRes.value) ?? metRes.value ?? {}
+      const metRes = await getCustomerMetrics(apiCustomerId).catch(() => null)
+      if (metRes) {
+        const m = unwrapPayload(metRes) ?? metRes ?? {}
         setMetrics({
           total_wallets: Number(m.total_wallets ?? 0),
           sub_accounts: Number(m.sub_accounts ?? 0),
@@ -302,18 +244,6 @@ export default function CustomerDetailsPage() {
         })
       } else {
         setMetrics({ total_wallets: 0, sub_accounts: 0, disputes: 0 })
-      }
-
-      if (sumRes.status === 'fulfilled') {
-        setDisputeSummary(normalizeDisputesSummary(sumRes.value))
-      } else {
-        setDisputeSummary({ total: 0, in_review: 0, escalated: 0, resolved: 0 })
-      }
-
-      if (listRes.status === 'fulfilled') {
-        setDisputeRows(pickRecords(listRes.value))
-      } else {
-        setDisputeRows([])
       }
 
       if (!customerPayload || typeof customerPayload !== 'object') {
@@ -334,55 +264,6 @@ export default function CustomerDetailsPage() {
     if (!statementIdentifier || !customer) return
     loadWallets()
   }, [statementIdentifier, customer, loadWallets])
-
-  useEffect(() => {
-    setStatementPage(1)
-    setStatementRows([])
-  }, [customerId, accountKey, statementIdentifier])
-
-  useEffect(() => {
-    if (!statementIdentifier || !accountKey) {
-      setStatementRows([])
-      setStatementTotalPages(1)
-      setStatementNote(null)
-      setStatementLoading(false)
-      return
-    }
-    if (!financial) {
-      setStatementRows([])
-      setStatementTotalPages(1)
-      setStatementLoading(false)
-      setStatementNote('Financial statement requires financial.read permission.')
-      return
-    }
-
-    let cancelled = false
-    setStatementLoading(true)
-    setStatementNote(null)
-    getMerchantCustomerTransactions(accountKey, statementIdentifier, {
-      page: statementPage,
-      limit: STATEMENT_PAGE_SIZE,
-    })
-      .then((res) => {
-        if (cancelled) return
-        const rows = pickRecords(res)
-        setStatementRows(rows)
-        setStatementTotalPages(inferTotalPagesFromResponse(res, STATEMENT_PAGE_SIZE, statementPage))
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setStatementRows([])
-          setStatementTotalPages(1)
-          setStatementNote(e?.response?.data?.message || 'Unable to load transaction statement.')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setStatementLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [accountKey, financial, statementFetchKey, statementIdentifier, statementPage])
 
   useEffect(() => {
     if (!statementIdentifier || !selectedWalletKey || !financial) {
@@ -484,14 +365,6 @@ export default function CustomerDetailsPage() {
     exportToCsv(rows, `customer-${customerId.slice(0, 8)}.csv`)
   }
 
-  const handleExportStatementRows = () => {
-    if (!statementRows.length) return
-    exportToCsv(
-      statementRows,
-      `customer-${String(statementIdentifier).slice(0, 8)}-transactions-page-${statementPage}.csv`
-    )
-  }
-
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
   const displayNameUpper = useMemo(() => (displayName === '—' ? '—' : displayName.toUpperCase()), [displayName])
   const flag = countryToFlagEmoji(customer?.country_code ?? customer?.country)
@@ -572,7 +445,6 @@ export default function CustomerDetailsPage() {
             onClick={() => {
               void fetchCore()
               void loadWallets()
-              setStatementFetchKey((k) => k + 1)
             }}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs text-text-secondary hover:bg-card-hover disabled:opacity-50"
@@ -758,9 +630,9 @@ export default function CustomerDetailsPage() {
                           : 'border-border/70 bg-[#0d1016] hover:border-border hover:bg-[#11151d]'
                       )}
                     >
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-text-muted">Wallet ID</p>
-                      <p className="mt-0.5 font-mono text-sm text-text-primary">{walletDisplayId(w)}</p>
-                      <p className="mt-2 text-[38px] font-semibold tabular-nums leading-none text-[#dfe4ec]">{formatWalletBalance(w, financial)}</p>
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-text-muted">Wallet Key</p>
+                      <p className="mt-0.5 break-all font-mono text-xs text-text-primary">{walletDisplayId(w)}</p>
+                      <p className="mt-2 text-[28px] font-normal tabular-nums leading-none text-[#dfe4ec]">{formatWalletBalance(w, financial)}</p>
                     </button>
                   )
                 })
@@ -885,198 +757,6 @@ export default function CustomerDetailsPage() {
               </div>
             )}
           </div>
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-card border border-border/70 bg-card">
-        <div className="flex border-b border-border/60">
-          {[
-            { id: 'transactions', label: 'Recent Transactions' },
-            { id: 'activity', label: 'Activity Feeds' },
-            { id: 'disputes', label: 'Disputes' },
-          ].map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setMainTab(t.id)}
-              className={cn(
-                'relative flex-1 px-4 py-3 text-center text-sm font-medium transition-colors',
-                mainTab === t.id ? 'text-accent' : 'text-text-muted hover:text-text-secondary'
-              )}
-            >
-              {t.label}
-              {mainTab === t.id ? (
-                <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-accent" />
-              ) : null}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4">
-          {mainTab === 'transactions' && (
-            <div>
-              <div className="mb-3 flex justify-end">
-                <button
-                  type="button"
-                  title="Download this page as CSV"
-                  disabled={!financial || !statementRows.length || statementLoading}
-                  onClick={handleExportStatementRows}
-                  className="text-sm font-medium text-accent hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
-                >
-                  View All
-                </button>
-              </div>
-              {!financial ? (
-                <p className="py-8 text-center text-sm text-text-muted">{statementNote}</p>
-              ) : statementLoading && !statementRows.length ? (
-                <div className="flex items-center justify-center gap-2 py-16 text-sm text-text-muted">
-                  <Loader2 className="h-5 w-5 animate-spin text-accent" aria-hidden />
-                  Loading transactions…
-                </div>
-              ) : statementRows.length ? (
-                <div className="flex flex-col gap-2">
-                  <div className="relative overflow-x-auto rounded-xl border border-border/60">
-                    {statementLoading ? (
-                      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-card/60 backdrop-blur-[1px]">
-                        <Loader2 className="h-6 w-6 animate-spin text-accent" aria-label="Loading" />
-                      </div>
-                    ) : null}
-                    <table className="w-full min-w-[720px] text-left text-sm">
-                      <thead className="bg-card-hover/60">
-                        <tr className="text-xs font-medium text-text-muted">
-                          <th className="px-3 py-3">Transaction ID</th>
-                          <th className="px-3 py-3">Amount</th>
-                          <th className="px-3 py-3">Type</th>
-                          <th className="px-3 py-3">Status</th>
-                          <th className="px-3 py-3">Date</th>
-                          <th className="w-10 px-3 py-3" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {statementRows.map((tx, idx) => {
-                          const st = statementStatusKind(tx.status)
-                          const amt =
-                            tx.amount != null
-                              ? formatBalance(Number(String(tx.amount).replace(/,/g, '')), tx.currency_code || 'USD')
-                              : '—'
-                          return (
-                            <tr key={`${tx.reference}-${idx}`} className="border-t border-border/50">
-                              <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">{tx.reference || '—'}</td>
-                              <td className="px-3 py-2.5 tabular-nums text-text-secondary">{amt}</td>
-                              <td className="px-3 py-2.5 uppercase text-text-secondary">{tx.transaction_type || '—'}</td>
-                              <td className="px-3 py-2.5">{dotBadge(st.kind, st.label)}</td>
-                              <td className="px-3 py-2.5 text-xs text-text-muted">{formatDate(tx.date_created)}</td>
-                              <td className="px-3 py-2.5">
-                                <span className="inline-flex rounded p-1 text-text-muted" aria-hidden>
-                                  <ChevronRight size={16} />
-                                </span>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex shrink-0 items-center justify-between rounded-lg border border-border/50 bg-[#0b0d12] px-3 py-2 text-[10px] text-[#8e95a1]">
-                    <span>
-                      Page {statementPage} of {statementTotalPages}
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={statementPage <= 1 || statementLoading}
-                        onClick={() => setStatementPage((p) => Math.max(1, p - 1))}
-                        className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        type="button"
-                        disabled={statementPage >= statementTotalPages || statementLoading}
-                        onClick={() => setStatementPage((p) => p + 1)}
-                        className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <p className="py-8 text-center text-sm text-text-muted">{statementNote || 'No transactions.'}</p>
-              )}
-            </div>
-          )}
-
-          {mainTab === 'activity' && (
-            <div className="max-h-[360px] space-y-2 overflow-y-auto">
-              {wallets.length ? (
-                wallets.map((w, idx) => (
-                  <div key={w.wallet_key || idx} className="flex items-start gap-3 rounded-xl border border-border/50 bg-card-hover/20 px-3 py-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
-                      <Wallet size={16} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-text-secondary">Wallet {walletDisplayId(w)} created</p>
-                      <p className="text-xs text-text-muted">{formatDate(w.date_created)}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="py-10 text-center text-sm text-text-muted">No activity yet.</p>
-              )}
-            </div>
-          )}
-
-          {mainTab === 'disputes' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { k: 'Total', v: disputeSummary.total },
-                  { k: 'In review', v: disputeSummary.in_review },
-                  { k: 'Escalated', v: disputeSummary.escalated },
-                  { k: 'Resolved', v: disputeSummary.resolved },
-                ].map(({ k, v }) => (
-                  <span
-                    key={k}
-                    className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card-hover/40 px-3 py-1.5 text-xs"
-                  >
-                    <span className="text-text-muted">{k}</span>
-                    <span className="font-semibold tabular-nums text-text-primary">{formatNumber(v)}</span>
-                  </span>
-                ))}
-              </div>
-              {disputeRows.length ? (
-                <div className="overflow-x-auto rounded-xl border border-border/60">
-                  <table className="w-full min-w-[560px] text-left text-sm">
-                    <thead className="bg-card-hover/60">
-                      <tr className="text-xs text-text-muted">
-                        <th className="px-3 py-2.5 font-medium">Reference</th>
-                        <th className="px-3 py-2.5 font-medium">Status</th>
-                        <th className="px-3 py-2.5 font-medium">Amount</th>
-                        <th className="px-3 py-2.5 font-medium">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {disputeRows.map((row, idx) => (
-                        <tr key={row.dispute_reference || row.reference || idx} className="border-t border-border/50">
-                          <td className="px-3 py-2 font-mono text-xs text-text-secondary">
-                            {row.dispute_reference || row.reference || '—'}
-                          </td>
-                          <td className="px-3 py-2 text-text-secondary">{row.status || '—'}</td>
-                          <td className="px-3 py-2 tabular-nums text-text-secondary">
-                            {row.currency_code || ''} {row.amount != null ? String(row.amount) : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-text-muted">{formatDate(row.date_created)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-center text-sm text-text-muted">No disputes for this customer.</p>
-              )}
-            </div>
-          )}
         </div>
       </section>
 
