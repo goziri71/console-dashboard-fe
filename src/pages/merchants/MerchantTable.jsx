@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { MoreVertical } from 'lucide-react'
-import { formatDate, formatNumber, cn } from '../../lib/utils'
+import { formatDate, cn } from '../../lib/utils'
 import {
   typeLabel,
   normalizeKycKey,
@@ -37,7 +37,6 @@ const COLUMNS = [
   { key: 'tier', label: 'Tier Level', width: 'w-[92px]' },
   { key: 'kyc', label: 'KYC Status', width: 'w-[120px]' },
   { key: 'status', label: 'Account Status', width: 'w-[140px]' },
-  { key: 'customers', label: 'Number Of Customers', width: 'min-w-[140px]' },
   { key: 'last', label: 'Last Activity', width: 'min-w-[170px]' },
   { key: 'actions', label: '', width: 'w-[56px]' },
 ]
@@ -95,9 +94,6 @@ export default function MerchantTable({ merchants, page = 1, limit = 20 }) {
                   </td>
                   <td className="px-4 py-2.5">
                     <Badge config={statusBadge} value={acct} />
-                  </td>
-                  <td className="px-4 py-2.5 tabular-nums text-text-primary">
-                    {formatNumber(merchant.customer_count ?? 0)}
                   </td>
                   <td className="px-4 py-2.5 text-xs text-text-secondary">
                     {formatDate(merchant.date_modified || merchant.date_created)}
