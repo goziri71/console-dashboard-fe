@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { MoreVertical } from 'lucide-react'
-import { formatDate, formatNumber, cn } from '../../lib/utils'
+import { formatDate, cn } from '../../lib/utils'
 import {
   countryToFlagEmoji,
   customerDisplayName,
@@ -8,7 +8,6 @@ import {
   customerTierLabel,
   customerKycKey,
   customerAccountStatusKey,
-  customerWalletCount,
   getCustomerIdentifier,
 } from './merchantCustomerUi'
 
@@ -41,7 +40,6 @@ const COLUMNS = [
   { key: 'tier', label: 'Tier Level', width: 'w-[92px]' },
   { key: 'kyc', label: 'KYC Status', width: 'w-[120px]' },
   { key: 'status', label: 'Account Status', width: 'w-[140px]' },
-  { key: 'wallets', label: 'Number Of Wallet', width: 'min-w-[120px]' },
   { key: 'last', label: 'Last Activity', width: 'min-w-[170px]' },
   { key: 'actions', label: '', width: 'w-[56px]' },
 ]
@@ -109,7 +107,6 @@ export default function MerchantCustomersTable({ customers }) {
                   <td className="px-4 py-2.5">
                     <Badge config={statusBadge} value={acct} />
                   </td>
-                  <td className="px-4 py-2.5 tabular-nums text-text-primary">{formatNumber(customerWalletCount(c))}</td>
                   <td className="px-4 py-2.5 text-xs text-text-secondary">
                     {formatDate(c.date_modified || c.date_created)}
                   </td>
