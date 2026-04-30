@@ -297,6 +297,56 @@ export default function TransactionsPage() {
     navigator.clipboard?.writeText(String(value)).catch(() => {})
   }
 
+  function buildDetailRows(tx, tab) {
+    if (!tx) return []
+    if (tab === 'withdrawals') {
+      return [
+        ['Recipient', tx.recipientName],
+        ['Recipient Account Number', pickFirstPath(tx.raw, ['recipient_account_number'])],
+        ['Recipient Account Name', pickFirstPath(tx.raw, ['recipient_account_name'])],
+        ['Recipient Institution', pickFirstPath(tx.raw, ['recipient_institution_name'])],
+        ['Recipient Institution ID', pickFirstPath(tx.raw, ['recipient_institution_identifier'])],
+        ['Source Account Name', pickFirstPath(tx.raw, ['source_account_name'])],
+        ['Source Account Number', pickFirstPath(tx.raw, ['source_account_number'])],
+        ['Amount', formatBalance(tx.amountRaw, tx.currency)],
+        ['Charge', formatBalance(pickFirst(tx.raw, ['charge', 'charges', 'transaction_fee', 'fee']) || 0, tx.currency)],
+        ['VAT', formatBalance(pickFirst(tx.raw, ['vat']) || 0, tx.currency)],
+        ['Narration', pickFirst(tx.raw, ['narration'])],
+        ['Live Reference', pickFirst(tx.raw, ['live_reference'])],
+        ['ISVS Reference', pickFirst(tx.raw, ['isvs_reference'])],
+        ['Reversal Reference', pickFirst(tx.raw, ['reversal_reference'])],
+        ['Vendor Reference', pickFirst(tx.raw, ['vendor_reference'])],
+        ['Vendor', pickFirst(tx.raw, ['vendor'])],
+        ['Payout Status', pickFirst(tx.raw, ['payout_status'])],
+        ['Opening Balance', formatBalance(tx.openingBalanceRaw, tx.currency)],
+        ['Closing Balance', formatBalance(tx.closingBalanceRaw, tx.currency)],
+        ['Session ID', pickFirst(tx.raw, ['session_id'])],
+        ['Date Reversed', pickFirst(tx.raw, ['date_reversed']) ? formatDate(pickFirst(tx.raw, ['date_reversed'])) : '--'],
+        ['Date Modified', pickFirst(tx.raw, ['date_modified']) ? formatDate(pickFirst(tx.raw, ['date_modified'])) : '--'],
+        
+      ]
+    }
+
+    return [
+      ['Recipient', tx.recipientName],
+      ['Recipient Account Number', pickFirstPath(tx.raw, ['recipient_account_number'])],
+      ['Sender', tx.senderName],
+      ['Sender Bank Name', pickFirstPath(tx.raw, ['sender_bank_name'])],
+      ['Reference ID', tx.id],
+      ['Deposit Reference', pickFirstPath(tx.raw, ['deposit_reference'])],
+      ['Amount', formatBalance(tx.amountRaw, tx.currency)],
+      ['Charge', formatBalance(pickFirst(tx.raw, ['charge', 'charges', 'transaction_fee', 'fee']) || 0, tx.currency)],
+      ['VAT', formatBalance(pickFirst(tx.raw, ['vat']) || 0, tx.currency)],
+      ['Settlement', formatBalance(pickFirst(tx.raw, ['settlement']) || 0, tx.currency)],
+      ['Credit Status', pickFirst(tx.raw, ['credit_status', 'status', 'transaction_status'])],
+      ['Opening Balance', formatBalance(tx.openingBalanceRaw, tx.currency)],
+      ['Closing Balance', formatBalance(tx.closingBalanceRaw, tx.currency)],
+      ['Session ID', pickFirst(tx.raw, ['session_id'])],
+      ['Date Modified', pickFirst(tx.raw, ['date_modified']) ? formatDate(pickFirst(tx.raw, ['date_modified'])) : '--'],
+      ['Status', normalizeStatus(tx.status)],
+    ]
+  }
+
   const modalState = selectedTx ? normalizeStatus(selectedTx.status) : 'processing'
 
   return (
@@ -491,22 +541,12 @@ export default function TransactionsPage() {
                   Payment Details
                 </div>
 
-                {[
-                  ['Recipient', selectedTx.recipientName],
-                  ['Sender', selectedTx.senderName],
-                  ['Reference ID', selectedTx.id],
-                  ['Date', formatDateParts(selectedTx.date).date],
-                  ['Time', formatDateParts(selectedTx.date).time],
-                  ['Status', normalizeStatus(selectedTx.status)],
-                  ['Fee', formatBalance(selectedTx.feeRaw, selectedTx.currency)],
-                  ['Opening Balance', formatBalance(selectedTx.openingBalanceRaw, selectedTx.currency)],
-                  ['Closing Balance', formatBalance(selectedTx.closingBalanceRaw, selectedTx.currency)],
-                ].map(([label, value], idx) => (
+                {buildDetailRows(selectedTx, activeTab).map(([label, value], idx, arr) => (
                   <div
                     key={label}
                     className={cn(
                       'flex items-center justify-between px-4 py-3',
-                      idx < 8 && 'border-b border-border/60'
+                      idx < arr.length - 1 && 'border-b border-border/60'
                     )}
                   >
                     <span className="text-sm text-text-secondary">{label}</span>
