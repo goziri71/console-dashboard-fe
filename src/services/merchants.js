@@ -12,6 +12,17 @@ export async function getMerchants(params = {}) {
   return data
 }
 
+export async function getBeamerAccounts(params = {}) {
+  const { data } = await api.get('/merchants/integrations/beamer/accounts', { params })
+  return data
+}
+
+export async function beamerAccountUpdate(accountKey, payload) {
+  const ak = encodeURIComponent(String(accountKey))
+  const { data } = await api.post(`/merchants/${ak}/integrations/beamer/account-update`, payload)
+  return data
+}
+
 // ── Single merchant ───────────────────────────────────────────────────────────
 
 export async function getMerchant(accountKey) {
