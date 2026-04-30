@@ -665,7 +665,7 @@ export default function CustomerDetailsPage() {
                     >
                       <p className="text-[10px] font-medium uppercase tracking-wider text-text-muted">Wallet Key</p>
                       <p className="mt-0.5 break-all font-mono text-xs text-text-primary">{walletDisplayId(w)}</p>
-                      <p className="mt-2 text-[28px] font-normal tabular-nums leading-none text-[#dfe4ec]">{formatWalletBalance(w, financial)}</p>
+                      <p className="mt-2 text-[24px] font-normal tabular-nums leading-none text-[#dfe4ec]">{formatWalletBalance(w, financial)}</p>
                     </button>
                   )
                 })
@@ -740,7 +740,7 @@ export default function CustomerDetailsPage() {
                           <tr key={row.reference || idx} className="border-t border-[#171b24] hover:bg-[#10141b]">
                             <td className="px-3 py-2.5 tabular-nums text-[#8c939f]">{sn}</td>
                             <td className="max-w-[220px] px-3 py-2.5 text-[#c8e64a]">
-                              <span className="line-clamp-2 text-[9px] font-medium uppercase leading-4">{row.service || row.narration || '—'}</span>
+                              <span className="line-clamp-2 text-[12px] font-medium uppercase leading-4">{row.service || row.narration || '—'}</span>
                             </td>
                             <td className="px-3 py-2.5 tabular-nums text-[#8e95a1]">{amt}</td>
                             <td className="px-3 py-2.5 tabular-nums text-[#17b26a]">{bal !== '—' ? `+${bal}` : '—'}</td>
