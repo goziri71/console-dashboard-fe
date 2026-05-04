@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Building2, Users, Clock, ShieldAlert, Link2, Loader2, X } from 'lucide-react'
-import { beamerAccountUpdate, getBeamerAccounts, getMerchantStats, getMerchants } from '../../services/merchants'
+import { beamerAccountUpdate, getMerchantStats, getMerchants } from '../../services/merchants'
 import { formatNumber, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -13,7 +13,6 @@ import {
 } from './merchantUi'
 
 const LIMIT = 20
-const LINK_LIMIT = 20
 
 function StatsSkeleton() {
   return (
@@ -129,13 +128,7 @@ export default function MerchantsPage() {
   const [order, setOrder] = useState('desc')
   const [statusFilter, setStatusFilter] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
-  const [linkRows, setLinkRows] = useState([])
-  const [linkPage, setLinkPage] = useState(1)
-  const [linkTotalPages, setLinkTotalPages] = useState(1)
-  const [linkTotal, setLinkTotal] = useState(0)
-  const [linkLoading, setLinkLoading] = useState(false)
-  const [linkError, setLinkError] = useState(null)
-  const [selectedLinkRow, setSelectedLinkRow] = useState(null)
+  const [linkMerchant, setLinkMerchant] = useState(null)
   const [accountNumber, setAccountNumber] = useState('')
   const [clientId, setClientId] = useState('')
   const [clientKey, setClientKey] = useState('')
@@ -182,31 +175,6 @@ export default function MerchantsPage() {
     setPage(1)
   }, [search, sortBy, order, statusFilter])
 
-  const fetchBeamerAccounts = useCallback(async () => {
-    if (!linkOpen) return
-    setLinkLoading(true)
-    setLinkError(null)
-    try {
-      const res = await getBeamerAccounts({ page: linkPage, limit: LINK_LIMIT })
-      const rows = res?.data?.rows || []
-      const meta = res?.meta || {}
-      setLinkRows(rows)
-      setLinkTotal(Number(res?.data?.count ?? rows.length) || rows.length)
-      setLinkTotalPages(Number(meta.total_pages) > 0 ? Number(meta.total_pages) : 1)
-    } catch (err) {
-      setLinkRows([])
-      setLinkTotal(0)
-      setLinkTotalPages(1)
-      setLinkError(err?.response?.data?.message || 'Failed to load Sterllo users.')
-    } finally {
-      setLinkLoading(false)
-    }
-  }, [linkOpen, linkPage])
-
-  useEffect(() => {
-    fetchBeamerAccounts()
-  }, [fetchBeamerAccounts])
-
   function handleExport() {
     if (!merchants.length) return
     const rows = merchants.map((merchant) => ({
@@ -222,25 +190,28 @@ export default function MerchantsPage() {
     exportToCsv(rows, `merchants-page-${page}.csv`)
   }
 
-  function openLinkModal() {
+  function openLinkModal(merchant) {
+    if (!merchant || merchant.udara360 != null) return
+    setLinkMerchant(merchant)
     setLinkOpen(true)
     setLinkMsg(null)
-    setLinkError(null)
+    setAccountNumber('')
+    setClientId('')
+    setClientKey('')
   }
 
   function closeLinkModal() {
     setLinkOpen(false)
-    setSelectedLinkRow(null)
+    setLinkMerchant(null)
     setAccountNumber('')
     setClientId('')
     setClientKey('')
     setLinkMsg(null)
-    setLinkPage(1)
   }
 
   async function handleLinkSubmit(e) {
     e.preventDefault()
-    if (!selectedLinkRow) return
+    if (!linkMerchant) return
     if (!accountNumber.trim() || !clientId.trim() || !clientKey.trim()) {
       setLinkMsg({ type: 'error', text: 'Account number, client id, and client key are required.' })
       return
@@ -251,7 +222,7 @@ export default function MerchantsPage() {
       const payload = {
         headers: { 'Request-Id': crypto.randomUUID() },
         data: {
-          id: String(selectedLinkRow.id),
+          id: String(linkMerchant.id),
           account_number: accountNumber.trim(),
           client: {
             id: clientId.trim(),
@@ -259,9 +230,9 @@ export default function MerchantsPage() {
           },
         },
       }
-      await beamerAccountUpdate(selectedLinkRow.account_key, payload)
-      setLinkMsg({ type: 'success', text: `Linked ${selectedLinkRow.name || selectedLinkRow.account_key} successfully.` })
-      fetchBeamerAccounts()
+      await beamerAccountUpdate(linkMerchant.account_key, payload)
+      setLinkMsg({ type: 'success', text: `Linked ${linkMerchant.name || linkMerchant.account_key} successfully.` })
+      await fetchMerchants()
     } catch (err) {
       setLinkMsg({ type: 'error', text: err?.response?.data?.message || 'Link merchant failed.' })
     } finally {
@@ -302,14 +273,6 @@ export default function MerchantsPage() {
         <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:gap-6">
           <div className="flex items-center gap-3">
             <h3 className="shrink-0 text-base font-medium text-text-primary lg:pt-0.5">All Merchants</h3>
-            <button
-              type="button"
-              onClick={openLinkModal}
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-page px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-card-hover hover:text-text-primary"
-            >
-              <Link2 size={14} />
-              Link Merchant
-            </button>
           </div>
           <div className="min-w-0 flex-1">
             <MerchantToolbar
@@ -346,19 +309,30 @@ export default function MerchantsPage() {
             </button>
           </div>
         ) : (
-          <MerchantTable merchants={merchants} page={page} limit={LIMIT} />
+          <MerchantTable merchants={merchants} page={page} limit={LIMIT} onLinkUdara={openLinkModal} />
         )}
 
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} label="Merchants" onPageChange={setPage} />
       </div>
 
       {linkOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-6">
-          <div className="w-full max-w-5xl overflow-hidden rounded-card border border-border bg-card shadow-2xl">
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-6"
+          role="presentation"
+          onClick={closeLinkModal}
+        >
+          <div
+            className="w-full max-w-xl overflow-hidden rounded-card border border-border bg-card shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h3 className="text-base font-medium text-text-primary">Link Merchant</h3>
-                <p className="text-xs text-text-muted">Select Sterllo user from second DB and link Beamer account.</p>
+                <h3 className="text-base font-medium text-text-primary">Link to Udara</h3>
+                <p className="text-xs text-text-muted">
+                  Enter Udara (Beamer) account number and client credentials for this merchant.
+                </p>
               </div>
               <button
                 type="button"
@@ -376,95 +350,13 @@ export default function MerchantsPage() {
               </div>
             ) : null}
 
-            <div className="grid gap-4 p-4 lg:grid-cols-[1.5fr_1fr]">
-              <div className="rounded-xl border border-border/70">
-                <div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
-                  <p className="text-xs font-medium text-text-secondary">Sterllo Users</p>
-                  <button
-                    type="button"
-                    onClick={fetchBeamerAccounts}
-                    className="text-xs text-accent hover:underline"
-                    disabled={linkLoading}
-                  >
-                    Refresh
-                  </button>
-                </div>
-                <div className="max-h-[420px] overflow-auto">
-                  {linkLoading ? (
-                    <div className="flex items-center justify-center gap-2 py-16 text-sm text-text-muted">
-                      <Loader2 size={16} className="animate-spin" />
-                      Loading users...
-                    </div>
-                  ) : linkError ? (
-                    <div className="px-4 py-12 text-center text-sm text-error">{linkError}</div>
-                  ) : linkRows.length ? (
-                    <table className="w-full min-w-[600px] text-left text-sm">
-                      <thead className="sticky top-0 z-10 bg-card-hover/50">
-                        <tr className="text-xs text-text-muted">
-                          <th className="px-3 py-2.5">Name</th>
-                          <th className="px-3 py-2.5">Account Key</th>
-                          <th className="px-3 py-2.5">Email</th>
-                          <th className="px-3 py-2.5 w-[96px]" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {linkRows.map((row) => {
-                          const selected = selectedLinkRow?.id === row.id
-                          return (
-                            <tr key={row.id} className="border-t border-border/50">
-                              <td className="px-3 py-2.5 text-text-primary">{row.name || '—'}</td>
-                              <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">{row.account_key || '—'}</td>
-                              <td className="px-3 py-2.5 text-xs text-text-secondary">{row.email_address || '—'}</td>
-                              <td className="px-3 py-2.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedLinkRow(row)}
-                                  className={`rounded-full border px-2.5 py-1 text-[11px] ${selected ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-secondary hover:bg-card-hover'}`}
-                                >
-                                  {selected ? 'Selected' : 'Select'}
-                                </button>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="px-4 py-12 text-center text-sm text-text-muted">No users found.</div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between border-t border-border/60 px-3 py-2 text-[11px] text-text-muted">
-                  <span>
-                    Page {linkPage} of {linkTotalPages} ({formatNumber(linkTotal)})
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setLinkPage((p) => Math.max(1, p - 1))}
-                      disabled={linkPage <= 1 || linkLoading}
-                      className="rounded-full border border-border px-3 py-1 text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                    >
-                      Prev
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLinkPage((p) => p + 1)}
-                      disabled={linkPage >= linkTotalPages || linkLoading}
-                      className="rounded-full border border-border px-3 py-1 text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <form onSubmit={handleLinkSubmit} className="rounded-xl border border-border/70 p-3">
-                <p className="text-xs font-medium text-text-secondary">Link details</p>
-                <div className="mt-3 space-y-3">
+            <div className="mx-auto max-w-lg p-4">
+              <form onSubmit={handleLinkSubmit} className="rounded-xl border border-border/70 p-4">
+                <div className="space-y-3">
                   <div className="rounded-lg border border-border bg-page px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Selected Merchant</p>
-                    <p className="mt-1 text-sm text-text-primary">{selectedLinkRow?.name || 'None selected'}</p>
-                    <p className="font-mono text-[11px] text-text-muted">{selectedLinkRow?.account_key || '—'}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Merchant</p>
+                    <p className="mt-1 text-sm text-text-primary">{linkMerchant?.name || '—'}</p>
+                    <p className="font-mono text-[11px] text-text-muted break-all">{linkMerchant?.account_key || '—'}</p>
                   </div>
 
                   <div>
@@ -501,11 +393,11 @@ export default function MerchantsPage() {
 
                 <button
                   type="submit"
-                  disabled={!selectedLinkRow || linkSubmitting}
-                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-transparent bg-[#F7F7F7] px-3 text-sm font-medium text-[#1a1c12] transition-colors hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!linkMerchant || linkSubmitting}
+                  className="mt-4 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent bg-[#F7F7F7] px-3 text-sm font-medium text-[#1a1c12] transition-all duration-150 hover:bg-[#e4e4e0] hover:text-[#0d0f0a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {linkSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-                  Link Now
+                  Link to Udara
                 </button>
               </form>
             </div>
