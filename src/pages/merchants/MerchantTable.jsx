@@ -75,7 +75,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
 
   return (
     <div className="p-4">
-      <div className="overflow-x-auto overflow-hidden rounded-2xl border border-border/70">
+      <div className="overflow-x-auto rounded-2xl border border-border/70">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-card-hover/40">
@@ -147,7 +147,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                       </button>
                       {menuOpen ? (
                         <div
-                          className="absolute right-0 top-full z-50 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-border bg-card py-1 text-left shadow-lg"
+                          className="absolute right-0 top-full z-[100] mt-1 min-w-[200px] overflow-hidden rounded-lg border border-border bg-card py-1 text-left shadow-lg"
                           role="menu"
                         >
                           <button

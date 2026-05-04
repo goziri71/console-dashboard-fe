@@ -5,7 +5,6 @@ import { formatNumber, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
 import MerchantTable from './MerchantTable'
-import PageLoader from '../../components/ui/PageLoader'
 import {
   typeLabel,
   normalizeKycKey,
@@ -14,6 +13,16 @@ import {
 } from './merchantUi'
 
 const LIMIT = 20
+
+function StatsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-[140px] skeleton rounded-card" />
+      ))}
+    </div>
+  )
+}
 
 function SummaryCard({ label, value, icon, iconWrapCls, comparison }) {
   const Icon = icon
@@ -210,8 +219,7 @@ export default function MerchantsPage() {
     setLinkSubmitting(true)
     setLinkMsg(null)
     try {
-      const payload = {
-        headers: { 'Request-Id': crypto.randomUUID() },
+      const body = {
         data: {
           id: String(linkMerchant.id),
           account_number: accountNumber.trim(),
@@ -221,7 +229,7 @@ export default function MerchantsPage() {
           },
         },
       }
-      await beamerAccountUpdate(linkMerchant.account_key, payload)
+      await beamerAccountUpdate(linkMerchant.account_key, body, crypto.randomUUID())
       setLinkMsg({ type: 'success', text: `Linked ${linkMerchant.name || linkMerchant.account_key} successfully.` })
       await fetchMerchants()
     } catch (err) {
@@ -244,7 +252,7 @@ export default function MerchantsPage() {
       </div>
 
       {statsLoading ? (
-        <PageLoader label="Loading merchant stats…" minHeight="min-h-[160px]" padding="py-8" />
+        <StatsSkeleton />
       ) : stats ? (
         <div className="animate-fade-in-up grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4" style={{ animationDelay: '60ms' }}>
           {statCards.map((card) => (
@@ -260,7 +268,7 @@ export default function MerchantsPage() {
         </div>
       ) : null}
 
-      <div className="animate-fade-in-up mt-6 overflow-hidden rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
+      <div className="animate-fade-in-up mt-6 rounded-card border border-border bg-card" style={{ animationDelay: '120ms' }}>
         <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:gap-6">
           <div className="flex items-center gap-3">
             <h3 className="shrink-0 text-base font-medium text-text-primary lg:pt-0.5">All Merchants</h3>
@@ -283,7 +291,11 @@ export default function MerchantsPage() {
         </div>
 
         {loading ? (
-          <PageLoader label="Loading merchants…" className="px-4" minHeight="min-h-[240px]" />
+          <div className="flex flex-col gap-3 p-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+            ))}
+          </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <p className="text-sm text-error">{error}</p>

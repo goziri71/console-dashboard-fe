@@ -13,7 +13,6 @@ import {
   XCircle,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
-import PageLoader from '../../components/ui/PageLoader'
 import { cn, formatBalance } from '../../lib/utils'
 import { getSettlementBatch, getSettlementBatches, getSettlementSummary } from '../../services/settlements'
 
@@ -354,11 +353,13 @@ export default function SettlementsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr className="border-t border-border/60">
-                  <td colSpan={9} className="px-4 py-2">
-                    <PageLoader label="Loading settlements…" minHeight="min-h-[200px]" padding="py-10" />
-                  </td>
-                </tr>
+                [...Array(TABLE_LIMIT)].map((_, idx) => (
+                  <tr key={idx} className="border-t border-border/60">
+                    <td colSpan={9} className="px-4 py-2.5">
+                      <div className="h-8 w-full animate-pulse rounded-md bg-card-hover" />
+                    </td>
+                  </tr>
+                ))
               ) : error ? (
                 <tr className="border-t border-border/60">
                   <td colSpan={9} className="px-4 py-8 text-center text-sm text-error">
@@ -653,7 +654,11 @@ export default function SettlementsPage() {
               </div>
 
               {detailsLoading ? (
-                <PageLoader label="Loading batch details…" minHeight="min-h-[180px]" padding="py-8" />
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, idx) => (
+                    <div key={idx} className="h-28 animate-pulse rounded-xl border border-border/60 bg-card-hover/40" />
+                  ))}
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">

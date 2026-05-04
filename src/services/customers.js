@@ -43,3 +43,38 @@ export async function getCustomerWalletLedger(identifier, walletKey, params = {}
   const { data } = await api.get(`/customers/${id}/wallets/${wk}/ledger`, { params })
   return data
 }
+
+/** Tier must be 1, 2, or 3. Requires `customer.update`. */
+export async function patchCustomerTier(identifier, payload) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.patch(`/customers/${id}/tier`, payload)
+  return data
+}
+
+/** At least one of is_pnd, is_pnc (Y/N or 1/0 in body). */
+export async function patchCustomerRestrictions(identifier, payload) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.patch(`/customers/${id}/restrictions`, payload)
+  return data
+}
+
+/** Optional body `{ scope: 'full' | 'debit_only' | 'credit_only' }` — defaults to full freeze. */
+export async function postCustomerFreeze(identifier, payload = {}) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.post(`/customers/${id}/freeze`, payload)
+  return data
+}
+
+/** Clears PND and PNC to N. */
+export async function postCustomerUnfreeze(identifier) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.post(`/customers/${id}/unfreeze`)
+  return data
+}
+
+/** Paginated KYC rows for this customer. */
+export async function getCustomerKycs(identifier, params = {}) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.get(`/customers/${id}/kycs`, { params })
+  return data
+}

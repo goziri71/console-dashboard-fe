@@ -13,7 +13,6 @@ import { getMerchant, getMerchantCustomers, updateMerchant } from '../../service
 import { useAuth } from '../../context/AuthContext'
 import { cn, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
-import PageLoader from '../../components/ui/PageLoader'
 import MerchantToolbar from './MerchantToolbar'
 import { CUSTOMER_SORT_OPTIONS } from './merchantToolbarOptions'
 import MerchantCustomersTable from './MerchantCustomersTable'
@@ -216,8 +215,10 @@ export default function MerchantDetailsPage() {
 
   if (merchantLoading && !merchant) {
     return (
-      <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] px-3 pb-6 sm:px-4 lg:px-0">
-        <PageLoader label="Loading merchant…" minHeight="min-h-[45vh]" size={30} />
+      <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
+        <div className="h-6 w-48 max-w-full skeleton rounded-lg" />
+        <div className="h-28 w-full skeleton rounded-card sm:h-32" />
+        <div className="h-56 w-full skeleton rounded-card sm:h-64" />
       </div>
     )
   }
@@ -378,7 +379,11 @@ export default function MerchantDetailsPage() {
         </div>
 
         {customersLoading ? (
-          <PageLoader label="Loading customers…" className="px-4" minHeight="min-h-[220px]" />
+          <div className="flex flex-col gap-3 p-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+            ))}
+          </div>
         ) : (
           <MerchantCustomersTable customers={customers} />
         )}

@@ -74,9 +74,21 @@ export function countryCodeToFlag(code) {
   )
 }
 
+/** Posting / restriction flags: API uses Y/N; 1/0 accepted and normalized server-side. */
+export function flagYes(v) {
+  const s = String(v ?? '').trim().toUpperCase()
+  return s === 'Y' || s === '1' || v === 1
+}
+
+export function flagNo(v) {
+  const s = String(v ?? '').trim().toUpperCase()
+  return s === 'N' || s === '0' || v === 0
+}
+
 export function deriveRiskLevel(customer) {
-  if (customer.is_pnd === '1' || customer.is_pnc === '1') return 'high'
-  if (customer.is_personal_compliant === '0' || customer.is_business_compliant === '0') return 'medium'
+  if (!customer || typeof customer !== 'object') return 'low'
+  if (flagYes(customer.is_pnd) || flagYes(customer.is_pnc)) return 'high'
+  if (flagNo(customer.is_personal_compliant) || flagNo(customer.is_business_compliant)) return 'medium'
   return 'low'
 }
 

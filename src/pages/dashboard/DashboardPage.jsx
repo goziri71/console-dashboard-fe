@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSummary } from '../../services/dashboard'
-import PageLoader from '../../components/ui/PageLoader'
+import { DashboardSkeleton } from '../../components/ui/Skeleton'
 import MetricsRow from './MetricsRow'
 import QuickActionsPanel from './QuickActionsPanel'
 import SettlementStatus from './SettlementStatus'
@@ -42,7 +42,7 @@ export default function DashboardPage() {
   }, [])
 
   if (loading) {
-    return <PageLoader label="Loading dashboard…" minHeight="min-h-[50vh]" size={32} />
+    return <DashboardSkeleton />
   }
 
   if (error) {

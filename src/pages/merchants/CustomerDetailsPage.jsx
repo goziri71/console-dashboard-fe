@@ -9,19 +9,24 @@ import {
   Users,
   Search,
   ChevronRight,
+  ChevronDown,
   Snowflake,
   Download,
   TrendingUp,
+  Unlock,
 } from 'lucide-react'
 import {
   getCustomer,
   getCustomerMetrics,
   getCustomerWallets,
   getCustomerWalletLedger,
-  patchCustomer,
+  patchCustomerTier,
+  postCustomerFreeze,
+  postCustomerUnfreeze,
+  getCustomerKycs,
 } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
-import { canReadFinancial } from '../../lib/permissions'
+import { canReadFinancial, canUpdateCustomerRecord } from '../../lib/permissions'
 import {
   cn,
   formatDate,
@@ -30,8 +35,9 @@ import {
   formatBalance,
   exportToCsv,
   deriveRiskLevel,
+  flagYes,
 } from '../../lib/utils'
-import PageLoader from '../../components/ui/PageLoader'
+import Pagination from '../../components/ui/Pagination'
 import { countryToFlagEmoji } from './merchantUi'
 import {
   customerDisplayName,
@@ -45,6 +51,7 @@ import {
 const CAN_MUTATE = ['operations', 'compliance']
 const WALLET_PAGE_SIZE = 8
 const LEDGER_PAGE_SIZE = 15
+const KYC_PAGE_SIZE = 10
 
 function unwrapPayload(payload) {
   if (payload == null) return null
@@ -97,6 +104,24 @@ function inferTotalPagesFromResponse(res, limit, currentPage) {
   return Math.max(currentPage + 1, 2)
 }
 
+function pickKycField(row, keys) {
+  if (!row || typeof row !== 'object') return '—'
+  for (const k of keys) {
+    const v = row[k]
+    if (v != null && v !== '') return String(v)
+  }
+  return '—'
+}
+
+function pickKycRaw(row, keys) {
+  if (!row || typeof row !== 'object') return null
+  for (const k of keys) {
+    const v = row[k]
+    if (v != null && v !== '') return v
+  }
+  return null
+}
+
 function ledgerStatusKind(status) {
   const s = String(status || '')
     .toLowerCase()
@@ -144,6 +169,7 @@ export default function CustomerDetailsPage() {
   const { user } = useAuth()
   const financial = canReadFinancial(user?.permissions)
   const canMutate = CAN_MUTATE.includes(user?.role)
+  const canPatchTier = canMutate && canUpdateCustomerRecord(user?.permissions)
 
   const customerId = useMemo(() => (identifierParam ? decodeURIComponent(identifierParam) : ''), [identifierParam])
 
@@ -174,6 +200,14 @@ export default function CustomerDetailsPage() {
   const [error, setError] = useState(null)
   const [msg, setMsg] = useState(null)
   const [mutating, setMutating] = useState(false)
+  const [freezeMenuOpen, setFreezeMenuOpen] = useState(false)
+  const freezeMenuRef = useRef(null)
+
+  const [kycRows, setKycRows] = useState([])
+  const [kycPage, setKycPage] = useState(1)
+  const [kycTotalPages, setKycTotalPages] = useState(1)
+  const [kycTotal, setKycTotal] = useState(0)
+  const [kycLoading, setKycLoading] = useState(false)
 
   const ledgerScopeRef = useRef('')
 
@@ -189,6 +223,10 @@ export default function CustomerDetailsPage() {
   useEffect(() => {
     setWalletPage(1)
   }, [walletSearch])
+
+  useEffect(() => {
+    setKycPage(1)
+  }, [statementIdentifier])
 
   const loadWallets = useCallback(async () => {
     if (!statementIdentifier) return
@@ -262,9 +300,44 @@ export default function CustomerDetailsPage() {
   }, [fetchCore])
 
   useEffect(() => {
+    if (!freezeMenuOpen) return
+    const onDoc = (e) => {
+      const w = freezeMenuRef.current
+      if (w && !w.contains(e.target)) setFreezeMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [freezeMenuOpen])
+
+  useEffect(() => {
     if (!statementIdentifier || !customer) return
     loadWallets()
   }, [statementIdentifier, customer, loadWallets])
+
+  const loadKycs = useCallback(async () => {
+    if (!statementIdentifier) return
+    setKycLoading(true)
+    try {
+      const res = await getCustomerKycs(statementIdentifier, { page: kycPage, limit: KYC_PAGE_SIZE })
+      const rows = pickRecords(res)
+      setKycRows(rows)
+      const pag = pickPagination(res)
+      const total = Number(pag.total ?? pag.count)
+      setKycTotal(Number.isFinite(total) && total >= 0 ? total : rows.length)
+      setKycTotalPages(inferTotalPagesFromResponse(res, KYC_PAGE_SIZE, kycPage))
+    } catch {
+      setKycRows([])
+      setKycTotal(0)
+      setKycTotalPages(1)
+    } finally {
+      setKycLoading(false)
+    }
+  }, [statementIdentifier, kycPage])
+
+  useEffect(() => {
+    if (!statementIdentifier || !customer) return
+    loadKycs()
+  }, [statementIdentifier, customer, loadKycs])
 
   useEffect(() => {
     if (!statementIdentifier || !selectedWalletKey || !financial) {
@@ -311,33 +384,67 @@ export default function CustomerDetailsPage() {
     window.setTimeout(() => setMsg(null), 4000)
   }
 
-  const handleFreeze = async () => {
+  const applyCustomerResponse = (res) => {
+    const body = unwrapPayload(res) ?? res
+    if (body && typeof body === 'object') {
+      setCustomer((prev) => (prev ? { ...prev, ...body } : prev))
+    }
+  }
+
+  const runFreeze = async (scope) => {
     if (!customer || !canMutate) return
-    if (!window.confirm(`Place post-no-debit restriction on ${displayName}?`)) return
+    const id = statementIdentifier || customerId
+    const labels = {
+      full: 'full freeze (PND + PNC)',
+      debit_only: 'debit-only restriction (PND)',
+      credit_only: 'credit-only restriction (PNC)',
+    }
+    if (!window.confirm(`Apply ${labels[scope] || scope} to ${displayName}?`)) return
+    setFreezeMenuOpen(false)
     setMutating(true)
     try {
-      const res = await patchCustomer(statementIdentifier || customerId, { is_pnd: '1' })
-      const body = unwrapPayload(res) ?? res
-      setCustomer((prev) => ({ ...prev, ...body }))
-      pushMsg('success', 'Customer updated.')
+      const res = await postCustomerFreeze(id, { scope })
+      applyCustomerResponse(res)
+      pushMsg('success', 'Restriction updated.')
+      void fetchCore()
     } catch (e) {
-      pushMsg('error', e?.response?.data?.message || 'Failed to freeze account.')
+      pushMsg('error', e?.response?.data?.message || 'Failed to apply freeze.')
+    } finally {
+      setMutating(false)
+    }
+  }
+
+  const handleUnfreeze = async () => {
+    if (!customer || !canMutate) return
+    if (!window.confirm(`Remove PND/PNC restrictions for ${displayName}?`)) return
+    setMutating(true)
+    try {
+      const res = await postCustomerUnfreeze(statementIdentifier || customerId)
+      applyCustomerResponse(res)
+      pushMsg('success', 'Account unfrozen.')
+      void fetchCore()
+    } catch (e) {
+      pushMsg('error', e?.response?.data?.message || 'Failed to unfreeze.')
     } finally {
       setMutating(false)
     }
   }
 
   const handleUpgradeTier = async () => {
-    if (!customer || !canMutate) return
+    if (!customer || !canPatchTier) return
     const current = Number(customer.tier ?? customer.default_kyc_tier ?? 1)
     const next = Number.isFinite(current) ? current + 1 : 2
+    if (next > 3) {
+      pushMsg('error', 'Customer is already at the maximum tier (3).')
+      return
+    }
     if (!window.confirm(`Upgrade ${displayName} to tier ${next}?`)) return
     setMutating(true)
     try {
-      const res = await patchCustomer(statementIdentifier || customerId, { tier: next })
-      const body = unwrapPayload(res) ?? res
-      setCustomer((prev) => ({ ...prev, ...body, tier: body?.tier ?? next }))
+      const res = await patchCustomerTier(statementIdentifier || customerId, { tier: next })
+      applyCustomerResponse(res)
       pushMsg('success', `Tier updated to ${next}.`)
+      void fetchCore()
     } catch (e) {
       pushMsg('error', e?.response?.data?.message || 'Failed to upgrade tier.')
     } finally {
@@ -415,10 +522,28 @@ export default function CustomerDetailsPage() {
     ? `Wallet: ${selectedWalletKey || '—'} | Address: ${selectedWalletCryptoAddress || '—'}`
     : `Wallet: ${selectedWalletKey || '—'} | Acct: ${selectedWalletAccountNumber || '—'} | Bank: ${selectedWalletBankSlug || '—'}`
 
+  const currentTier = useMemo(() => {
+    const t = Number(customer?.tier ?? customer?.default_kyc_tier ?? 1)
+    if (Number.isFinite(t) && t >= 1 && t <= 3) return t
+    return 1
+  }, [customer])
+
+  const isRestricted = useMemo(
+    () => (customer ? flagYes(customer.is_pnd) || flagYes(customer.is_pnc) : false),
+    [customer]
+  )
+
   if (loading && !customer) {
     return (
-      <div className="animate-fade-in-up">
-        <PageLoader label="Loading customer…" minHeight="min-h-[50vh]" size={30} />
+      <div className="animate-fade-in-up space-y-6">
+        <div className="h-6 w-56 skeleton rounded-lg" />
+        <div className="h-40 skeleton rounded-card" />
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 skeleton rounded-card" />
+          ))}
+        </div>
+        <div className="h-72 skeleton rounded-card" />
       </div>
     )
   }
@@ -467,6 +592,7 @@ export default function CustomerDetailsPage() {
             onClick={() => {
               void fetchCore()
               void loadWallets()
+              void loadKycs()
             }}
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs text-text-secondary hover:bg-card-hover disabled:opacity-50"
@@ -499,15 +625,62 @@ export default function CustomerDetailsPage() {
           </div>
           {canMutate ? (
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <button
-                type="button"
-                disabled={mutating}
-                onClick={handleFreeze}
-                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-transparent px-4 py-2.5 text-xs font-medium text-white transition-colors hover:bg-white/6"
-              >
-                <Snowflake size={14} />
-                Freeze Account
-              </button>
+              <div className="relative" ref={freezeMenuRef}>
+                <button
+                  type="button"
+                  disabled={mutating}
+                  onClick={() => setFreezeMenuOpen((o) => !o)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-transparent px-4 py-2.5 text-xs font-medium text-white transition-colors hover:bg-white/6 disabled:opacity-60"
+                  aria-expanded={freezeMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  <Snowflake size={14} />
+                  Freeze
+                  <ChevronDown size={14} className="opacity-80" />
+                </button>
+                {freezeMenuOpen ? (
+                  <div
+                    className="absolute right-0 top-full z-30 mt-1 min-w-[240px] overflow-hidden rounded-xl border border-white/15 bg-[#141414] py-1 text-left shadow-xl"
+                    role="menu"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full px-3 py-2.5 text-left text-xs text-white transition-colors hover:bg-white/10"
+                      onClick={() => runFreeze('full')}
+                    >
+                      Full freeze (PND + PNC)
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full px-3 py-2.5 text-left text-xs text-white transition-colors hover:bg-white/10"
+                      onClick={() => runFreeze('debit_only')}
+                    >
+                      Debit only (PND)
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full px-3 py-2.5 text-left text-xs text-white transition-colors hover:bg-white/10"
+                      onClick={() => runFreeze('credit_only')}
+                    >
+                      Credit only (PNC)
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              {isRestricted ? (
+                <button
+                  type="button"
+                  disabled={mutating}
+                  onClick={handleUnfreeze}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-transparent px-4 py-2.5 text-xs font-medium text-white transition-colors hover:bg-white/6 disabled:opacity-60"
+                >
+                  <Unlock size={14} />
+                  Unfreeze
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleExportCustomer}
@@ -516,15 +689,17 @@ export default function CustomerDetailsPage() {
                 <Download size={14} />
                 Export Customer Data
               </button>
-              <button
-                type="button"
-                disabled={mutating}
-                onClick={handleUpgradeTier}
-                className="inline-flex items-center gap-2 rounded-full border border-transparent bg-[#C5DC4B] px-4 py-2.5 text-xs font-semibold text-black shadow-sm transition-colors hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
-              >
-                {mutating ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />}
-                Upgrade Tier
-              </button>
+              {canPatchTier ? (
+                <button
+                  type="button"
+                  disabled={mutating || currentTier >= 3}
+                  onClick={handleUpgradeTier}
+                  className="inline-flex items-center gap-2 rounded-full border border-transparent bg-[#C5DC4B] px-4 py-2.5 text-xs font-semibold text-black shadow-sm transition-colors hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
+                >
+                  {mutating ? <Loader2 size={14} className="animate-spin" /> : <TrendingUp size={14} />}
+                  Upgrade Tier
+                </button>
+              ) : null}
             </div>
           ) : (
             <button
@@ -619,6 +794,66 @@ export default function CustomerDetailsPage() {
       </div>
 
       <section className="overflow-hidden rounded-card border border-border/70 bg-card">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h2 className="text-sm font-semibold text-text-primary">KYC records</h2>
+          <p className="mt-0.5 text-xs text-text-muted">Verification history for this customer</p>
+        </div>
+        {kycLoading ? (
+          <div className="flex flex-col gap-2 px-4 py-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : kycRows.length ? (
+          <>
+            <div className="overflow-x-auto px-2 pb-2">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border/60 text-xs text-text-muted">
+                    <th className="px-3 py-2.5 font-medium">ID</th>
+                    <th className="px-3 py-2.5 font-medium">Status</th>
+                    <th className="px-3 py-2.5 font-medium">Tier</th>
+                    <th className="px-3 py-2.5 font-medium">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kycRows.map((row, ri) => (
+                    <tr key={row.id ?? row.kyc_id ?? ri} className="border-b border-border/40">
+                      <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">
+                        {pickKycField(row, ['id', 'kyc_id', 'identifier'])}
+                      </td>
+                      <td className="px-3 py-2.5 text-text-primary">
+                        {pickKycField(row, ['status', 'kyc_status', 'verification_status'])}
+                      </td>
+                      <td className="px-3 py-2.5 tabular-nums text-text-secondary">
+                        {pickKycField(row, ['tier', 'kyc_tier', 'default_kyc_tier'])}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-text-muted">
+                        {(() => {
+                          const d = pickKycRaw(row, ['date_created', 'created_at', 'date_modified'])
+                          return d != null ? formatDate(d) : '—'
+                        })()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={kycPage}
+              totalPages={kycTotalPages}
+              total={kycTotal}
+              limit={KYC_PAGE_SIZE}
+              label="KYC records"
+              onPageChange={setKycPage}
+            />
+          </>
+        ) : (
+          <p className="py-10 text-center text-sm text-text-muted">No KYC records returned.</p>
+        )}
+      </section>
+
+      <section className="overflow-hidden rounded-card border border-border/70 bg-card">
         <div className="grid min-h-0 lg:grid-cols-[minmax(285px,320px)_1fr] lg:max-h-[min(640px,calc(100dvh-260px))] lg:grid-rows-1 lg:divide-x lg:divide-border/60">
           <div className="flex min-h-0 flex-col border-b border-border/60 bg-[#0b0d11] p-3 lg:border-b-0">
             <div className="relative">
@@ -633,9 +868,10 @@ export default function CustomerDetailsPage() {
             </div>
             <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none">
               {walletsLoading ? (
-                <div className="flex items-center justify-center gap-2 py-12 text-sm text-text-muted">
-                  <Loader2 size={16} className="animate-spin" />
-                  Loading wallets…
+                <div className="space-y-2 py-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="skeleton h-[72px] w-full rounded-xl" />
+                  ))}
                 </div>
               ) : wallets.length ? (
                 wallets.map((w, wi) => {
@@ -696,9 +932,10 @@ export default function CustomerDetailsPage() {
             {!financial ? (
               <p className="py-12 text-center text-sm text-text-muted">Wallet activity requires financial.read to view amounts and ledger.</p>
             ) : ledgerLoading ? (
-              <div className="flex h-full min-h-[200px] flex-1 items-center justify-center gap-2 text-sm text-text-muted">
-                <Loader2 size={18} className="animate-spin" />
-                Loading ledger…
+              <div className="flex min-h-[200px] flex-1 flex-col gap-2 p-3">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="skeleton h-9 w-full rounded-md" />
+                ))}
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col gap-2">

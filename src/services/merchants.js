@@ -12,9 +12,18 @@ export async function getMerchants(params = {}) {
   return data
 }
 
-export async function beamerAccountUpdate(accountKey, payload) {
+/**
+ * Udara / Beamer account link. Sends `Request-Id` as an HTTP header (not in JSON body).
+ * @param {string} accountKey merchant account_key path segment
+ * @param {Record<string, unknown>} body JSON body (e.g. `{ data: { id, account_number, client } }`)
+ * @param {string} [requestId] optional idempotency / trace id
+ */
+export async function beamerAccountUpdate(accountKey, body, requestId) {
   const ak = encodeURIComponent(String(accountKey))
-  const { data } = await api.post(`/merchants/${ak}/integrations/beamer/account-update`, payload)
+  const rid = requestId || crypto.randomUUID()
+  const { data } = await api.post(`/merchants/${ak}/integrations/beamer/account-update`, body, {
+    headers: { 'Request-Id': rid },
+  })
   return data
 }
 

@@ -35,7 +35,6 @@ import {
   getComplianceRiskTrends,
   getComplianceVerificationStatus,
 } from '../../services/compliance'
-import PageLoader from '../../components/ui/PageLoader'
 import { cn, formatNumber, timeAgo } from '../../lib/utils'
 
 const SIDEBAR_ITEMS = [
@@ -312,7 +311,19 @@ export default function CompliancePage() {
           </div>
 
           {loading ? (
-            <PageLoader label="Loading compliance data…" minHeight="min-h-[320px]" size={30} />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-[120px] rounded-card skeleton" />
+                ))}
+              </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <div className="xl:col-span-2 h-[240px] rounded-card skeleton" />
+                <div className="h-[240px] rounded-card skeleton" />
+                <div className="xl:col-span-2 h-[240px] rounded-card skeleton" />
+                <div className="h-[240px] rounded-card skeleton" />
+              </div>
+            </div>
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">

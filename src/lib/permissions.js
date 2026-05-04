@@ -2,6 +2,8 @@
 export const PERMISSION_ALL = '*'
 export const PERMISSION_FINANCIAL_READ = 'financial.read'
 export const PERMISSION_RBAC_MANAGE = 'rbac.manage'
+/** Tier upgrade — PATCH /customers/:identifier/tier */
+export const PERMISSION_CUSTOMER_UPDATE = 'customer.update'
 
 /** Seeded management role: server rejects PATCH …/roles/:id/permissions for this slug only. */
 export const ROLE_SLUG_MANAGEMENT = 'management'
@@ -23,6 +25,11 @@ export function canReadFinancial(permissions) {
 export function canManageRbac(permissions) {
   if (!permissions?.length) return false
   return hasFullAccess(permissions) || permissions.includes(PERMISSION_RBAC_MANAGE)
+}
+
+export function canUpdateCustomerRecord(permissions) {
+  if (!permissions?.length) return false
+  return hasFullAccess(permissions) || permissions.includes(PERMISSION_CUSTOMER_UPDATE)
 }
 
 /**

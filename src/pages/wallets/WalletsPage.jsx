@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, MoreVertical, Search, Wallet, WalletCards } from 'lucide-react'
 import MetricCard from '../../components/ui/MetricCard'
-import PageLoader from '../../components/ui/PageLoader'
 import Pagination from '../../components/ui/Pagination'
 import { cn, formatCurrency, formatNumber, timeAgo } from '../../lib/utils'
 import { getWalletsPage } from '../../services/wallets'
@@ -173,7 +172,11 @@ export default function WalletsPage() {
         </div>
 
         {loading ? (
-          <PageLoader label="Loading wallets…" className="px-4" minHeight="min-h-[240px]" />
+          <div className="flex flex-col gap-3 p-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+            ))}
+          </div>
         ) : error ? (
           <div className="flex items-center justify-center py-16 text-sm text-error">{error}</div>
         ) : (

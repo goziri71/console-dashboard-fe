@@ -13,15 +13,14 @@ import DisputesPage from './pages/disputes/DisputesPage'
 import SettlementsPage from './pages/settlements/SettlementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import AdminPage from './pages/admin/AdminPage'
-import PageLoader from './components/ui/PageLoader'
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth()
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-page">
-        <PageLoader label="Loading session…" minHeight="min-h-0" padding="py-0" size={32} />
+      <div className="flex h-screen items-center justify-center bg-page">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
       </div>
     )
   }

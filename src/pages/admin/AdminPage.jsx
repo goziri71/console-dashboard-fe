@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import Pagination from '../../components/ui/Pagination'
-import PageLoader from '../../components/ui/PageLoader'
 import { cn, formatDate } from '../../lib/utils'
 import {
   PERMISSION_ALL,
@@ -656,11 +655,13 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 ) : teamUsersLoading ? (
-                  <tr className="border-b border-border/50">
-                    <td colSpan={5} className="px-4 py-2">
-                      <PageLoader label="Loading team…" minHeight="min-h-[140px]" padding="py-8" />
-                    </td>
-                  </tr>
+                  [...Array(6)].map((_, i) => (
+                    <tr key={i} className="border-b border-border/50">
+                      <td colSpan={5} className="px-4 py-3">
+                        <div className="skeleton h-9 w-full rounded-lg" />
+                      </td>
+                    </tr>
+                  ))
                 ) : !teamUsers.length ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-16 text-center text-sm text-text-muted">
@@ -884,7 +885,11 @@ export default function AdminPage() {
         </div>
 
         {loading ? (
-          <PageLoader label="Loading roles…" className="px-4 lg:px-6" minHeight="min-h-[240px]" />
+          <div className="space-y-3 p-4 lg:p-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-24 rounded-xl skeleton" />
+            ))}
+          </div>
         ) : !rolesList.length ? (
           <p className="p-6 text-sm text-text-muted">No roles returned. Check API access or errors above.</p>
         ) : (

@@ -13,7 +13,6 @@ import {
   XCircle,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
-import PageLoader from '../../components/ui/PageLoader'
 import {
   cn,
   countryCodeToFlag,
@@ -396,7 +395,11 @@ export default function DisputesPage() {
       </div>
 
       {summaryLoading ? (
-        <PageLoader label="Loading dispute summary…" minHeight="min-h-[160px]" padding="py-10" />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-[160px] skeleton rounded-[24px]" />
+          ))}
+        </div>
       ) : (
         <div className="flex flex-col gap-6 xl:flex-row">
           <MetricCard
@@ -498,13 +501,11 @@ export default function DisputesPage() {
         </div>
 
         {loading ? (
-          <PageLoader
-            label="Loading disputes…"
-            className="px-4"
-            minHeight="min-h-[280px]"
-            iconClassName="text-[#b7e07a]"
-            labelClassName="text-sm text-[#a2a2a2]"
-          />
+          <div className="flex flex-col gap-3 p-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+            ))}
+          </div>
         ) : error ? (
           <div className="py-16 text-center text-sm text-error">{error}</div>
         ) : (
