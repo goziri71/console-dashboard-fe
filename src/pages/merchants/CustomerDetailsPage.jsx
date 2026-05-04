@@ -31,6 +31,7 @@ import {
   exportToCsv,
   deriveRiskLevel,
 } from '../../lib/utils'
+import PageLoader from '../../components/ui/PageLoader'
 import { countryToFlagEmoji } from './merchantUi'
 import {
   customerDisplayName,
@@ -416,15 +417,8 @@ export default function CustomerDetailsPage() {
 
   if (loading && !customer) {
     return (
-      <div className="animate-fade-in-up space-y-6">
-        <div className="h-6 w-56 skeleton rounded-lg" />
-        <div className="h-40 skeleton rounded-card" />
-        <div className="grid gap-4 sm:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 skeleton rounded-card" />
-          ))}
-        </div>
-        <div className="h-72 skeleton rounded-card" />
+      <div className="animate-fade-in-up">
+        <PageLoader label="Loading customer…" minHeight="min-h-[50vh]" size={30} />
       </div>
     )
   }

@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
+import PageLoader from '../../components/ui/PageLoader'
 import { cn, exportToCsv, formatBalance, formatDate } from '../../lib/utils'
 import {
   getNgnDeposits,
@@ -421,11 +422,7 @@ export default function TransactionsPage() {
         </div>
 
         {loading ? (
-          <div className="p-4 flex flex-col gap-3">
-            {[...Array(10)].map((_, i) => (
-              <div key={i} className="skeleton h-10 w-full rounded-lg" />
-            ))}
-          </div>
+          <PageLoader label="Loading transactions…" className="px-4" minHeight="min-h-[280px]" />
         ) : error ? (
           <div className="flex items-center justify-center py-16 text-sm text-error">{error}</div>
         ) : (

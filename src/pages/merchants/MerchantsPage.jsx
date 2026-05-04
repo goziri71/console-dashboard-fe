@@ -5,6 +5,7 @@ import { formatNumber, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
 import MerchantTable from './MerchantTable'
+import PageLoader from '../../components/ui/PageLoader'
 import {
   typeLabel,
   normalizeKycKey,
@@ -13,16 +14,6 @@ import {
 } from './merchantUi'
 
 const LIMIT = 20
-
-function StatsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-[140px] skeleton rounded-card" />
-      ))}
-    </div>
-  )
-}
 
 function SummaryCard({ label, value, icon, iconWrapCls, comparison }) {
   const Icon = icon
@@ -253,7 +244,7 @@ export default function MerchantsPage() {
       </div>
 
       {statsLoading ? (
-        <StatsSkeleton />
+        <PageLoader label="Loading merchant stats…" minHeight="min-h-[160px]" padding="py-8" />
       ) : stats ? (
         <div className="animate-fade-in-up grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4" style={{ animationDelay: '60ms' }}>
           {statCards.map((card) => (
@@ -292,11 +283,7 @@ export default function MerchantsPage() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col gap-3 p-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="skeleton h-10 w-full rounded-lg" />
-            ))}
-          </div>
+          <PageLoader label="Loading merchants…" className="px-4" minHeight="min-h-[240px]" />
         ) : error ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16">
             <p className="text-sm text-error">{error}</p>

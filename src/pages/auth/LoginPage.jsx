@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck, Eye, EyeOff } from 'lucide-react'
+import { ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
@@ -125,9 +125,16 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-4 w-full rounded-full bg-[#B8CF33] py-4 text-base font-semibold text-page transition-all duration-200 hover:opacity-90 hover:shadow-lg hover:shadow-accent/20 active:scale-[0.98] disabled:opacity-50 disabled:hover:shadow-none"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B8CF33] py-4 text-base font-semibold text-page transition-all duration-200 hover:opacity-90 hover:shadow-lg hover:shadow-accent/20 active:scale-[0.98] disabled:opacity-50 disabled:hover:shadow-none"
             >
-              {submitting ? 'Signing in...' : 'Login to Console'}
+              {submitting ? (
+                <>
+                  <Loader2 size={20} className="animate-spin shrink-0" aria-hidden />
+                  Signing in…
+                </>
+              ) : (
+                'Login to Console'
+              )}
             </button>
 
             <p className="mt-2 text-center text-base text-text-secondary">
