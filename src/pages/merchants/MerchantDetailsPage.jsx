@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   Snowflake,
@@ -10,6 +11,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import { getMerchant, getMerchantCustomers, updateMerchant } from '../../services/merchants'
+import { patchCustomer, patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
 import { cn, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
@@ -56,6 +58,7 @@ function ProfileDivider() {
 
 export default function MerchantDetailsPage() {
   const { accountKey } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const canMutate = CAN_MUTATE.includes(user?.role)
 
@@ -78,6 +81,16 @@ export default function MerchantDetailsPage() {
   const [freezing, setFreezing] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirm',
+    confirmClassName: 'bg-error text-white hover:brightness-105',
+    showTierSelect: false,
+    selectedTier: 1,
+    onConfirm: null,
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -145,6 +158,23 @@ export default function MerchantDetailsPage() {
     setTimeout(() => setMsg(null), 3500)
   }
 
+  const closeConfirm = () => {
+    setConfirmState((prev) => ({ ...prev, open: false, onConfirm: null, showTierSelect: false }))
+  }
+
+  const openConfirm = ({ title, message, confirmLabel, confirmClassName, showTierSelect, selectedTier, onConfirm }) => {
+    setConfirmState({
+      open: true,
+      title: title || 'Please confirm',
+      message: message || '',
+      confirmLabel: confirmLabel || 'Confirm',
+      confirmClassName: confirmClassName || 'bg-error text-white hover:brightness-105',
+      showTierSelect: !!showTierSelect,
+      selectedTier: Number(selectedTier) >= 1 && Number(selectedTier) <= 3 ? Number(selectedTier) : 1,
+      onConfirm: typeof onConfirm === 'function' ? onConfirm : null,
+    })
+  }
+
   const primaryFromList = customers[0]
   const phone = merchant?.phone ?? merchant?.phone_number ?? primaryFromList?.phone_number
   const email = merchant?.email ?? merchant?.email_address ?? primaryFromList?.email_address
@@ -166,8 +196,7 @@ export default function MerchantDetailsPage() {
     exportToCsv(rows, `merchant-${accountKey}-customers-${page}.csv`)
   }
 
-  const handleFreeze = async () => {
-    if (!window.confirm(`Freeze account for ${merchant?.name}?`)) return
+  const runFreezeMerchant = async () => {
     setFreezing(true)
     try {
       await updateMerchant(accountKey, { status: 'FROZEN' })
@@ -180,10 +209,22 @@ export default function MerchantDetailsPage() {
     }
   }
 
-  const handleUpgradeTier = async () => {
-    const currentTier = merchant?.default_kyc_tier ?? 1
-    const nextTier = currentTier + 1
-    if (!window.confirm(`Upgrade ${merchant?.name} from Tier ${currentTier} to Tier ${nextTier}?`)) return
+  const handleFreeze = () => {
+    openConfirm({
+      title: 'Freeze Merchant Account',
+      message: `Freeze account for ${merchant?.name || 'this merchant'}?`,
+      confirmLabel: 'Freeze Account',
+      onConfirm: runFreezeMerchant,
+    })
+  }
+
+  const runUpgradeTier = async (targetTier) => {
+    const currentTier = Number(merchant?.default_kyc_tier ?? 1)
+    const nextTier = Number(targetTier)
+    if (!Number.isFinite(nextTier) || nextTier < 1 || nextTier > 3) {
+      pushMsg('error', 'Select a valid tier (1 to 3).')
+      return
+    }
     setUpgrading(true)
     try {
       const res = await updateMerchant(accountKey, { default_kyc_tier: nextTier })
@@ -199,6 +240,106 @@ export default function MerchantDetailsPage() {
       setUpgrading(false)
       setMenuOpen(false)
     }
+  }
+
+  const handleUpgradeTier = () => {
+    const currentTier = Number(merchant?.default_kyc_tier ?? 1)
+    openConfirm({
+      title: 'Upgrade Merchant Tier',
+      message: `Select target tier for ${merchant?.name || 'this merchant'}.`,
+      confirmLabel: 'Upgrade Tier',
+      confirmClassName: 'bg-[#C5DC4B] text-black hover:brightness-105',
+      showTierSelect: true,
+      selectedTier: currentTier >= 1 && currentTier <= 3 ? currentTier : 1,
+      onConfirm: runUpgradeTier,
+    })
+  }
+
+  const getCustomerId = (customer) => customer?.identifier ?? customer?.customer_identifier ?? customer?.id ?? ''
+
+  const handleViewCustomerKyc = (customer) => {
+    const id = getCustomerId(customer)
+    if (!id) return
+    navigate(`/merchants/${accountKey}/customers/${encodeURIComponent(String(id))}`)
+  }
+
+  const runFreezeCustomer = async (customer) => {
+    const id = getCustomerId(customer)
+    const label = customerDisplayName(customer)
+    if (!id) return
+    try {
+      await postCustomerFreeze(id, { scope: 'full' })
+      pushMsg('success', `${label} frozen successfully.`)
+      await fetchCustomers()
+    } catch (e) {
+      pushMsg('error', e?.response?.data?.message || 'Failed to freeze customer account.')
+    }
+  }
+
+  const handleFreezeCustomer = (customer) => {
+    const label = customerDisplayName(customer)
+    openConfirm({
+      title: 'Freeze Customer Account',
+      message: `Freeze account for ${label}?`,
+      confirmLabel: 'Freeze Account',
+      onConfirm: () => runFreezeCustomer(customer),
+    })
+  }
+
+  const runUpgradeCustomer = async (customer, targetTier) => {
+    const id = getCustomerId(customer)
+    const label = customerDisplayName(customer)
+    const current = Number(customer?.tier ?? customer?.default_kyc_tier ?? 1)
+    const next = Number(targetTier)
+    if (!id) return
+    if (!Number.isFinite(next) || next < 1 || next > 3) {
+      pushMsg('error', 'Select a valid tier (1 to 3).')
+      return
+    }
+    try {
+      await patchCustomerTier(id, { tier: next })
+      pushMsg('success', `${label} upgraded to Tier ${next}.`)
+      await fetchCustomers()
+    } catch (e) {
+      pushMsg('error', e?.response?.data?.message || 'Failed to upgrade customer tier.')
+    }
+  }
+
+  const handleUpgradeCustomer = (customer) => {
+    const label = customerDisplayName(customer)
+    const current = Number(customer?.tier ?? customer?.default_kyc_tier ?? 1)
+    openConfirm({
+      title: 'Upgrade Customer Tier',
+      message: `Select target tier for ${label}.`,
+      confirmLabel: 'Upgrade Account',
+      confirmClassName: 'bg-[#C5DC4B] text-black hover:brightness-105',
+      showTierSelect: true,
+      selectedTier: current >= 1 && current <= 3 ? current : 1,
+      onConfirm: (tier) => runUpgradeCustomer(customer, tier),
+    })
+  }
+
+  const runDeactivateCustomer = async (customer) => {
+    const id = getCustomerId(customer)
+    const label = customerDisplayName(customer)
+    if (!id) return
+    try {
+      await patchCustomer(id, { status: 'INACTIVE' })
+      pushMsg('success', `${label} deactivated successfully.`)
+      await fetchCustomers()
+    } catch (e) {
+      pushMsg('error', e?.response?.data?.message || 'Failed to deactivate customer account.')
+    }
+  }
+
+  const handleDeactivateCustomer = (customer) => {
+    const label = customerDisplayName(customer)
+    openConfirm({
+      title: 'Deactivate Customer Account',
+      message: `Deactivate account for ${label}?`,
+      confirmLabel: 'Deactivate Account',
+      onConfirm: () => runDeactivateCustomer(customer),
+    })
   }
 
   const sortOptions = useMemo(() => CUSTOMER_SORT_OPTIONS, [])
@@ -385,7 +526,13 @@ export default function MerchantDetailsPage() {
             ))}
           </div>
         ) : (
-          <MerchantCustomersTable customers={customers} />
+          <MerchantCustomersTable
+            customers={customers}
+            onViewKyc={handleViewCustomerKyc}
+            onFreezeAccount={handleFreezeCustomer}
+            onUpgradeAccount={handleUpgradeCustomer}
+            onDeactivateAccount={handleDeactivateCustomer}
+          />
         )}
 
         <Pagination
@@ -397,6 +544,70 @@ export default function MerchantDetailsPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {confirmState.open
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm sm:p-6"
+              role="presentation"
+              onClick={closeConfirm}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-h-[calc(100vh-3rem)]"
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-base font-semibold text-text-primary">{confirmState.title}</h3>
+                <p className="mt-2 text-sm text-text-secondary">{confirmState.message}</p>
+                {confirmState.showTierSelect ? (
+                  <div className="mt-4">
+                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">Select Tier</label>
+                    <select
+                      value={confirmState.selectedTier}
+                      onChange={(e) =>
+                        setConfirmState((prev) => ({
+                          ...prev,
+                          selectedTier: Number(e.target.value),
+                        }))
+                      }
+                      className="h-11 w-full appearance-none rounded-xl border border-[#313131] bg-[#181818] px-3 text-sm font-medium text-[#f7f7f7] outline-none transition-colors focus:border-[#717171]"
+                    >
+                      <option value={1}>Tier 1</option>
+                      <option value={2}>Tier 2</option>
+                      <option value={3}>Tier 3</option>
+                    </select>
+                  </div>
+                ) : null}
+                <div className="mt-5 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeConfirm}
+                    className="rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-card-hover"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const run = confirmState.onConfirm
+                      const tier = confirmState.selectedTier
+                      closeConfirm()
+                      if (run) await run(tier)
+                    }}
+                    className={cn(
+                      'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                      confirmState.confirmClassName
+                    )}
+                  >
+                    {confirmState.confirmLabel}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   )
 }
