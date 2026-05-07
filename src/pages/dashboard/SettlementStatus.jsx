@@ -22,7 +22,7 @@ export default function SettlementStatus({ data }) {
   const pendingCount = data.pending_count ?? 0
 
   return (
-    <div className="h-full rounded-card border border-border bg-card">
+    <div className="h-full min-h-[295px] rounded-card border border-border bg-card">
       <div className="border-b border-border px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-base font-medium text-text-primary">Settlement Status</h3>

@@ -12,7 +12,7 @@ export default function CurrencyWalletDistribution({ data = [] }) {
       <div className="border-b border-border px-4 py-3">
         <h3 className="text-base font-medium text-text-primary">Wallet Distribution by Currency</h3>
       </div>
-      <div className="space-y-3 p-3">
+      <div className="space-y-1 p-4">
         {topCurrencies.map((item) => {
           const walletCount = item.wallet_count || 0
           const percentage = totalWallets ? Math.round((walletCount / totalWallets) * 100) : 0
