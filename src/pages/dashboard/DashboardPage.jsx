@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { getSummary } from '../../services/dashboard'
 import { DashboardSkeleton } from '../../components/ui/Skeleton'
 import MetricsRow from './MetricsRow'
-import QuickActionsPanel from './QuickActionsPanel'
 import SettlementStatus from './SettlementStatus'
 import CurrencyUsageChart from './CurrencyUsageChart'
+import CurrencyWalletDistribution from './CurrencyWalletDistribution'
 import OperationalMonitoring from './OperationalMonitoring'
 import RecentActivityFeed from './RecentActivityFeed'
 import DepartmentMetrics from './DepartmentMetrics'
@@ -51,7 +51,7 @@ export default function DashboardPage() {
         <p className="text-sm text-error">{error}</p>
         <button
           onClick={() => window.location.reload()}
-          className="rounded-[var(--radius-button)] border border-border bg-card px-4 py-2 text-sm text-text-primary transition-colors hover:bg-card-hover active:scale-[0.97]"
+          className="rounded-button border border-border bg-card px-4 py-2 text-sm text-text-primary transition-colors hover:bg-card-hover active:scale-[0.97]"
         >
           Retry
         </button>
@@ -60,12 +60,15 @@ export default function DashboardPage() {
   }
 
   const dept = summary?.department
+  const departmentGroups = dept?.departments || {}
+  const financeDept = departmentGroups.finance
+  const complianceDept = departmentGroups.compliance
 
   return (
-    <div>
+    <div className="pb-4">
       {/* Page Header */}
       <Stagger delay={0}>
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-text-primary">Dashboard</h1>
             <p className="mt-1 text-sm text-text-secondary">
@@ -91,39 +94,48 @@ export default function DashboardPage() {
         <MetricsRow overview={summary?.overview} />
       </Stagger>
 
-      {/* Two-Column Content Grid */}
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_470px]">
-        {/* Left Column */}
-        <div className="flex flex-col gap-6">
-          <Stagger delay={120}>
-            <QuickActionsPanel />
-          </Stagger>
-          {dept?.settlement_status && (
-            <Stagger delay={180}>
-              <SettlementStatus data={dept.settlement_status} />
+      {/* At-a-Glance Responsive Grid */}
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-12">
+        {financeDept?.settlement_status && (
+          <div className="h-full 2xl:col-span-4">
+            <Stagger delay={120}>
+              <SettlementStatus data={financeDept.settlement_status} />
             </Stagger>
-          )}
-          {dept?.currency_volume && (
-            <Stagger delay={240}>
-              <CurrencyUsageChart data={dept.currency_volume} />
-            </Stagger>
-          )}
-          <Stagger delay={300}>
-            <DepartmentMetrics department={dept} />
-          </Stagger>
-        </div>
-
-        {/* Right Column */}
-        <div className="flex flex-col gap-6">
-          {(dept?.kyc_pending_approval != null || dept?.id_verification_pending_approval != null) && (
+          </div>
+        )}
+        {(complianceDept?.kyc_pending_approval != null ||
+          complianceDept?.id_verification_pending_approval != null) && (
+          <div className="h-full 2xl:col-span-4">
             <Stagger delay={140}>
-              <OperationalMonitoring data={dept} />
+              <OperationalMonitoring data={complianceDept} />
             </Stagger>
-          )}
-          <Stagger delay={200}>
+          </div>
+        )}
+        {financeDept?.currency_volume && (
+          <div className="h-full 2xl:col-span-4">
+            <Stagger delay={180}>
+              <CurrencyUsageChart data={financeDept.currency_volume} />
+            </Stagger>
+          </div>
+        )}
+        {financeDept?.currency_usage?.length > 0 && (
+          <div className="h-full 2xl:col-span-4">
+            <Stagger delay={200}>
+              <CurrencyWalletDistribution data={financeDept.currency_usage} />
+            </Stagger>
+          </div>
+        )}
+        <div className="h-full 2xl:col-span-8">
+          <Stagger delay={220}>
             <RecentActivityFeed />
           </Stagger>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <Stagger delay={240}>
+          <DepartmentMetrics department={dept} />
+        </Stagger>
       </div>
 
       <GenerateReportPanel

@@ -17,16 +17,24 @@ import { formatNumber } from '../../lib/utils'
 
 function Section({ title, children }) {
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-card">
-      <div className="border-b border-border px-4 py-4">
+    <div className="rounded-card border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
         <h3 className="text-base font-medium text-text-primary">{title}</h3>
       </div>
-      <div className="grid grid-cols-2 gap-4 p-4">{children}</div>
+      <div className="grid grid-cols-2 gap-3 p-3 2xl:grid-cols-3">{children}</div>
     </div>
   )
 }
 
+function getDepartmentData(department, key) {
+  if (!department) return null
+  if (department.departments?.[key]) return department.departments[key]
+  if (department.role === key) return department
+  return null
+}
+
 function FinanceMetrics({ dept }) {
+  if (!dept) return null
   return (
     <Section title="Finance Overview">
       <MetricCard label="NGN Deposits Today" value={formatNumber(dept.total_ngn_deposits_today)} icon={ArrowDownToLine} iconColor="success" />
@@ -36,6 +44,7 @@ function FinanceMetrics({ dept }) {
 }
 
 function OperationsMetrics({ dept }) {
+  if (!dept) return null
   return (
     <Section title="Operations Overview">
       <MetricCard label="Open Disputes" value={formatNumber(dept.open_disputes)} icon={AlertTriangle} iconColor="error" />
@@ -49,6 +58,7 @@ function OperationsMetrics({ dept }) {
 }
 
 function OpsSupportMetrics({ dept }) {
+  if (!dept) return null
   return (
     <Section title="Customer Support Overview">
       <MetricCard label="Onboarded Today" value={formatNumber(dept.customers_onboarded_today)} icon={UserPlus} iconColor="success" />
@@ -60,6 +70,7 @@ function OpsSupportMetrics({ dept }) {
 }
 
 function ComplianceMetrics({ dept }) {
+  if (!dept) return null
   return (
     <Section title="Compliance Overview">
       <MetricCard label="KYC Pending" value={formatNumber(dept.kyc_pending_approval)} icon={ShieldCheck} iconColor="warning" />
@@ -73,6 +84,7 @@ function ComplianceMetrics({ dept }) {
 }
 
 function GrowthMetrics({ dept }) {
+  if (!dept) return null
   return (
     <Section title="Growth Overview">
       <MetricCard label="Onboarded Today" value={formatNumber(dept.customers_onboarded_today)} icon={UserPlus} iconColor="success" />
@@ -95,8 +107,27 @@ const roleComponentMap = {
 export default function DepartmentMetrics({ department }) {
   if (!department?.role) return null
 
+  if (department.role === 'management') {
+    const finance = getDepartmentData(department, 'finance')
+    const operations = getDepartmentData(department, 'operations')
+    const opsSupport = getDepartmentData(department, 'ops_support')
+    const compliance = getDepartmentData(department, 'compliance')
+    const growth = getDepartmentData(department, 'growth')
+
+    return (
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {finance && <FinanceMetrics dept={finance} />}
+        {operations && <OperationsMetrics dept={operations} />}
+        {opsSupport && <OpsSupportMetrics dept={opsSupport} />}
+        {compliance && <ComplianceMetrics dept={compliance} />}
+        {growth && <GrowthMetrics dept={growth} />}
+      </div>
+    )
+  }
+
   const Component = roleComponentMap[department.role]
   if (!Component) return null
 
-  return <Component dept={department} />
+  const scopedDepartment = getDepartmentData(department, department.role) || department
+  return <Component dept={scopedDepartment} />
 }

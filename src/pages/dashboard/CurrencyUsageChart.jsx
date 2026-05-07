@@ -42,12 +42,12 @@ export default function CurrencyUsageChart({ data }) {
   const ticks = Array.from({ length: 6 }, (_, i) => i * step)
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-card">
-      <div className="border-b border-border px-4 py-4">
+    <div className="h-full rounded-card border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
         <h3 className="text-base font-medium text-text-primary">Customer Currency Usage</h3>
       </div>
-      <div className="p-4">
-        <ResponsiveContainer width="100%" height={360}>
+      <div className="p-3">
+        <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} barCategoryGap="20%">
             <CartesianGrid
               strokeDasharray="0"

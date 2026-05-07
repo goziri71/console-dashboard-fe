@@ -22,11 +22,11 @@ export default function OperationalMonitoring({ data }) {
   ]
 
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-card">
-      <div className="border-b border-border px-4 py-4">
+    <div className="h-full rounded-card border border-border bg-card">
+      <div className="border-b border-border px-4 py-3">
         <h3 className="text-base font-medium text-text-primary">Operational Monitoring</h3>
       </div>
-      <div className="flex flex-col py-2">
+      <div className="flex flex-col py-1.5">
         {items.map((item) => (
           <MonitoringItem
             key={item.id}
