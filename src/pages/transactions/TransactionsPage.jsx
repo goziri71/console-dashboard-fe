@@ -54,18 +54,25 @@ function pickFirstPath(obj, paths) {
   return ''
 }
 
-function normalizeStatus(status) {
-  const value = String(status || '').toLowerCase()
+function statusFromBackend(status) {
+  const value = String(status ?? '').trim()
+  return value || '--'
+}
+
+function statusKind(status) {
+  const value = statusFromBackend(status).toLowerCase()
   if (value.includes('success')) return 'completed'
   if (value.includes('fail') || value.includes('error')) return 'failed'
-  return 'processing'
+  if (value.includes('pending') || value.includes('process')) return 'processing'
+  return 'neutral'
 }
 
 function statusBadgeCls(status) {
-  const normalized = normalizeStatus(status)
-  if (normalized === 'completed') return 'bg-success-bg text-success'
-  if (normalized === 'failed') return 'bg-error-bg text-error'
-  return 'bg-warning-bg text-warning'
+  const kind = statusKind(status)
+  if (kind === 'completed') return 'bg-success-bg text-success'
+  if (kind === 'failed') return 'bg-error-bg text-error'
+  if (kind === 'processing') return 'bg-warning-bg text-warning'
+  return 'bg-card-hover text-text-muted'
 }
 
 function FilterPill({ icon: Icon, label, value, options, onChange }) {
@@ -343,11 +350,11 @@ export default function TransactionsPage() {
       ['Closing Balance', formatBalance(tx.closingBalanceRaw, tx.currency)],
       ['Session ID', pickFirst(tx.raw, ['session_id'])],
       ['Date Modified', pickFirst(tx.raw, ['date_modified']) ? formatDate(pickFirst(tx.raw, ['date_modified'])) : '--'],
-      ['Status', normalizeStatus(tx.status)],
+      ['Status', statusFromBackend(tx.status)],
     ]
   }
 
-  const modalState = selectedTx ? normalizeStatus(selectedTx.status) : 'processing'
+  const modalState = selectedTx ? statusKind(selectedTx.status) : 'neutral'
 
   return (
     <div>
@@ -459,7 +466,7 @@ export default function TransactionsPage() {
                       <td className="px-4 py-2 text-text-secondary">{row.date ? formatDate(row.date) : '--'}</td>
                       <td className="px-4 py-2">
                         <span className={cn('inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium', statusBadgeCls(row.status))}>
-                          {normalizeStatus(row.status)}
+                          {statusFromBackend(row.status)}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right">
@@ -513,19 +520,17 @@ export default function TransactionsPage() {
                   'mx-auto mb-5 flex h-28 w-28 items-center justify-center rounded-full',
                   modalState === 'completed' && 'bg-success-bg/20',
                   modalState === 'failed' && 'bg-error-bg/20',
-                  modalState === 'processing' && 'bg-card-hover'
+                  modalState === 'processing' && 'bg-card-hover',
+                  modalState === 'neutral' && 'bg-card-hover'
                 )}
               >
                 {modalState === 'completed' && <CheckCircle2 size={44} className="text-success" />}
                 {modalState === 'failed' && <XCircle size={44} className="text-error" />}
                 {modalState === 'processing' && <Clock3 size={44} className="text-warning" />}
+                {modalState === 'neutral' && <Clock3 size={44} className="text-text-muted" />}
               </div>
               <p className="text-center text-xl font-semibold text-text-primary">
-                {modalState === 'completed'
-                  ? 'Transaction Successful'
-                  : modalState === 'failed'
-                    ? 'Transaction Failed'
-                    : 'Transaction Pending'}
+                {statusFromBackend(selectedTx.status)}
               </p>
             </div>
 
