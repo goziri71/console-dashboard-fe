@@ -24,7 +24,7 @@ const statusBadge = {
 
 const udaraLinkBadge = {
   linked: { label: 'Linked', cls: 'bg-success-bg text-success' },
-  unlinked: { label: 'Not linked', cls: 'bg-warning-bg text-warning' },
+  unlinked: { label: 'Not linked', cls: 'bg-warning-bg text-warning text-[1px] px-0' },
 }
 
 function Badge({ config, value }) {
