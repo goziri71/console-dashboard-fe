@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, AlertCircle, CheckCircle, Download, FileText, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, AlertCircle, CheckCircle, Download, FileText, Loader2, RefreshCw, XCircle, HelpCircle } from 'lucide-react'
 import { getCustomer, getCustomerKycs } from '../../services/customers'
 import { cn, formatDate, exportToCsv, deriveRiskLevel } from '../../lib/utils'
 import { countryToFlagEmoji } from './merchantUi'
@@ -133,6 +133,71 @@ function rowStatusKey(statusStr) {
   if (s.includes('pend') || s.includes('submitted')) return 'pending'
   if (s.includes('reject') || s.includes('fail')) return 'rejected'
   return 'none'
+}
+
+/** Same layout as verified banner; colors per aggregate KYC status. */
+const KYC_SUMMARY_BANNER = {
+  verified: {
+    Icon: CheckCircle,
+    iconSize: 28,
+    iconStroke: 1.5,
+    title: 'KYC Verified',
+    body: "This customer's KYC has been verified successfully.",
+    wrap: 'flex flex-col items-center justify-center gap-3 rounded-lg border border-[#5c6639]/90 bg-[#161a12] p-12',
+    iconRing: 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#14532d]/80 text-[#97AB27]',
+    titleClass: 'text-center text-[21px] font-semibold text-[#97AB27]',
+    bodyClass: 'mt-1.5 max-w-md text-center text-[16px] font-normal leading-relaxed text-[#97AB27]/95',
+  },
+  pending: {
+    Icon: AlertCircle,
+    iconSize: 28,
+    iconStroke: 1.5,
+    title: 'KYC Pending',
+    body: 'Verification is still in progress for this customer.',
+    wrap: 'flex flex-col items-center justify-center gap-3 rounded-lg border border-[#a16207]/55 bg-[#1c1810] p-12',
+    iconRing: 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#713f12]/55 text-[#fbbf24]',
+    titleClass: 'text-center text-[21px] font-semibold text-[#fbbf24]',
+    bodyClass: 'mt-1.5 max-w-md text-center text-[16px] font-normal leading-relaxed text-[#d4c4a0]',
+  },
+  rejected: {
+    Icon: XCircle,
+    iconSize: 28,
+    iconStroke: 1.5,
+    title: 'KYC Rejected',
+    body: "This customer's KYC was not approved.",
+    wrap: 'flex flex-col items-center justify-center gap-3 rounded-lg border border-[#b91c1c]/55 bg-[#1a1010] p-12',
+    iconRing: 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#7f1d1d]/50 text-[#f87171]',
+    titleClass: 'text-center text-[21px] font-semibold text-[#fca5a5]',
+    bodyClass: 'mt-1.5 max-w-md text-center text-[16px] font-normal leading-relaxed text-[#d4a8a8]',
+  },
+  none: {
+    Icon: HelpCircle,
+    iconSize: 28,
+    iconStroke: 1.5,
+    title: 'KYC Status',
+    body: 'No aggregate KYC status is available for this customer yet.',
+    wrap: 'flex flex-col items-center justify-center gap-3 rounded-lg border border-[#3f3f3f] bg-[#161616] p-12',
+    iconRing: 'flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#2a2a2a] text-[#9ca3af]',
+    titleClass: 'text-center text-[21px] font-semibold text-[#d4d4d4]',
+    bodyClass: 'mt-1.5 max-w-md text-center text-[16px] font-normal leading-relaxed text-[#9ca3af]',
+  },
+}
+
+function KycSummaryStatusBanner({ kycKey }) {
+  const key = kycKey === 'verified' ? 'verified' : kycKey === 'pending' ? 'pending' : kycKey === 'rejected' ? 'rejected' : 'none'
+  const cfg = KYC_SUMMARY_BANNER[key]
+  const Icon = cfg.Icon
+  return (
+    <div className={cfg.wrap}>
+      <div className={cfg.iconRing}>
+        <Icon size={cfg.iconSize} strokeWidth={cfg.iconStroke} />
+      </div>
+      <div className="min-w-0">
+        <p className={cfg.titleClass}>{cfg.title}</p>
+        <p className={cfg.bodyClass}>{cfg.body}</p>
+      </div>
+    </div>
+  )
 }
 
 /** Dark green pill on document rows (matches Sterllo KYC design). */
@@ -485,39 +550,7 @@ export default function CustomerKycPage() {
             <h2 className="text-[16px] font-bold tracking-[0.02em] text-[#BAD133]">KYC Summary</h2>
           </div>
           <div className="flex flex-1 flex-col gap-5 p-6">
-            {kycKey === 'verified' ? (
-              <div className="flex items-center justify-center flex-col gap-3 rounded-lg border border-[#5c6639]/90 bg-[#161a12] p-12">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#14532d]/80 text-[#97AB27]">
-                  <CheckCircle size={28} strokeWidth={1.5} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[21px] text-center font-semibold text-[#97AB27]">KYC Verified</p>
-                  <p className="mt-1.5 text-[16px] leading-relaxed text-[#97AB27]">
-                    This customer&apos;s KYC has been verified successfully.
-                  </p>
-                </div>
-              </div>
-            ) : kycKey === 'pending' ? (
-              <div className="flex gap-3 rounded-lg border border-[#854d0e]/60 bg-[#1c1410] p-12">
-                <AlertCircle className="mt-0.5 shrink-0 text-[#fbbf24]" size={22} />
-                <div>
-                  <p className="text-sm font-semibold text-[#fbbf24]">KYC Pending</p>
-                  <p className="mt-1 text-xs text-[#a8a29e]">Verification is still in progress for this customer.</p>
-                </div>
-              </div>
-            ) : kycKey === 'rejected' ? (
-              <div className="flex gap-3 rounded-lg border border-[#991b1b]/50 bg-[#1a1010] p-12">
-                <AlertCircle className="mt-0.5 shrink-0 text-[#f87171]" size={22} />
-                <div>
-                  <p className="text-sm font-semibold text-[#fca5a5]">KYC Rejected</p>
-                  <p className="mt-1 text-xs text-[#a8a29e]">This customer&apos;s KYC was not approved.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-[#2a2a2a] bg-[#161616] p-4 text-xs text-[#9ca3af]">
-                No aggregate KYC status available.
-              </div>
-            )}
+            <KycSummaryStatusBanner kycKey={kycKey} />
 
             <dl className="mt-auto divide-y divide-[#2a2a2a] text-sm">
               <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
