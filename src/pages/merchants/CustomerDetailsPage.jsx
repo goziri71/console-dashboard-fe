@@ -14,6 +14,7 @@ import {
   Download,
   TrendingUp,
   Unlock,
+  ShieldCheck,
 } from 'lucide-react'
 import {
   getCustomer,
@@ -579,12 +580,19 @@ export default function CustomerDetailsPage() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 text-xs text-text-muted">
+        <div className="inline-flex flex-wrap items-center gap-2 text-xs text-text-muted">
           <Link to={`/merchants/${accountKey}`} className="hover:text-accent">
             Customer
           </Link>
           <span className="text-text-muted">›</span>
           <span className="font-medium text-text-primary">Customer Profile</span>
+          <Link
+            to={`/merchants/${accountKey}/customers/${encodeURIComponent(customerId)}/kyc`}
+            className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-accent/40 hover:bg-card-hover"
+          >
+            <ShieldCheck size={14} className="text-accent" />
+            View KYC
+          </Link>
         </div>
         <div className="flex items-center gap-2">
           <button

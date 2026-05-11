@@ -9,6 +9,7 @@ import {
   RefreshCw,
   AlertCircle,
   MoreHorizontal,
+  X,
 } from 'lucide-react'
 import { getMerchant, getMerchantCustomers, updateMerchant } from '../../services/merchants'
 import { patchCustomer, patchCustomerTier, postCustomerFreeze } from '../../services/customers'
@@ -83,6 +84,7 @@ export default function MerchantDetailsPage() {
   const [msg, setMsg] = useState(null)
   const [confirmState, setConfirmState] = useState({
     open: false,
+    variant: 'default',
     title: '',
     message: '',
     confirmLabel: 'Confirm',
@@ -159,12 +161,28 @@ export default function MerchantDetailsPage() {
   }
 
   const closeConfirm = () => {
-    setConfirmState((prev) => ({ ...prev, open: false, onConfirm: null, showTierSelect: false }))
+    setConfirmState((prev) => ({
+      ...prev,
+      open: false,
+      variant: 'default',
+      onConfirm: null,
+      showTierSelect: false,
+    }))
   }
 
-  const openConfirm = ({ title, message, confirmLabel, confirmClassName, showTierSelect, selectedTier, onConfirm }) => {
+  const openConfirm = ({
+    title,
+    message,
+    confirmLabel,
+    confirmClassName,
+    showTierSelect,
+    selectedTier,
+    onConfirm,
+    variant = 'default',
+  }) => {
     setConfirmState({
       open: true,
+      variant: variant === 'freeze' ? 'freeze' : 'default',
       title: title || 'Please confirm',
       message: message || '',
       confirmLabel: confirmLabel || 'Confirm',
@@ -211,9 +229,11 @@ export default function MerchantDetailsPage() {
 
   const handleFreeze = () => {
     openConfirm({
-      title: 'Freeze Merchant Account',
-      message: `Freeze account for ${merchant?.name || 'this merchant'}?`,
-      confirmLabel: 'Freeze Account',
+      variant: 'freeze',
+      title: 'Freeze Account',
+      message: `This will freeze the account for ${merchant?.name || 'this merchant'}. They will not be able to use it until unfrozen.`,
+      confirmLabel: 'Confirm Freeze',
+      confirmClassName: 'bg-[#C5DC4B] text-black hover:brightness-105',
       onConfirm: runFreezeMerchant,
     })
   }
@@ -260,7 +280,7 @@ export default function MerchantDetailsPage() {
   const handleViewCustomerKyc = (customer) => {
     const id = getCustomerId(customer)
     if (!id) return
-    navigate(`/merchants/${accountKey}/customers/${encodeURIComponent(String(id))}`)
+    navigate(`/merchants/${accountKey}/customers/${encodeURIComponent(String(id))}/kyc`)
   }
 
   const runFreezeCustomer = async (customer) => {
@@ -279,9 +299,11 @@ export default function MerchantDetailsPage() {
   const handleFreezeCustomer = (customer) => {
     const label = customerDisplayName(customer)
     openConfirm({
-      title: 'Freeze Customer Account',
-      message: `Freeze account for ${label}?`,
-      confirmLabel: 'Freeze Account',
+      variant: 'freeze',
+      title: 'Freeze Account',
+      message: `This will freeze the account for ${label}. They will not be able to use it until unfrozen.`,
+      confirmLabel: 'Confirm Freeze',
+      confirmClassName: 'bg-[#C5DC4B] text-black hover:brightness-105',
       onConfirm: () => runFreezeCustomer(customer),
     })
   }
@@ -548,62 +570,114 @@ export default function MerchantDetailsPage() {
       {confirmState.open
         ? createPortal(
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm sm:p-6"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm sm:p-6"
               role="presentation"
               onClick={closeConfirm}
             >
-              <div
-                className="w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-h-[calc(100vh-3rem)]"
-                role="dialog"
-                aria-modal="true"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-base font-semibold text-text-primary">{confirmState.title}</h3>
-                <p className="mt-2 text-sm text-text-secondary">{confirmState.message}</p>
-                {confirmState.showTierSelect ? (
-                  <div className="mt-4">
-                    <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">Select Tier</label>
-                    <select
-                      value={confirmState.selectedTier}
-                      onChange={(e) =>
-                        setConfirmState((prev) => ({
-                          ...prev,
-                          selectedTier: Number(e.target.value),
-                        }))
-                      }
-                      className="h-11 w-full appearance-none rounded-xl border border-[#313131] bg-[#181818] px-3 text-sm font-medium text-[#f7f7f7] outline-none transition-colors focus:border-[#717171]"
+              {confirmState.variant === 'freeze' ? (
+                <div
+                  className="w-full max-w-[440px] overflow-hidden rounded-2xl border border-[#2f2f2f] bg-[#141414] shadow-2xl"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="freeze-dialog-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-start justify-between gap-3 px-5 pt-5">
+                    <h2 id="freeze-dialog-title" className="text-lg font-semibold leading-tight text-white">
+                      {confirmState.title}
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={closeConfirm}
+                      className="rounded-lg p-1.5 text-[#9ca3af] transition-colors hover:bg-white/10 hover:text-white"
+                      aria-label="Close"
                     >
-                      <option value={1}>Tier 1</option>
-                      <option value={2}>Tier 2</option>
-                      <option value={3}>Tier 3</option>
-                    </select>
+                      <X size={18} strokeWidth={2} />
+                    </button>
                   </div>
-                ) : null}
-                <div className="mt-5 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={closeConfirm}
-                    className="rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-card-hover"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const run = confirmState.onConfirm
-                      const tier = confirmState.selectedTier
-                      closeConfirm()
-                      if (run) await run(tier)
-                    }}
-                    className={cn(
-                      'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                      confirmState.confirmClassName
-                    )}
-                  >
-                    {confirmState.confirmLabel}
-                  </button>
+                  <div className="px-5 pb-1 pt-3">
+                    <div className="rounded-xl border border-[#3a3a3a] bg-[#1a1a1a] px-4 py-4">
+                      <p className="text-sm leading-relaxed text-[#e5e5e5]">{confirmState.message}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-stretch gap-3 px-5 pb-5 pt-4">
+                    <button
+                      type="button"
+                      onClick={closeConfirm}
+                      className="flex-1 rounded-xl border border-[#4b4b4b] bg-transparent py-3 text-sm font-medium text-[#d4d4d4] transition-colors hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const run = confirmState.onConfirm
+                        closeConfirm()
+                        if (run) await run()
+                      }}
+                      className={cn(
+                        'min-w-[52%] flex-[1.35] rounded-full py-3 text-sm font-semibold transition-colors active:scale-[0.98]',
+                        confirmState.confirmClassName
+                      )}
+                    >
+                      {confirmState.confirmLabel}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div
+                  className="w-full max-w-md rounded-2xl border border-border bg-card p-4 shadow-2xl max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-h-[calc(100vh-3rem)]"
+                  role="dialog"
+                  aria-modal="true"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="text-base font-semibold text-text-primary">{confirmState.title}</h3>
+                  <p className="mt-2 text-sm text-text-secondary">{confirmState.message}</p>
+                  {confirmState.showTierSelect ? (
+                    <div className="mt-4">
+                      <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-text-muted">Select Tier</label>
+                      <select
+                        value={confirmState.selectedTier}
+                        onChange={(e) =>
+                          setConfirmState((prev) => ({
+                            ...prev,
+                            selectedTier: Number(e.target.value),
+                          }))
+                        }
+                        className="h-11 w-full appearance-none rounded-xl border border-[#313131] bg-[#181818] px-3 text-sm font-medium text-[#f7f7f7] outline-none transition-colors focus:border-[#717171]"
+                      >
+                        <option value={1}>Tier 1</option>
+                        <option value={2}>Tier 2</option>
+                        <option value={3}>Tier 3</option>
+                      </select>
+                    </div>
+                  ) : null}
+                  <div className="mt-5 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={closeConfirm}
+                      className="rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-card-hover"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const run = confirmState.onConfirm
+                        const tier = confirmState.selectedTier
+                        closeConfirm()
+                        if (run) await run(tier)
+                      }}
+                      className={cn(
+                        'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        confirmState.confirmClassName
+                      )}
+                    >
+                      {confirmState.confirmLabel}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>,
             document.body
           )
