@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { getMerchant, getMerchantCustomers, updateMerchant } from '../../services/merchants'
-import { patchCustomer, patchCustomerTier, postCustomerFreeze } from '../../services/customers'
+import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
 import { cn, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
@@ -341,29 +341,6 @@ export default function MerchantDetailsPage() {
     })
   }
 
-  const runDeactivateCustomer = async (customer) => {
-    const id = getCustomerId(customer)
-    const label = customerDisplayName(customer)
-    if (!id) return
-    try {
-      await patchCustomer(id, { status: 'INACTIVE' })
-      pushMsg('success', `${label} deactivated successfully.`)
-      await fetchCustomers()
-    } catch (e) {
-      pushMsg('error', e?.response?.data?.message || 'Failed to deactivate customer account.')
-    }
-  }
-
-  const handleDeactivateCustomer = (customer) => {
-    const label = customerDisplayName(customer)
-    openConfirm({
-      title: 'Deactivate Customer Account',
-      message: `Deactivate account for ${label}?`,
-      confirmLabel: 'Deactivate Account',
-      onConfirm: () => runDeactivateCustomer(customer),
-    })
-  }
-
   const sortOptions = useMemo(() => CUSTOMER_SORT_OPTIONS, [])
   const filterOptions = useMemo(
     () => [
@@ -553,7 +530,6 @@ export default function MerchantDetailsPage() {
             onViewKyc={handleViewCustomerKyc}
             onFreezeAccount={handleFreezeCustomer}
             onUpgradeAccount={handleUpgradeCustomer}
-            onDeactivateAccount={handleDeactivateCustomer}
           />
         )}
 

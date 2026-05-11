@@ -50,7 +50,6 @@ export default function MerchantCustomersTable({
   onViewKyc,
   onFreezeAccount,
   onUpgradeAccount,
-  onDeactivateAccount,
 }) {
   const navigate = useNavigate()
   const { accountKey } = useParams()
@@ -188,17 +187,6 @@ export default function MerchantCustomersTable({
                             }}
                           >
                             Upgrade Account
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="flex w-full items-center px-3 py-2 text-left text-xs text-text-primary transition-colors hover:bg-card-hover"
-                            onClick={() => {
-                              setOpenMenuKey(null)
-                              if (typeof onDeactivateAccount === 'function') onDeactivateAccount(c)
-                            }}
-                          >
-                            Deactivate Account
                           </button>
                         </div>
                       ) : null}
