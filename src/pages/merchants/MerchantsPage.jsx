@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Building2, Users, Clock, ShieldAlert, Link2, Loader2, X } from 'lucide-react'
-import { beamerAccountUpdate, getMerchantStats, getMerchants } from '../../services/merchants'
+import { Building2, Users, Clock, ShieldAlert, Link2, Loader2, X, TrendingUp } from 'lucide-react'
+import { beamerAccountUpdate, getMerchantStats, getMerchants, patchMerchantTier } from '../../services/merchants'
 import { formatNumber, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -13,7 +13,6 @@ import {
 } from './merchantUi'
 
 const LIMIT = 20
-
 function StatsSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
@@ -135,6 +134,12 @@ export default function MerchantsPage() {
   const [linkSubmitting, setLinkSubmitting] = useState(false)
   const [linkMsg, setLinkMsg] = useState(null)
 
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [upgradeMerchant, setUpgradeMerchant] = useState(null)
+  const [upgradeTier, setUpgradeTier] = useState(1)
+  const [upgradeSubmitting, setUpgradeSubmitting] = useState(false)
+  const [upgradeMsg, setUpgradeMsg] = useState(null)
+
   useEffect(() => {
     getMerchantStats()
       .then((res) => setStats(unwrapStats(res)))
@@ -207,6 +212,47 @@ export default function MerchantsPage() {
     setClientId('')
     setClientKey('')
     setLinkMsg(null)
+  }
+
+  function openUpgradeModal(merchant) {
+    if (!merchant?.account_key) return
+    setUpgradeMerchant(merchant)
+    const t = Number(merchant.default_kyc_tier ?? 1)
+    setUpgradeTier(Number.isFinite(t) && t >= 1 && t <= 3 ? t : 1)
+    setUpgradeMsg(null)
+    setUpgradeOpen(true)
+  }
+
+  function closeUpgradeModal() {
+    setUpgradeOpen(false)
+    setUpgradeMerchant(null)
+    setUpgradeTier(1)
+    setUpgradeMsg(null)
+  }
+
+  async function handleUpgradeSubmit(e) {
+    e.preventDefault()
+    if (!upgradeMerchant?.account_key) return
+    const next = Number(upgradeTier)
+    if (!Number.isFinite(next) || next < 1 || next > 3) {
+      setUpgradeMsg({ type: 'error', text: 'Select a valid tier (1 to 3).' })
+      return
+    }
+    setUpgradeSubmitting(true)
+    setUpgradeMsg(null)
+    try {
+      await patchMerchantTier(upgradeMerchant.account_key, { tier: next })
+      setUpgradeMsg({
+        type: 'success',
+        text: `Tier updated to ${next} for ${upgradeMerchant.name || upgradeMerchant.account_key}.`,
+      })
+      await fetchMerchants()
+      window.setTimeout(() => closeUpgradeModal(), 1200)
+    } catch (err) {
+      setUpgradeMsg({ type: 'error', text: err?.response?.data?.message || 'Failed to upgrade merchant tier.' })
+    } finally {
+      setUpgradeSubmitting(false)
+    }
   }
 
   async function handleLinkSubmit(e) {
@@ -308,7 +354,13 @@ export default function MerchantsPage() {
             </button>
           </div>
         ) : (
-          <MerchantTable merchants={merchants} page={page} limit={LIMIT} onLinkUdara={openLinkModal} />
+          <MerchantTable
+            merchants={merchants}
+            page={page}
+            limit={LIMIT}
+            onLinkUdara={openLinkModal}
+            onUpgradeMerchant={openUpgradeModal}
+          />
         )}
 
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} label="Merchants" onPageChange={setPage} />
@@ -400,6 +452,96 @@ export default function MerchantsPage() {
                 </button>
               </form>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {upgradeOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-6"
+          role="presentation"
+          onClick={closeUpgradeModal}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-card border border-border bg-card shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <h3 className="text-base font-medium text-text-primary">Upgrade merchant tier</h3>
+                <p className="text-xs text-text-muted">Same flow as customer upgrade — tier 1 to 3 via merchant account key.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeUpgradeModal}
+                className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-card-hover hover:text-text-primary"
+                aria-label="Close modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {upgradeMsg ? (
+              <div
+                className={`mx-4 mt-3 rounded-lg border px-3 py-2 text-xs ${
+                  upgradeMsg.type === 'success'
+                    ? 'border-success/30 bg-success-bg text-success'
+                    : 'border-error/30 bg-error-bg text-error'
+                }`}
+              >
+                {upgradeMsg.text}
+              </div>
+            ) : null}
+
+            <form onSubmit={handleUpgradeSubmit} className="p-4">
+              <div className="rounded-lg border border-border bg-page px-3 py-2">
+                <p className="text-[10px] uppercase tracking-wide text-text-muted">Merchant</p>
+                <p className="mt-1 text-sm text-text-primary">{upgradeMerchant?.name || '—'}</p>
+                <p className="break-all font-mono text-[11px] text-text-muted">{upgradeMerchant?.account_key || '—'}</p>
+              </div>
+
+              <label className="mb-1 mt-4 block text-xs font-medium uppercase tracking-wide text-text-muted">
+                Target tier
+              </label>
+              <select
+                value={upgradeTier}
+                onChange={(e) => setUpgradeTier(Number(e.target.value))}
+                className="h-11 w-full appearance-none rounded-xl border border-[#313131] bg-[#181818] px-3 text-sm font-medium text-[#f7f7f7] outline-none transition-colors focus:border-[#717171]"
+              >
+                <option value={1}>Tier 1</option>
+                <option value={2}>Tier 2</option>
+                <option value={3}>Tier 3</option>
+              </select>
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeUpgradeModal}
+                  className="flex-1 rounded-lg border border-border py-2.5 text-sm text-text-secondary transition-colors hover:bg-card-hover"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!upgradeMerchant || upgradeSubmitting}
+                  className="flex-[1.2] rounded-full border border-transparent bg-[#C5DC4B] py-2.5 text-sm font-semibold text-black transition-colors hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {upgradeSubmitting ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Loader2 size={14} className="animate-spin" />
+                      Saving…
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <TrendingUp size={14} />
+                      Upgrade tier
+                    </span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

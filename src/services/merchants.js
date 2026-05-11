@@ -40,6 +40,13 @@ export async function updateMerchant(accountKey, payload) {
   return data
 }
 
+/** Merchant KYC tier 1–3 — `PATCH /merchants/:account_key/tier` */
+export async function patchMerchantTier(accountKey, payload) {
+  const ak = encodeURIComponent(String(accountKey))
+  const { data } = await api.patch(`/merchants/${ak}/tier`, payload)
+  return data
+}
+
 // ── Sub-resources ─────────────────────────────────────────────────────────────
 
 export async function getMerchantWallets(accountKey, params = {}) {

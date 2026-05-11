@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MoreVertical, Link2, ExternalLink } from 'lucide-react'
+import { MoreVertical, Link2, ExternalLink, TrendingUp } from 'lucide-react'
 import { formatDate, cn } from '../../lib/utils'
 import {
   typeLabel,
@@ -48,7 +48,7 @@ const COLUMNS = [
   { key: 'actions', label: '', width: 'w-[56px]' },
 ]
 
-export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkUdara }) {
+export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkUdara, onUpgradeMerchant }) {
   const navigate = useNavigate()
   const [openMenuKey, setOpenMenuKey] = useState(null)
 
@@ -94,6 +94,9 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
               const rowKey = merchant.account_key || String(merchant.id ?? idx)
               const menuOpen = openMenuKey === rowKey
               const canLinkUdara = typeof onLinkUdara === 'function' && merchant.udara360 == null
+              const canUpgradeTier = typeof onUpgradeMerchant === 'function'
+              const currentTier = Number(merchant?.default_kyc_tier ?? 1)
+              const atMaxTier = Number.isFinite(currentTier) && currentTier >= 3
               const udaraLinkKey = merchant.udara360 != null ? 'linked' : 'unlinked'
               return (
                 <tr
@@ -177,6 +180,23 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                                 className="shrink-0 text-accent transition-colors duration-150 group-hover:text-accent"
                               />
                               Link to Udara
+                            </button>
+                          ) : null}
+                          {canUpgradeTier ? (
+                            <button
+                              type="button"
+                              role="menuitem"
+                              disabled={atMaxTier}
+                              title={atMaxTier ? 'Merchant is already at Tier 3' : undefined}
+                              className="group flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-text-primary transition-colors duration-150 hover:bg-accent/15 hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+                              onClick={() => {
+                                if (atMaxTier) return
+                                setOpenMenuKey(null)
+                                onUpgradeMerchant(merchant)
+                              }}
+                            >
+                              <TrendingUp size={14} className="shrink-0 text-accent" />
+                              Upgrade account
                             </button>
                           ) : null}
                         </div>

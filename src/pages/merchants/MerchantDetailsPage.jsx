@@ -11,7 +11,7 @@ import {
   MoreHorizontal,
   X,
 } from 'lucide-react'
-import { getMerchant, getMerchantCustomers, updateMerchant } from '../../services/merchants'
+import { getMerchant, getMerchantCustomers, updateMerchant, patchMerchantTier } from '../../services/merchants'
 import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
 import { cn, exportToCsv } from '../../lib/utils'
@@ -247,11 +247,11 @@ export default function MerchantDetailsPage() {
     }
     setUpgrading(true)
     try {
-      const res = await updateMerchant(accountKey, { default_kyc_tier: nextTier })
+      const res = await patchMerchantTier(accountKey, { tier: nextTier })
       const body = unwrapPayload(res)
       setMerchant((prev) => ({
         ...prev,
-        default_kyc_tier: body?.default_kyc_tier ?? nextTier,
+        default_kyc_tier: body?.default_kyc_tier ?? body?.tier ?? nextTier,
       }))
       pushMsg('success', `Tier upgraded to ${nextTier}.`)
     } catch (e) {
