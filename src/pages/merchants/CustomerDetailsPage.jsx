@@ -567,7 +567,7 @@ export default function CustomerDetailsPage() {
   }
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up min-w-0 max-w-full space-y-6">
       {msg && (
         <div
           className={cn(
@@ -861,9 +861,9 @@ export default function CustomerDetailsPage() {
         )}
       </section>
 
-      <section className="overflow-hidden rounded-card border border-border/70 bg-card">
-        <div className="grid min-h-0 lg:grid-cols-[minmax(285px,320px)_1fr] lg:max-h-[min(640px,calc(100dvh-260px))] lg:grid-rows-1 lg:divide-x lg:divide-border/60">
-          <div className="flex min-h-0 flex-col border-b border-border/60 bg-[#0b0d11] p-3 lg:border-b-0">
+      <section className="min-w-0 overflow-hidden rounded-card border border-border/70 bg-card">
+        <div className="grid min-h-0 min-w-0 grid-cols-1 divide-y divide-border/60 lg:max-h-[min(640px,calc(100dvh-260px))] lg:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] lg:grid-rows-1 lg:divide-x lg:divide-y-0 xl:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+          <div className="flex min-h-0 min-w-0 flex-col bg-[#0b0d11] p-3">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
@@ -911,11 +911,11 @@ export default function CustomerDetailsPage() {
                 <p className="py-10 text-center text-sm text-text-muted">No wallets found.</p>
               )}
             </div>
-            <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3 text-[10px] text-text-muted">
-              <span>
+            <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-[10px] text-text-muted">
+              <span className="min-w-0">
                 Page {walletPage} of {walletTotalPages}
               </span>
-              <div className="flex gap-2">
+              <div className="flex shrink-0 gap-2">
                 <button
                   type="button"
                   disabled={walletPage <= 1 || walletsLoading}
@@ -936,28 +936,28 @@ export default function CustomerDetailsPage() {
             </div>
           </div>
 
-          <div className="flex min-h-[280px] flex-col bg-[#090b0f] p-3 lg:min-h-0">
+          <div className="flex min-h-[280px] min-w-0 flex-col bg-[#090b0f] p-3 lg:min-h-0">
             {!financial ? (
               <p className="py-12 text-center text-sm text-text-muted">Wallet activity requires financial.read to view amounts and ledger.</p>
             ) : ledgerLoading ? (
-              <div className="flex min-h-[200px] flex-1 flex-col gap-2 p-3">
+              <div className="flex min-h-[200px] min-w-0 flex-1 flex-col gap-2 p-3">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="skeleton h-9 w-full rounded-md" />
                 ))}
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 flex-col gap-2">
-                <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-border/60 bg-[#0b0d12]">
-                    <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="sticky top-0 z-10 bg-linear-to-b from-[#3a3d44] to-[#2d3037] shadow-sm">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+                <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-xl border border-border/60 bg-[#0b0d12] [-webkit-overflow-scrolling:touch]">
+                  <table className="w-full min-w-[min(100%,560px)] text-left text-sm sm:min-w-[640px] xl:min-w-[760px]">
+                    <thead className="sticky top-0 z-10 bg-linear-to-b from-[#3a3d44] to-[#2d3037] shadow-sm">
                     <tr className="text-xs font-medium text-[#c6cad1]">
-                      <th className="px-3 py-3">S/N</th>
-                      <th className="px-3 py-3">Service</th>
-                      <th className="px-3 py-3">Amount</th>
-                      <th className="px-3 py-3">Balance</th>
-                      <th className="px-3 py-3">Date</th>
-                      <th className="px-3 py-3">Status</th>
-                      <th className="px-3 py-3 w-12" />
+                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">S/N</th>
+                      <th className="min-w-[140px] px-2 py-3 sm:min-w-[180px] sm:px-3">Service</th>
+                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Amount</th>
+                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Balance</th>
+                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Date</th>
+                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Status</th>
+                      <th className="w-10 px-1 py-3 sm:w-12 sm:px-3" />
                     </tr>
                   </thead>
                   <tbody>
@@ -977,15 +977,17 @@ export default function CustomerDetailsPage() {
                               : '—'
                         return (
                           <tr key={row.reference || idx} className="border-t border-[#171b24] hover:bg-[#10141b]">
-                            <td className="px-3 py-2.5 tabular-nums text-[#8c939f]">{sn}</td>
-                            <td className="max-w-[220px] px-3 py-2.5 text-[#c8e64a]">
-                              <span className="line-clamp-2 text-[12px] font-medium uppercase leading-4">{row.service || row.narration || '—'}</span>
+                            <td className="px-2 py-2.5 tabular-nums text-[#8c939f] sm:px-3">{sn}</td>
+                            <td className="max-w-[min(220px,45vw)] px-2 py-2.5 text-[#c8e64a] sm:max-w-[260px] sm:px-3 xl:max-w-[320px]">
+                              <span className="line-clamp-3 wrap-break-word text-[11px] font-medium uppercase leading-snug sm:line-clamp-2 sm:text-[12px] sm:leading-4">
+                                {row.service || row.narration || '—'}
+                              </span>
                             </td>
-                            <td className="px-3 py-2.5 tabular-nums text-[#8e95a1]">{amt}</td>
-                            <td className="px-3 py-2.5 tabular-nums text-[#17b26a]">{bal !== '—' ? `+${bal}` : '—'}</td>
-                            <td className="px-3 py-2.5 text-xs text-[#8e95a1]">{formatDate(row.date_created).split(' ')[0]}</td>
-                            <td className="px-3 py-2.5">{ledgerStatusPill(st.kind, st.label)}</td>
-                            <td className="px-3 py-2.5">
+                            <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-[#8e95a1] sm:px-3">{amt}</td>
+                            <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-[#17b26a] sm:px-3">{bal !== '—' ? `+${bal}` : '—'}</td>
+                            <td className="whitespace-nowrap px-2 py-2.5 text-xs text-[#8e95a1] sm:px-3">{formatDate(row.date_created).split(' ')[0]}</td>
+                            <td className="px-2 py-2.5 sm:px-3">{ledgerStatusPill(st.kind, st.label)}</td>
+                            <td className="px-1 py-2.5 sm:px-3">
                               <button type="button" className="rounded p-1 text-[#8e95a1] hover:bg-card-hover" aria-label="Row actions">
                                 <ChevronRight size={16} />
                               </button>
@@ -1003,11 +1005,11 @@ export default function CustomerDetailsPage() {
                   </tbody>
                 </table>
                 </div>
-                <div className="flex shrink-0 items-center justify-between rounded-lg border border-border/50 bg-[#0b0d12] px-3 py-2 text-[10px] text-[#8e95a1]">
-                  <span>
+                <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 bg-[#0b0d12] px-3 py-2 text-[10px] text-[#8e95a1]">
+                  <span className="min-w-0">
                     Page {ledgerPage} of {ledgerTotalPages}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     <button
                       type="button"
                       disabled={ledgerPage <= 1 || ledgerLoading}

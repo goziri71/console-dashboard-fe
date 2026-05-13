@@ -10,7 +10,7 @@ export async function login(email, password) {
  * @param {{ email: string, password: string, first_name: string, last_name: string, role: string }} payload
  */
 export async function register(payload) {
-  const { data } = await api.post('/api/v1/auth/register', payload)
+  const { data } = await api.post('/auth/register', payload)
   return data
 }
 
