@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   AlertCircle,
@@ -48,6 +48,7 @@ import {
   customerTypeLabel,
   getCustomerIdentifier,
 } from './merchantCustomerUi'
+import { pickMerchantAccountKeyFromCustomer } from '../../lib/walletNavigation'
 
 const CAN_MUTATE = ['operations', 'compliance']
 const WALLET_PAGE_SIZE = 8
@@ -166,7 +167,14 @@ function formatWalletBalance(w, financial) {
 }
 
 export default function CustomerDetailsPage() {
-  const { accountKey, identifier: identifierParam } = useParams()
+  const { accountKey: accountKeyParam, identifier: identifierParam } = useParams()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const walletFromQuery =
+    searchParams.get('wallet')?.trim() ||
+    (typeof location.state?.walletKey === 'string' ? location.state.walletKey.trim() : '') ||
+    null
   const { user } = useAuth()
   const financial = canReadFinancial(user?.permissions)
   const canMutate = CAN_MUTATE.includes(user?.role)
@@ -175,6 +183,11 @@ export default function CustomerDetailsPage() {
   const customerId = useMemo(() => (identifierParam ? decodeURIComponent(identifierParam) : ''), [identifierParam])
 
   const [customer, setCustomer] = useState(null)
+
+  const merchantAccountKey = useMemo(() => {
+    const fromCustomer = customer ? pickMerchantAccountKeyFromCustomer(customer, customerId) : ''
+    return fromCustomer || accountKeyParam || ''
+  }, [customer, customerId, accountKeyParam])
 
   /** Canonical customer id for wallets and ledger calls. */
   const statementIdentifier = useMemo(() => {
@@ -214,7 +227,7 @@ export default function CustomerDetailsPage() {
 
   useEffect(() => {
     setCustomer(null)
-  }, [customerId, accountKey])
+  }, [customerId, accountKeyParam])
 
   useEffect(() => {
     const t = window.setTimeout(() => setWalletSearch(walletSearchInput), 400)
@@ -248,6 +261,11 @@ export default function CustomerDetailsPage() {
       )
       const keys = rows.map((w) => w.wallet_key || w.wallet_id).filter(Boolean)
       setSelectedWalletKey((prev) => {
+        const preferred = walletFromQuery || prev
+        if (preferred) {
+          if (keys.includes(preferred)) return preferred
+          if (walletFromQuery && preferred === walletFromQuery) return walletFromQuery
+        }
         if (prev && keys.includes(prev)) return prev
         return keys[0] ?? null
       })
@@ -257,7 +275,23 @@ export default function CustomerDetailsPage() {
     } finally {
       setWalletsLoading(false)
     }
-  }, [statementIdentifier, walletPage, walletSearch])
+  }, [statementIdentifier, walletPage, walletSearch, walletFromQuery])
+
+  useEffect(() => {
+    if (walletFromQuery) setSelectedWalletKey(walletFromQuery)
+  }, [customerId, walletFromQuery])
+
+  useEffect(() => {
+    if (!customer || !customerId) return
+    const merchantFromCustomer = pickMerchantAccountKeyFromCustomer(customer, customerId)
+    if (!merchantFromCustomer) return
+    if (accountKeyParam === merchantFromCustomer) return
+    const qs = walletFromQuery ? `?wallet=${encodeURIComponent(walletFromQuery)}` : ''
+    navigate(
+      `/merchants/${encodeURIComponent(merchantFromCustomer)}/customers/${encodeURIComponent(customerId)}${qs}`,
+      { replace: true, state: location.state }
+    )
+  }, [customer, customerId, accountKeyParam, walletFromQuery, navigate, location.state])
 
   const fetchCore = useCallback(async () => {
     if (!customerId) return
@@ -294,7 +328,7 @@ export default function CustomerDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }, [accountKey, customerId])
+  }, [accountKeyParam, customerId])
 
   useEffect(() => {
     fetchCore()
@@ -581,13 +615,13 @@ export default function CustomerDetailsPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex flex-wrap items-center gap-2 text-xs text-text-muted">
-          <Link to={`/merchants/${accountKey}`} className="hover:text-accent">
+          <Link to={`/merchants/${merchantAccountKey}`} className="hover:text-accent">
             Customer
           </Link>
           <span className="text-text-muted">›</span>
           <span className="font-medium text-text-primary">Customer Profile</span>
           <Link
-            to={`/merchants/${accountKey}/customers/${encodeURIComponent(customerId)}/kyc`}
+            to={`/merchants/${merchantAccountKey}/customers/${encodeURIComponent(customerId)}/kyc`}
             className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:border-accent/40 hover:bg-card-hover"
           >
             <ShieldCheck size={14} className="text-accent" />

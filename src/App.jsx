@@ -51,6 +51,7 @@ function AppRoutes() {
         <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />
         <Route path="/merchants/:accountKey/customers/:identifier/kyc" element={<CustomerKycPage />} />
         <Route path="/merchants/:accountKey/customers/:identifier" element={<CustomerDetailsPage />} />
+        <Route path="/customers/:identifier" element={<CustomerDetailsPage />} />
         <Route path="/customers" element={<Navigate to="/merchants" replace />} />
         <Route path="/wallets" element={<WalletsPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />

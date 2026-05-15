@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, MoreVertical, Search, Wallet, WalletCards } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Activity, Search, Wallet, WalletCards } from 'lucide-react'
 import MetricCard from '../../components/ui/MetricCard'
 import Pagination from '../../components/ui/Pagination'
-import { cn, formatCurrency, formatNumber, timeAgo } from '../../lib/utils'
+import { cn, formatCurrency, formatNumber } from '../../lib/utils'
+import {
+  parseWalletsPageResponse,
+  resolveWalletRowNavigation,
+  walletRowIsNavigable,
+} from '../../lib/walletNavigation'
 import { getWalletsPage } from '../../services/wallets'
 
 const TABLE_LIMIT = 10
 
 export default function WalletsPage() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [navError, setNavError] = useState(null)
+  const [navigatingKey, setNavigatingKey] = useState(null)
   const [summary, setSummary] = useState({
     total_wallets: 0,
     total_value: '0',
@@ -56,14 +65,14 @@ export default function WalletsPage() {
     setError(null)
     try {
       const res = await getWalletsPage(params, controller.signal)
-      const payload = res?.data || {}
+      const payload = parseWalletsPageResponse(res)
       setSummary(payload.summary || {
         total_wallets: 0,
         total_value: '0',
         active_wallets: 0,
         pending_transactions: 0,
       })
-      setRows(payload.records || [])
+      setRows(payload.records)
       setTotal(payload.pagination?.total || 0)
       setTotalPages(payload.pagination?.total_pages || 1)
     } catch (err) {
@@ -98,6 +107,32 @@ export default function WalletsPage() {
     if (!Number.isFinite(value)) return '--'
     return formatCurrency(value, 'NGN')
   }, [stats.totalValue])
+
+  const handleWalletRowClick = useCallback(
+    async (row) => {
+      if (!walletRowIsNavigable(row)) return
+
+      const rowKey = `${row.owner_type}-${row.owner_key}-${row.wallet_key}`
+      setNavigatingKey(rowKey)
+      setNavError(null)
+
+      try {
+        const result = await resolveWalletRowNavigation(row)
+        if ('error' in result) {
+          setNavError(result.error)
+          return
+        }
+        navigate(result.path, {
+          state: result.walletKey ? { walletKey: result.walletKey } : undefined,
+        })
+      } catch {
+        setNavError('Could not open profile for this wallet.')
+      } finally {
+        setNavigatingKey(null)
+      }
+    },
+    [navigate]
+  )
 
   return (
     <div>
@@ -140,6 +175,9 @@ export default function WalletsPage() {
       </div>
 
       <div className="mt-6 rounded-card border border-border bg-card">
+        {navError ? (
+            <div className="border-b border-error/30 bg-error-bg px-4 py-3 text-sm text-error">{navError}</div>
+        ) : null}
         <div className="flex flex-col gap-4 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
           <h3 className="text-base font-medium text-text-primary">All Wallets</h3>
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -191,48 +229,73 @@ export default function WalletsPage() {
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Status</th>
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Date Created</th>
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Environment</th>
-                  <th className="px-4 py-3 text-xs font-medium text-text-muted text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length > 0 ? (
-                  rows.map((row) => (
-                    <tr key={`${row.owner_type}-${row.owner_key}-${row.wallet_key}`} className="border-b border-border/40 hover:bg-card-hover/30">
-                      <td className="px-4 py-2.5">
-                        <p className="text-text-primary">{row.owner_name || '--'}</p>
-                        <p className="text-[11px] text-text-muted capitalize">{row.owner_type}</p>
-                      </td>
-                      <td className="px-4 py-2.5 text-text-secondary">{row.wallet_key || row.wallet_id || '--'}</td>
-                      <td className="px-4 py-2.5 text-text-secondary">
-                        {row.current_balance != null
-                          ? formatNumber(Number(row.current_balance))
-                          : '--'}
-                      </td>
-                      <td className="px-4 py-2.5 text-text-secondary">{row.currency_code || '--'}</td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className={cn(
-                            'inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium',
-                            row.status === 'active'
-                              ? 'bg-success-bg text-success'
-                              : 'bg-card-hover text-text-muted'
-                          )}
-                        >
-                          {row.status || '--'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-text-secondary">{row.date_created ? row.date_created.slice(0, 10) : '--'}</td>
-                      <td className="px-4 py-2.5 text-text-secondary">{row.environment || '--'}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <button className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary">
-                          <MoreVertical size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  rows.map((row) => {
+                    const rowKey = `${row.owner_type}-${row.owner_key}-${row.wallet_key}`
+                    const navigable = walletRowIsNavigable(row)
+                    const isNavigating = navigatingKey === rowKey
+                    return (
+                      <tr
+                        key={rowKey}
+                        role={navigable ? 'button' : undefined}
+                        tabIndex={navigable ? 0 : undefined}
+                        onClick={navigable ? () => handleWalletRowClick(row) : undefined}
+                        onKeyDown={
+                          navigable
+                            ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  handleWalletRowClick(row)
+                                }
+                              }
+                            : undefined
+                        }
+                        className={cn(
+                          'border-b border-border/40 transition-colors',
+                          navigable &&
+                            'cursor-pointer hover:bg-card-hover/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent/50',
+                          isNavigating && 'opacity-60'
+                        )}
+                        aria-busy={isNavigating || undefined}
+                      >
+                        <td className="px-4 py-2.5">
+                          <p className="text-text-primary">{row.owner_name || '--'}</p>
+                          <p className="text-[11px] text-text-muted capitalize">{row.owner_type}</p>
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-text-secondary">
+                          {row.wallet_key || row.wallet_id || '--'}
+                        </td>
+                        <td className="px-4 py-2.5 text-text-secondary">
+                          {row.current_balance != null
+                            ? formatNumber(Number(row.current_balance))
+                            : '--'}
+                        </td>
+                        <td className="px-4 py-2.5 text-text-secondary">{row.currency_code || '--'}</td>
+                        <td className="px-4 py-2.5">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium',
+                              row.status === 'active'
+                                ? 'bg-success-bg text-success'
+                                : 'bg-card-hover text-text-muted'
+                            )}
+                          >
+                            {row.status || '--'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-text-secondary">
+                          {row.date_created ? row.date_created.slice(0, 10) : '--'}
+                        </td>
+                        <td className="px-4 py-2.5 text-text-secondary">{row.environment || '--'}</td>
+                      </tr>
+                    )
+                  })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-text-muted">
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-text-muted">
                       No wallets found. Try a broader search.
                     </td>
                   </tr>
