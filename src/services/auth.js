@@ -6,7 +6,7 @@ export async function login(email, password) {
 }
 
 /**
- * Console user registration — `POST /api/v1/auth/register`
+ * Admin-provisioned console user — `POST /auth/register` (not public; call from Admin Tools only).
  * @param {{ email: string, password: string, first_name: string, last_name: string, role: string }} payload
  */
 export async function register(payload) {

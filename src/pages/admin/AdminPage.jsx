@@ -30,6 +30,7 @@ import {
   patchRolePermissions,
   revokeUserRole,
 } from '../../services/rbac'
+import AdminCreateUserForm from './AdminCreateUserForm'
 
 const BANNER_AUTO_DISMISS_MS = 5000
 
@@ -462,9 +463,9 @@ export default function AdminPage() {
       <div className="animate-fade-in-up mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Admin tools</h1>
         <p className="mt-1 text-sm text-text-secondary">
-          Manage RBAC roles and permission keys via the console API. Assign roles to users with{' '}
-          <code className="text-text-muted">POST /rbac/users/:userKey/roles</code> using each user’s key from
-          your identity backend.
+          Create console accounts, manage RBAC roles, and assign permissions. New users are provisioned here
+          (not from the login page). Assign roles with{' '}
+          <code className="text-text-muted">POST /rbac/users/:userKey/roles</code>.
         </p>
       </div>
 
@@ -518,8 +519,8 @@ export default function AdminPage() {
             <p className="text-sm font-medium text-text-primary">Restricted</p>
             <p className="mt-1 text-sm text-text-secondary">
               You need <PermChip highlight>rbac.manage</PermChip> or full access{' '}
-              <PermChip highlight>*</PermChip> to assign roles, create roles, or edit permission keys. You can
-              still view catalog data if the API allows it.
+              <PermChip highlight>*</PermChip> to create console accounts, assign roles, create roles, or edit
+              permission keys. You can still view catalog data if the API allows it.
             </p>
           </div>
         </div>
@@ -745,6 +746,18 @@ export default function AdminPage() {
         </div>
 
         <div className="flex flex-col gap-6">
+          <AdminCreateUserForm
+            disabled={!manage}
+            inputCls={inputCls}
+            pending={pending}
+            setPending={setPending}
+            onSuccess={(text) => {
+              setBanner({ type: 'success', text })
+              if (manage) void loadTeamUsers()
+            }}
+            onError={(text) => setBanner({ type: 'error', text })}
+          />
+
           <div className="h-fit overflow-hidden rounded-card border border-border bg-card">
             <div className="border-b border-border px-4 py-4">
               <div className="flex items-center gap-2">

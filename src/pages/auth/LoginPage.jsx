@@ -1,37 +1,17 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const registrationSuccessInState = Boolean(location.state?.registrationSuccess)
-  const [registrationAck, setRegistrationAck] = useState(false)
-  const showRegistrationBanner = registrationAck || registrationSuccessInState
-
-  useEffect(() => {
-    if (registrationSuccessInState) {
-      setRegistrationAck(true)
-      navigate(location.pathname, { replace: true, state: {} })
-    }
-  }, [registrationSuccessInState, location.pathname, navigate])
-
-  const handleCreateAccount = () => {
-    const url = typeof import.meta.env.VITE_SIGNUP_URL === 'string' ? import.meta.env.VITE_SIGNUP_URL.trim() : ''
-    if (url) {
-      window.location.assign(url)
-      return
-    }
-    navigate('/register')
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -91,15 +71,6 @@ export default function LoginPage() {
               transactions, compliance reporting, and operational workflows.
             </p>
           </div>
-
-          {showRegistrationBanner ? (
-            <p
-              role="status"
-              className="mb-5 rounded-2xl border border-accent/40 bg-accent/10 px-3 py-3 text-center text-sm text-text-primary sm:mb-6 sm:px-4"
-            >
-              Account created. Sign in with your email and password.
-            </p>
-          ) : null}
 
           <div className="mb-6 flex flex-col items-center gap-2 sm:mb-10 sm:gap-3">
             <p className="text-center text-xs text-text-secondary sm:text-sm">
@@ -175,17 +146,6 @@ export default function LoginPage() {
             >
               {submitting ? 'Signing in…' : 'Login to Console'}
             </button>
-
-            <p className="mt-1 text-center text-sm text-text-secondary sm:mt-2 sm:text-base">
-              Don&apos;t have an account?{' '}
-              <button
-                type="button"
-                onClick={handleCreateAccount}
-                className="inline-flex min-h-11 touch-manipulation items-center font-semibold text-accent underline-offset-2 hover:underline sm:min-h-0"
-              >
-                Create Account
-              </button>
-            </p>
           </form>
         </div>
       </div>
