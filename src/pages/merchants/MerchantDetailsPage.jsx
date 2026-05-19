@@ -14,12 +14,18 @@ import {
 import { getMerchant, getMerchantCustomers, updateMerchant, patchMerchantTier } from '../../services/merchants'
 import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
-import { cn, exportToCsv } from '../../lib/utils'
+import { cn, exportToCsv, formatNumber } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
 import { CUSTOMER_SORT_OPTIONS } from './merchantToolbarOptions'
 import MerchantCustomersTable from './MerchantCustomersTable'
-import { countryToFlagEmoji, normalizeAccountStatusKey, typeLabel, tierLabel } from './merchantUi'
+import {
+  countryToFlagEmoji,
+  normalizeAccountStatusKey,
+  typeLabel,
+  tierLabel,
+  merchantCustomerCount,
+} from './merchantUi'
 import {
   customerDisplayName,
   customerTypeLabel,
@@ -199,6 +205,13 @@ export default function MerchantDetailsPage() {
 
   const accountStatusKey = merchant ? normalizeAccountStatusKey(merchant) : 'active'
   const typeStr = typeLabel(merchant)
+
+  const merchantCustomerTotal = useMemo(() => {
+    const fromMerchant = merchantCustomerCount(merchant)
+    if (fromMerchant != null) return fromMerchant
+    if (!search.trim() && !statusFilter) return total
+    return null
+  }, [merchant, total, search, statusFilter])
 
   const handleExportCustomers = () => {
     if (!customers.length) return
@@ -469,6 +482,14 @@ export default function MerchantDetailsPage() {
 
           <div className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-normal text-white md:flex-row md:flex-wrap md:items-center md:gap-x-1 md:text-sm">
             <span className="shrink-0 tabular-nums">{phone || '—'}</span>
+            {merchantCustomerTotal != null ? (
+              <>
+                <ProfileDivider />
+                <span className="shrink-0 tabular-nums">
+                  {formatNumber(merchantCustomerTotal)} {merchantCustomerTotal === 1 ? 'Customer' : 'Customers'}
+                </span>
+              </>
+            ) : null}
             <ProfileDivider />
             <span className="shrink-0">{tierLabel(merchant)}</span>
           </div>

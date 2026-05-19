@@ -7,6 +7,7 @@ import {
   normalizeKycKey,
   normalizeAccountStatusKey,
   tierLabel,
+  merchantCustomerCount,
 } from './merchantUi'
 
 const kycBadge = {
@@ -40,6 +41,7 @@ const COLUMNS = [
   { key: 'index', label: '#', width: 'w-[52px]' },
   { key: 'name', label: 'Name', width: 'min-w-[200px]' },
   { key: 'type', label: 'Type', width: 'w-[100px]' },
+  { key: 'customers', label: 'Customers', width: 'w-[100px]' },
   { key: 'tier', label: 'Tier Level', width: 'w-[92px]' },
   { key: 'kyc', label: 'KYC Status', width: 'w-[120px]' },
   { key: 'status', label: 'Account Status', width: 'w-[140px]' },
@@ -116,6 +118,9 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-text-secondary">{typeLabel(merchant)}</td>
+                  <td className="px-4 py-2.5 tabular-nums text-text-secondary">
+                    {merchantCustomerCount(merchant) ?? '—'}
+                  </td>
                   <td className="px-4 py-2.5 text-text-secondary">{tierLabel(merchant)}</td>
                   <td className="px-4 py-2.5">
                     <Badge config={kycBadge} value={kyc} />

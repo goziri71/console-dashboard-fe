@@ -57,3 +57,15 @@ export function tierLabel(merchant) {
   const n = Number(t)
   return Number.isFinite(n) ? `Tier ${n}` : '—'
 }
+
+/** Total customers for a merchant (list/detail payloads). */
+export function merchantCustomerCount(merchant) {
+  if (merchant == null || typeof merchant !== 'object') return null
+  const raw =
+    merchant.customer_count ??
+    merchant.total_customers ??
+    merchant.customers_count ??
+    merchant.customer_total
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
