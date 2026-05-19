@@ -8,7 +8,6 @@ import {
   Wallet,
   Users,
   Search,
-  ChevronRight,
   ChevronDown,
   Snowflake,
   Download,
@@ -20,7 +19,6 @@ import {
   getCustomer,
   getCustomerMetrics,
   getCustomerWallets,
-  getCustomerWalletLedger,
   patchCustomerTier,
   postCustomerFreeze,
   postCustomerUnfreeze,
@@ -49,10 +47,10 @@ import {
   getCustomerIdentifier,
 } from './merchantCustomerUi'
 import { pickMerchantAccountKeyFromCustomer } from '../../lib/walletNavigation'
+import CustomerWalletTransactionsPanel from './CustomerWalletTransactionsPanel'
 
 const CAN_MUTATE = ['operations', 'compliance']
 const WALLET_PAGE_SIZE = 8
-const LEDGER_PAGE_SIZE = 15
 const KYC_PAGE_SIZE = 10
 
 function unwrapPayload(payload) {
@@ -124,31 +122,6 @@ function pickKycRaw(row, keys) {
   return null
 }
 
-function ledgerStatusKind(status) {
-  const s = String(status || '')
-    .toLowerCase()
-    .trim()
-  if (s.includes('fail') || s.includes('declin')) return { kind: 'failed', label: 'Failed' }
-  if (s.includes('success') || s.includes('complete')) return { kind: 'completed', label: 'Completed' }
-  if (s.includes('pend')) return { kind: 'pending', label: 'Pending' }
-  return { kind: 'processing', label: status || 'Processing' }
-}
-
-function ledgerStatusPill(kind, label) {
-  const styles = {
-    completed: 'border-[#0b5c39] bg-[#053321] text-[#17b26a]',
-    pending: 'border-[#b45309] bg-[#f59e0b] text-[#271406]',
-    failed: 'border-[#7f1d1d] bg-[#d98282] text-[#3f1111]',
-    processing: 'border-[#1d4ed8]/40 bg-[#072a66] text-[#60a5fa]',
-    inactive: 'border-border bg-card-hover text-text-muted',
-  }
-  return (
-    <span className={cn('inline-flex min-w-[74px] items-center justify-center rounded-full border px-2.5 py-0.5 text-[10px] font-medium', styles[kind] || styles.inactive)}>
-      {label}
-    </span>
-  )
-}
-
 function walletDisplayId(w) {
   const id = w.wallet_key
   if (!id) return '—'
@@ -189,7 +162,7 @@ export default function CustomerDetailsPage() {
     return fromCustomer || accountKeyParam || ''
   }, [customer, customerId, accountKeyParam])
 
-  /** Canonical customer id for wallets and ledger calls. */
+  /** Canonical customer id for wallets and transaction calls. */
   const statementIdentifier = useMemo(() => {
     if (!customerId) return ''
     if (!customer) return customerId
@@ -205,10 +178,6 @@ export default function CustomerDetailsPage() {
   const [walletsLoading, setWalletsLoading] = useState(false)
 
   const [selectedWalletKey, setSelectedWalletKey] = useState(null)
-  const [ledgerRows, setLedgerRows] = useState([])
-  const [ledgerPage, setLedgerPage] = useState(1)
-  const [ledgerTotalPages, setLedgerTotalPages] = useState(1)
-  const [ledgerLoading, setLedgerLoading] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -222,8 +191,6 @@ export default function CustomerDetailsPage() {
   const [kycTotalPages, setKycTotalPages] = useState(1)
   const [kycTotal, setKycTotal] = useState(0)
   const [kycLoading, setKycLoading] = useState(false)
-
-  const ledgerScopeRef = useRef('')
 
   useEffect(() => {
     setCustomer(null)
@@ -373,46 +340,6 @@ export default function CustomerDetailsPage() {
     if (!statementIdentifier || !customer) return
     loadKycs()
   }, [statementIdentifier, customer, loadKycs])
-
-  useEffect(() => {
-    if (!statementIdentifier || !selectedWalletKey || !financial) {
-      setLedgerRows([])
-      setLedgerTotalPages(1)
-      ledgerScopeRef.current = ''
-      return
-    }
-
-    const scopeKey = `${statementIdentifier}:${selectedWalletKey}`
-    if (ledgerScopeRef.current !== scopeKey) {
-      ledgerScopeRef.current = scopeKey
-      if (ledgerPage !== 1) {
-        setLedgerPage(1)
-        return
-      }
-    }
-
-    let cancelled = false
-    setLedgerLoading(true)
-    getCustomerWalletLedger(statementIdentifier, selectedWalletKey, { page: ledgerPage, limit: LEDGER_PAGE_SIZE })
-      .then((res) => {
-        if (cancelled) return
-        const rows = pickRecords(res)
-        setLedgerRows(rows)
-        setLedgerTotalPages(inferTotalPagesFromResponse(res, LEDGER_PAGE_SIZE, ledgerPage))
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLedgerRows([])
-          setLedgerTotalPages(1)
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLedgerLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [statementIdentifier, selectedWalletKey, financial, ledgerPage])
 
   const pushMsg = (type, text) => {
     setMsg({ type, text })
@@ -925,7 +852,6 @@ export default function CustomerDetailsPage() {
                       type="button"
                       onClick={() => {
                         if (!wk) return
-                        setLedgerPage(1)
                         setSelectedWalletKey(wk)
                       }}
                       className={cn(
@@ -970,100 +896,13 @@ export default function CustomerDetailsPage() {
             </div>
           </div>
 
-          <div className="flex min-h-[280px] min-w-0 flex-col bg-[#090b0f] p-3 lg:min-h-0">
-            {!financial ? (
-              <p className="py-12 text-center text-sm text-text-muted">Wallet activity requires financial.read to view amounts and ledger.</p>
-            ) : ledgerLoading ? (
-              <div className="flex min-h-[200px] min-w-0 flex-1 flex-col gap-2 p-3">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="skeleton h-9 w-full rounded-md" />
-                ))}
-              </div>
-            ) : (
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-                <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-xl border border-border/60 bg-[#0b0d12] [-webkit-overflow-scrolling:touch]">
-                  <table className="w-full min-w-[min(100%,560px)] text-left text-sm sm:min-w-[640px] xl:min-w-[760px]">
-                    <thead className="sticky top-0 z-10 bg-linear-to-b from-[#3a3d44] to-[#2d3037] shadow-sm">
-                    <tr className="text-xs font-medium text-[#c6cad1]">
-                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">S/N</th>
-                      <th className="min-w-[140px] px-2 py-3 sm:min-w-[180px] sm:px-3">Service</th>
-                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Amount</th>
-                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Balance</th>
-                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Date</th>
-                      <th className="whitespace-nowrap px-2 py-3 sm:px-3">Status</th>
-                      <th className="w-10 px-1 py-3 sm:w-12 sm:px-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ledgerRows.length ? (
-                      ledgerRows.map((row, idx) => {
-                        const sn = (ledgerPage - 1) * LEDGER_PAGE_SIZE + idx + 1
-                        const st = ledgerStatusKind(row.status)
-                        const amt =
-                          row.amount != null
-                            ? `${(row.currency_code || 'NGN').toUpperCase() === 'NGN' ? '₦' : ''}${row.amount}`.trim()
-                            : '—'
-                        const bal =
-                          row.closing_balance != null
-                            ? String(row.closing_balance)
-                            : row.opening_balance != null
-                              ? String(row.opening_balance)
-                              : '—'
-                        return (
-                          <tr key={row.reference || idx} className="border-t border-[#171b24] hover:bg-[#10141b]">
-                            <td className="px-2 py-2.5 tabular-nums text-[#8c939f] sm:px-3">{sn}</td>
-                            <td className="max-w-[min(220px,45vw)] px-2 py-2.5 text-[#c8e64a] sm:max-w-[260px] sm:px-3 xl:max-w-[320px]">
-                              <span className="line-clamp-3 wrap-break-word text-[11px] font-medium uppercase leading-snug sm:line-clamp-2 sm:text-[12px] sm:leading-4">
-                                {row.service || row.narration || '—'}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-[#8e95a1] sm:px-3">{amt}</td>
-                            <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-[#17b26a] sm:px-3">{bal !== '—' ? `+${bal}` : '—'}</td>
-                            <td className="whitespace-nowrap px-2 py-2.5 text-xs text-[#8e95a1] sm:px-3">{formatDate(row.date_created).split(' ')[0]}</td>
-                            <td className="px-2 py-2.5 sm:px-3">{ledgerStatusPill(st.kind, st.label)}</td>
-                            <td className="px-1 py-2.5 sm:px-3">
-                              <button type="button" className="rounded p-1 text-[#8e95a1] hover:bg-card-hover" aria-label="Row actions">
-                                <ChevronRight size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    ) : (
-                      <tr className="border-t border-border/50">
-                        <td colSpan={7} className="px-3 py-10 text-center text-sm text-text-muted">
-                          {selectedWalletKey ? 'No ledger entries for this wallet.' : 'Select a wallet.'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-                </div>
-                <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 bg-[#0b0d12] px-3 py-2 text-[10px] text-[#8e95a1]">
-                  <span className="min-w-0">
-                    Page {ledgerPage} of {ledgerTotalPages}
-                  </span>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      disabled={ledgerPage <= 1 || ledgerLoading}
-                      onClick={() => setLedgerPage((p) => Math.max(1, p - 1))}
-                      className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      disabled={ledgerPage >= ledgerTotalPages || ledgerLoading}
-                      onClick={() => setLedgerPage((p) => p + 1)}
-                      className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="flex min-h-[280px] min-w-0 flex-col bg-[#090b0f] p-0 lg:min-h-0">
+            <CustomerWalletTransactionsPanel
+              customerIdentifier={statementIdentifier}
+              merchantAccountKey={merchantAccountKey}
+              walletKey={selectedWalletKey}
+              financial={financial}
+            />
           </div>
         </div>
       </section>
