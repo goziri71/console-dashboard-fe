@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownCircle, ArrowUpCircle, Filter, Shuffle } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, BookOpenText, Filter, Send, Shuffle } from 'lucide-react'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
 import {
+  getCryptoPayouts,
   getNgnDeposits,
   getNgnPayouts,
+  getStatementTransactions,
   getSwapTransactions,
 } from '../../services/transactions'
 
 const TX_PAGE_SIZE = 15
+const CRYPTO_PAYOUT_CURRENCIES = new Set(['USDT', 'BTC', 'ETH', 'USDC', 'USD'])
 
 const TAB_ITEMS = [
   { key: 'deposits', label: 'Deposits', icon: ArrowDownCircle, fetcher: getNgnDeposits },
   { key: 'withdrawals', label: 'Withdrawals', icon: ArrowUpCircle, fetcher: getNgnPayouts },
   { key: 'swaps', label: 'Swaps', icon: Shuffle, fetcher: getSwapTransactions },
+  { key: 'payout', label: 'Payout', icon: Send, fetcher: null },
+  { key: 'statement', label: 'Statement', icon: BookOpenText, fetcher: getStatementTransactions },
 ]
 
 function unwrapPayload(payload) {
@@ -70,6 +75,37 @@ function pickFirst(obj, keys) {
   return ''
 }
 
+function payoutRowDate(row) {
+  const raw = pickFirst(row, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date'])
+  const t = raw ? new Date(raw).getTime() : 0
+  return Number.isFinite(t) ? t : 0
+}
+
+async function fetchCustomerPayouts(params, signal) {
+  const currency = String(params.currency_code || '')
+    .trim()
+    .toUpperCase()
+  if (currency === 'NGN') return getNgnPayouts(params, signal)
+  if (currency && CRYPTO_PAYOUT_CURRENCIES.has(currency)) return getCryptoPayouts(params, signal)
+
+  const [ngnRes, cryptoRes] = await Promise.all([
+    getNgnPayouts(params, signal),
+    getCryptoPayouts(params, signal),
+  ])
+  const limit = Number(params.limit) || TX_PAGE_SIZE
+  const page = Number(params.page) || 1
+  const merged = [...pickRecords(ngnRes), ...pickRecords(cryptoRes)].sort(
+    (a, b) => payoutRowDate(b) - payoutRowDate(a)
+  )
+  const start = (page - 1) * limit
+  const pageRows = merged.slice(start, start + limit)
+  const totalPages = Math.max(inferTotalPages(ngnRes, limit, page), inferTotalPages(cryptoRes, limit, page))
+  return {
+    records: pageRows,
+    pagination: { total_pages: totalPages, total: merged.length },
+  }
+}
+
 function txStatusKind(status) {
   const s = String(status || '')
     .toLowerCase()
@@ -115,16 +151,34 @@ function mapTxRow(row, index, page, activeTab) {
     pickFirst(row, ['opening_balance', 'balance_before']) ||
     ''
   const service =
-    pickFirst(row, ['service', 'narration', 'description', 'memo', 'reference']) ||
-    pickFirst(row, ['live_reference', 'deposit_reference']) ||
-    '—'
+    activeTab === 'statement'
+      ? pickFirst(row, [
+          'transaction_type',
+          'type',
+          'service',
+          'narration',
+          'description',
+          'memo',
+          'reference',
+        ])
+      : pickFirst(row, ['service', 'narration', 'description', 'memo', 'reference']) ||
+        pickFirst(row, ['live_reference', 'deposit_reference']) ||
+        '—'
   const dateRaw = pickFirst(row, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date'])
   const statusRaw =
     activeTab === 'deposits'
       ? pickFirst(row, ['credit_status', 'status', 'transaction_status'])
-      : activeTab === 'withdrawals'
+      : activeTab === 'withdrawals' || activeTab === 'payout'
         ? pickFirst(row, ['payout_status', 'status', 'transaction_status'])
-        : pickFirst(row, ['status', 'transaction_status', 'swap_status'])
+        : activeTab === 'statement'
+          ? pickFirst(row, [
+              'status',
+              'transaction_status',
+              'credit_status',
+              'payout_status',
+              'debit_status',
+            ])
+          : pickFirst(row, ['status', 'transaction_status', 'swap_status'])
 
   let balanceDisplay = '—'
   if (balanceRaw !== '' && balanceRaw != null) {
@@ -143,7 +197,7 @@ function mapTxRow(row, index, page, activeTab) {
 }
 
 /**
- * Customer-scoped deposits / withdrawals / swaps for the selected wallet.
+ * Customer-scoped deposits, withdrawals, swaps, payouts, and statement for the selected wallet.
  */
 export default function CustomerWalletTransactionsPanel({
   customerIdentifier,
@@ -208,7 +262,10 @@ export default function CustomerWalletTransactionsPanel({
     setLoading(true)
     setError(null)
     try {
-      const res = await selectedTab.fetcher(params, controller.signal)
+      const res =
+        activeTab === 'payout'
+          ? await fetchCustomerPayouts(params, controller.signal)
+          : await selectedTab.fetcher(params, controller.signal)
       const records = pickRecords(res)
       setRows(records)
       setTotalPages(inferTotalPages(res, TX_PAGE_SIZE, page))
@@ -229,6 +286,7 @@ export default function CustomerWalletTransactionsPanel({
     statusFilter,
     currencyFilter,
     selectedTab,
+    activeTab,
   ])
 
   useEffect(() => {
@@ -260,7 +318,7 @@ export default function CustomerWalletTransactionsPanel({
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                'flex h-12 min-w-[33%] shrink-0 items-center justify-center gap-2 border-r border-border/60 px-4 text-sm transition-colors last:border-r-0 sm:min-w-[28%] lg:min-w-0 lg:flex-1',
+                'flex h-12 min-w-[28%] shrink-0 items-center justify-center gap-2 border-r border-border/60 px-3 text-sm transition-colors last:border-r-0 sm:min-w-[22%] lg:min-w-0 lg:flex-1',
                 active
                   ? 'border-b-2 border-b-accent bg-[#0b0d12] text-text-primary'
                   : 'text-text-secondary hover:bg-[#0b0d12]/60 hover:text-text-primary'

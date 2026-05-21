@@ -296,6 +296,12 @@ export default function CustomerKycPage() {
     setKycPage(1)
   }, [statementIdentifier])
 
+  useEffect(() => {
+    if (kycMsg?.type !== 'success') return undefined
+    const timer = window.setTimeout(() => setKycMsg(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [kycMsg])
+
   const runApproveKyc = async () => {
     const reference = approveConfirm.reference
     if (!reference || !canApprove) return
@@ -492,20 +498,21 @@ export default function CustomerKycPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
-        {kycMsg ? (
-          <div
-            className={cn(
-              'rounded-lg border px-4 py-2.5 text-sm',
-              kycMsg.type === 'success'
-                ? 'border-[#5c6639]/90 bg-[#161a12] text-[#97AB27]'
-                : 'border-[#b91c1c]/55 bg-[#1a1010] text-[#fca5a5]'
-            )}
-          >
-            {kycMsg.text}
-          </div>
-        ) : null}
+      {kycMsg ? (
+        <div
+          className={cn(
+            'rounded-lg border px-4 py-2.5 text-sm',
+            kycMsg.type === 'success'
+              ? 'border-[#5c6639]/90 bg-[#161a12] text-[#97AB27]'
+              : 'border-[#b91c1c]/55 bg-[#1a1010] text-[#fca5a5]'
+          )}
+          role="status"
+        >
+          {kycMsg.text}
+        </div>
+      ) : null}
 
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
         {/* Document list: rows from GET /customers/:id/kycs — see loadKycs + getCustomerKycs */}
         <section className="flex flex-col overflow-hidden rounded-[30px] border border-[#2a2a2a] bg-[#111111]">
           <div className="border-b border-[#2a2a2a] px-5 py-4">
