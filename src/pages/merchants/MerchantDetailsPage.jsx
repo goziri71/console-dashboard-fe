@@ -9,11 +9,13 @@ import {
   RefreshCw,
   AlertCircle,
   MoreHorizontal,
+  ShieldCheck,
   X,
 } from 'lucide-react'
 import { getMerchant, getMerchantCustomers, updateMerchant, patchMerchantTier } from '../../services/merchants'
 import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
+import { canKycUpdate } from '../../lib/permissions'
 import { cn, exportToCsv, formatNumber } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -34,6 +36,8 @@ import {
   customerAccountStatusKey,
   customerWalletCount,
 } from './merchantCustomerUi'
+import MerchantKycPanel from './MerchantKycPanel'
+import { kycAggregateLabel, kycStatusPillClass, normalizeKycAggregateStatus } from '../../lib/kycUi'
 
 const CAN_MUTATE = ['operations', 'compliance']
 const LIMIT = 20
@@ -68,6 +72,7 @@ export default function MerchantDetailsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const canMutate = CAN_MUTATE.includes(user?.role)
+  const canApproveMerchantKyc = canKycUpdate(user?.permissions, user?.role)
 
   const [merchant, setMerchant] = useState(null)
   const [merchantLoading, setMerchantLoading] = useState(true)
@@ -83,6 +88,8 @@ export default function MerchantDetailsPage() {
   const [sortBy, setSortBy] = useState('')
   const [order, setOrder] = useState('desc')
   const [statusFilter, setStatusFilter] = useState('')
+  const [merchantKycStatus, setMerchantKycStatus] = useState(null)
+  const [merchantKycPending, setMerchantKycPending] = useState(0)
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [freezing, setFreezing] = useState(false)
@@ -366,6 +373,12 @@ export default function MerchantDetailsPage() {
     []
   )
 
+  const handleMerchantKycMeta = useCallback((meta) => {
+    if (!meta) return
+    setMerchantKycStatus(meta.status ?? null)
+    setMerchantKycPending(Number(meta.pendingCount) || 0)
+  }, [])
+
   if (merchantLoading && !merchant) {
     return (
       <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
@@ -395,6 +408,14 @@ export default function MerchantDetailsPage() {
 
   const flag = countryToFlagEmoji(merchant.country_code ?? merchant.country)
   const accountTypeLabel = typeStr === '—' ? '—' : `${String(typeStr).slice(0, 1).toUpperCase()}${String(typeStr).slice(1).toLowerCase()}`
+  const merchantKycKey = normalizeKycAggregateStatus(merchantKycStatus ?? merchant.kyc_status)
+  const showMerchantKycAlert =
+    merchantKycKey === 'pending' || (Number(merchantKycPending) > 0 && merchantKycKey !== 'verified')
+
+  const scrollToMerchantKyc = () => {
+    setMenuOpen(false)
+    document.getElementById('merchant-kyc')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
@@ -409,6 +430,29 @@ export default function MerchantDetailsPage() {
         </div>
       )}
 
+      {showMerchantKycAlert ? (
+        <div className="flex flex-col gap-3 rounded-card border border-warning/40 bg-warning-bg/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <ShieldCheck size={20} className="mt-0.5 shrink-0 text-warning" />
+            <div>
+              <p className="text-sm font-medium text-text-primary">Merchant KYC pending approval</p>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                Scroll to the <strong>Merchant KYC approval</strong> section below the profile header to approve
+                documents.
+                {!canApproveMerchantKyc ? ' Your role needs kyc.update to approve.' : ''}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={scrollToMerchantKyc}
+            className="shrink-0 rounded-full bg-[#C5DC4B] px-4 py-2 text-xs font-semibold text-black hover:brightness-105"
+          >
+            Go to merchant KYC
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="inline-flex max-w-full min-w-0 items-center gap-2 self-start rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs text-text-muted sm:self-auto">
           <Link to="/merchants" className="inline-flex min-w-0 items-center gap-1 hover:text-accent">
@@ -418,6 +462,19 @@ export default function MerchantDetailsPage() {
           <span className="shrink-0 text-text-muted">›</span>
           <span className="truncate text-text-primary">Merchant profile</span>
         </div>
+        <button
+          type="button"
+          onClick={scrollToMerchantKyc}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3 py-2 text-xs font-medium text-accent hover:bg-accent/20 sm:ml-auto sm:w-auto"
+        >
+          <ShieldCheck size={14} />
+          Merchant KYC
+          {merchantKycPending > 0 ? (
+            <span className="rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-bold text-black">
+              {merchantKycPending}
+            </span>
+          ) : null}
+        </button>
         {canMutate && (
           <div className="relative w-full sm:w-auto sm:self-auto">
             <button
@@ -449,6 +506,16 @@ export default function MerchantDetailsPage() {
                   >
                     {upgrading ? <Loader2 size={14} className="animate-spin shrink-0" /> : <TrendingUp size={14} className="shrink-0" />}
                     Upgrade tier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={scrollToMerchantKyc}
+                    className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-secondary hover:bg-card-hover sm:py-2"
+                  >
+                    <ShieldCheck size={14} className="shrink-0 text-accent" />
+                    {showMerchantKycAlert && canApproveMerchantKyc
+                      ? 'Approve merchant KYC'
+                      : 'View merchant KYC'}
                   </button>
                 </div>
               </>
@@ -512,9 +579,31 @@ export default function MerchantDetailsPage() {
               <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6f747f]">Account Type</p>
               <div className="mt-2">{profileBannerPill('type', accountTypeLabel)}</div>
             </div>
+            <div className="min-w-0 sm:min-w-30">
+              <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[#6f747f]">KYC Status</p>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={scrollToMerchantKyc}
+                  className={cn(
+                    'inline-flex rounded-full px-3 py-1 text-xs font-medium leading-none transition-opacity hover:opacity-90',
+                    kycStatusPillClass(merchantKycKey)
+                  )}
+                  title="Jump to merchant KYC approval"
+                >
+                  {kycAggregateLabel(merchantKycKey)}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
+
+      <MerchantKycPanel
+        accountKey={accountKey}
+        merchantProfile={merchant}
+        onKycMetaChange={handleMerchantKycMeta}
+      />
 
       <div className="overflow-hidden rounded-card border border-border bg-card">
         <div className="flex flex-col gap-4 border-b border-border px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:gap-6">

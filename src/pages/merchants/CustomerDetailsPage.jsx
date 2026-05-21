@@ -25,7 +25,14 @@ import {
   getCustomerKycs,
 } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
-import { canReadFinancial, canUpdateCustomerRecord } from '../../lib/permissions'
+import { canReadFinancial, canKycUpdate, canUpdateCustomerRecord } from '../../lib/permissions'
+import { patchKycCompliance } from '../../services/kyc'
+import KycApproveConfirmDialog from '../../components/kyc/KycApproveConfirmDialog'
+import {
+  isKycRowPending,
+  kycRowReference,
+  kycRowStatusKey,
+} from '../../lib/kycUi'
 import {
   cn,
   formatDate,
@@ -152,6 +159,7 @@ export default function CustomerDetailsPage() {
   const financial = canReadFinancial(user?.permissions)
   const canMutate = CAN_MUTATE.includes(user?.role)
   const canPatchTier = canMutate && canUpdateCustomerRecord(user?.permissions)
+  const canApproveKyc = canKycUpdate(user?.permissions, user?.role)
 
   const customerId = useMemo(() => (identifierParam ? decodeURIComponent(identifierParam) : ''), [identifierParam])
 
@@ -191,6 +199,8 @@ export default function CustomerDetailsPage() {
   const [kycTotalPages, setKycTotalPages] = useState(1)
   const [kycTotal, setKycTotal] = useState(0)
   const [kycLoading, setKycLoading] = useState(false)
+  const [kycApproving, setKycApproving] = useState(false)
+  const [kycApproveConfirm, setKycApproveConfirm] = useState({ open: false, reference: '' })
 
   useEffect(() => {
     setCustomer(null)
@@ -344,6 +354,23 @@ export default function CustomerDetailsPage() {
   const pushMsg = (type, text) => {
     setMsg({ type, text })
     window.setTimeout(() => setMsg(null), 4000)
+  }
+
+  const runApproveCustomerKyc = async () => {
+    const reference = kycApproveConfirm.reference
+    if (!reference || !canApproveKyc) return
+    setKycApproving(true)
+    try {
+      await patchKycCompliance(reference, { is_compliant: 'Y' })
+      pushMsg('success', 'KYC record approved successfully.')
+      setKycApproveConfirm({ open: false, reference: '' })
+      await fetchCore()
+      await loadKycs()
+    } catch (err) {
+      pushMsg('error', err.response?.data?.message || 'Failed to approve KYC record.')
+    } finally {
+      setKycApproving(false)
+    }
   }
 
   const applyCustomerResponse = (res) => {
@@ -763,9 +790,17 @@ export default function CustomerDetailsPage() {
       </div>
 
       <section className="overflow-hidden rounded-card border border-border/70 bg-card">
-        <div className="border-b border-border/60 px-4 py-3">
-          <h2 className="text-sm font-semibold text-text-primary">KYC records</h2>
-          <p className="mt-0.5 text-xs text-text-muted">Verification history for this customer</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary">KYC records</h2>
+            <p className="mt-0.5 text-xs text-text-muted">Verification history for this customer</p>
+          </div>
+          <Link
+            to={`/merchants/${merchantAccountKey}/customers/${encodeURIComponent(customerId)}/kyc`}
+            className="text-xs font-medium text-accent hover:underline"
+          >
+            Open full KYC page
+          </Link>
         </div>
         {kycLoading ? (
           <div className="flex flex-col gap-2 px-4 py-4">
@@ -779,32 +814,51 @@ export default function CustomerDetailsPage() {
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border/60 text-xs text-text-muted">
-                    <th className="px-3 py-2.5 font-medium">ID</th>
+                    <th className="px-3 py-2.5 font-medium">Reference</th>
                     <th className="px-3 py-2.5 font-medium">Status</th>
-                    <th className="px-3 py-2.5 font-medium">Tier</th>
                     <th className="px-3 py-2.5 font-medium">Created</th>
+                    {canApproveKyc ? <th className="px-3 py-2.5 font-medium w-24" /> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {kycRows.map((row, ri) => (
-                    <tr key={row.id ?? row.kyc_id ?? ri} className="border-b border-border/40">
-                      <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">
-                        {pickKycField(row, ['id', 'kyc_id', 'identifier'])}
-                      </td>
-                      <td className="px-3 py-2.5 text-text-primary">
-                        {pickKycField(row, ['status', 'kyc_status', 'verification_status'])}
-                      </td>
-                      <td className="px-3 py-2.5 tabular-nums text-text-secondary">
-                        {pickKycField(row, ['tier', 'kyc_tier', 'default_kyc_tier'])}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-text-muted">
-                        {(() => {
-                          const d = pickKycRaw(row, ['date_created', 'created_at', 'date_modified'])
-                          return d != null ? formatDate(d) : '—'
-                        })()}
-                      </td>
-                    </tr>
-                  ))}
+                  {kycRows.map((row, ri) => {
+                    const reference = kycRowReference(row)
+                    const pending = isKycRowPending(row)
+                    const sk = kycRowStatusKey(row)
+                    return (
+                      <tr key={reference || row.id || row.kyc_id || ri} className="border-b border-border/40">
+                        <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">
+                          {reference || pickKycField(row, ['id', 'kyc_id', 'identifier'])}
+                        </td>
+                        <td className="px-3 py-2.5 text-text-primary capitalize">
+                          {pickKycField(row, ['compliance_status', 'status', 'kyc_status', 'verification_status']) ||
+                            sk}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-text-muted">
+                          {(() => {
+                            const d = pickKycRaw(row, ['date_created', 'created_at', 'date_modified'])
+                            return d != null ? formatDate(d) : '—'
+                          })()}
+                        </td>
+                        {canApproveKyc ? (
+                          <td className="px-3 py-2.5">
+                            {pending && reference ? (
+                              <button
+                                type="button"
+                                disabled={kycApproving}
+                                onClick={() => setKycApproveConfirm({ open: true, reference })}
+                                className="rounded-lg bg-[#C5DC4B] px-2.5 py-1 text-[11px] font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                              >
+                                Approve
+                              </button>
+                            ) : (
+                              <span className="text-xs text-text-muted">—</span>
+                            )}
+                          </td>
+                        ) : null}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -916,6 +970,14 @@ export default function CustomerDetailsPage() {
           Back to Merchants
         </Link>
       </div>
+
+      <KycApproveConfirmDialog
+        open={kycApproveConfirm.open}
+        message={`Approve KYC record ${kycApproveConfirm.reference}?`}
+        loading={kycApproving}
+        onCancel={() => !kycApproving && setKycApproveConfirm({ open: false, reference: '' })}
+        onConfirm={runApproveCustomerKyc}
+      />
     </div>
   )
 }

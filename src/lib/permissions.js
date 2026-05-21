@@ -4,6 +4,8 @@ export const PERMISSION_FINANCIAL_READ = 'financial.read'
 export const PERMISSION_RBAC_MANAGE = 'rbac.manage'
 /** Tier upgrade — PATCH /customers/:identifier/tier */
 export const PERMISSION_CUSTOMER_UPDATE = 'customer.update'
+/** KYC document approval — PATCH /kycs/:reference, POST /merchants/:account_key/kyc/approve */
+export const PERMISSION_KYC_UPDATE = 'kyc.update'
 
 /** Seeded management role: server rejects PATCH …/roles/:id/permissions for this slug only. */
 export const ROLE_SLUG_MANAGEMENT = 'management'
@@ -30,6 +32,17 @@ export function canManageRbac(permissions) {
 export function canUpdateCustomerRecord(permissions) {
   if (!permissions?.length) return false
   return hasFullAccess(permissions) || permissions.includes(PERMISSION_CUSTOMER_UPDATE)
+}
+
+/** Roles that typically approve KYC in the console (when RBAC key not assigned yet). */
+export const KYC_APPROVER_ROLES = ['operations', 'compliance']
+
+export function canKycUpdate(permissions, role) {
+  if (hasFullAccess(permissions) || permissions?.includes(PERMISSION_KYC_UPDATE)) return true
+  const r = String(role ?? '')
+    .toLowerCase()
+    .trim()
+  return KYC_APPROVER_ROLES.includes(r)
 }
 
 /**

@@ -2,7 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, CheckCircle, Download, FileText, Loader2, RefreshCw, XCircle, HelpCircle } from 'lucide-react'
 import { getCustomer, getCustomerKycs } from '../../services/customers'
+import { patchKycCompliance } from '../../services/kyc'
+import { useAuth } from '../../context/AuthContext'
+import { canKycUpdate } from '../../lib/permissions'
 import { cn, formatDate, exportToCsv, deriveRiskLevel } from '../../lib/utils'
+import KycApproveConfirmDialog from '../../components/kyc/KycApproveConfirmDialog'
+import {
+  isKycRowPending,
+  kycIdentificationLabel,
+  kycRowReference,
+  kycRowStatusKey,
+} from '../../lib/kycUi'
 import { countryToFlagEmoji } from './merchantUi'
 import {
   customerDisplayName,
@@ -210,6 +220,8 @@ function documentRowStatusPillClass(key) {
 
 export default function CustomerKycPage() {
   const { accountKey, identifier: identifierParam } = useParams()
+  const { user } = useAuth()
+  const canApprove = canKycUpdate(user?.permissions, user?.role)
   const customerId = useMemo(() => (identifierParam ? decodeURIComponent(identifierParam) : ''), [identifierParam])
 
   const [customer, setCustomer] = useState(null)
@@ -220,6 +232,9 @@ export default function CustomerKycPage() {
   const [kycTotalPages, setKycTotalPages] = useState(1)
   const [kycTotal, setKycTotal] = useState(0)
   const [kycLoading, setKycLoading] = useState(false)
+  const [kycMsg, setKycMsg] = useState(null)
+  const [approving, setApproving] = useState(false)
+  const [approveConfirm, setApproveConfirm] = useState({ open: false, reference: '' })
 
   const statementIdentifier = useMemo(() => {
     if (!customerId) return ''
@@ -280,6 +295,27 @@ export default function CustomerKycPage() {
   useEffect(() => {
     setKycPage(1)
   }, [statementIdentifier])
+
+  const runApproveKyc = async () => {
+    const reference = approveConfirm.reference
+    if (!reference || !canApprove) return
+    setApproving(true)
+    setKycMsg(null)
+    try {
+      await patchKycCompliance(reference, { is_compliant: 'Y' })
+      setKycMsg({ type: 'success', text: 'KYC record approved successfully.' })
+      setApproveConfirm({ open: false, reference: '' })
+      await fetchCore()
+      await loadKycs()
+    } catch (err) {
+      setKycMsg({
+        type: 'error',
+        text: err.response?.data?.message || 'Failed to approve KYC record.',
+      })
+    } finally {
+      setApproving(false)
+    }
+  }
 
   const handleExportCustomer = () => {
     if (!customer) return
@@ -457,6 +493,19 @@ export default function CustomerKycPage() {
       </section>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+        {kycMsg ? (
+          <div
+            className={cn(
+              'rounded-lg border px-4 py-2.5 text-sm',
+              kycMsg.type === 'success'
+                ? 'border-[#5c6639]/90 bg-[#161a12] text-[#97AB27]'
+                : 'border-[#b91c1c]/55 bg-[#1a1010] text-[#fca5a5]'
+            )}
+          >
+            {kycMsg.text}
+          </div>
+        ) : null}
+
         {/* Document list: rows from GET /customers/:id/kycs — see loadKycs + getCustomerKycs */}
         <section className="flex flex-col overflow-hidden rounded-[30px] border border-[#2a2a2a] bg-[#111111]">
           <div className="border-b border-[#2a2a2a] px-5 py-4">
@@ -474,8 +523,10 @@ export default function CustomerKycPage() {
             <>
               <ul className="flex-1 divide-y divide-[#2a2a2a]">
                 {kycRows.map((row, ri) => {
-                  const statusStr = pickKycField(row, ['status', 'kyc_status', 'verification_status'])
-                  const sk = rowStatusKey(statusStr)
+                  const statusStr = pickKycField(row, ['status', 'kyc_status', 'verification_status', 'compliance_status'])
+                  const sk = kycRowStatusKey(row) !== 'none' ? kycRowStatusKey(row) : rowStatusKey(statusStr)
+                  const reference = kycRowReference(row)
+                  const pending = isKycRowPending(row)
                   const rawId =
                     pickKycRaw(row, ['document_number', 'identifier', 'bvn', 'tin', 'registration_number', 'value']) ?? ''
                   const submitted = pickKycRaw(row, ['date_created', 'created_at', 'date_modified', 'submitted_at'])
@@ -487,7 +538,16 @@ export default function CustomerKycPage() {
                         <FileText size={18} strokeWidth={1.75} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white">{humanizeDocTitle(row)}</p>
+                        <p className="text-sm font-semibold text-white">
+                          {humanizeDocTitle(row) !== 'Verification document'
+                            ? humanizeDocTitle(row)
+                            : kycIdentificationLabel(row)}
+                        </p>
+                        {reference ? (
+                          <p className="mt-1 text-xs text-[#9ca3af]">
+                            Reference: <span className="font-mono text-[#b4b9c4]">{reference}</span>
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-xs text-[#9ca3af]">
                           Document Number: <span className="font-mono text-[#b4b9c4]">{maskValue(rawId)}</span>
                         </p>
@@ -504,6 +564,16 @@ export default function CustomerKycPage() {
                         >
                           {sk === 'verified' ? 'Verified' : sk === 'pending' ? 'Pending' : sk === 'rejected' ? 'Rejected' : statusStr || '—'}
                         </span>
+                        {canApprove && pending && reference ? (
+                          <button
+                            type="button"
+                            disabled={approving}
+                            onClick={() => setApproveConfirm({ open: true, reference })}
+                            className="rounded-full bg-[#C5DC4B] px-3 py-1.5 text-[11px] font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                        ) : null}
                         {downloadUrl ? (
                           <a
                             href={String(downloadUrl)}
@@ -601,6 +671,14 @@ export default function CustomerKycPage() {
           </div>
         </section>
       </div>
+
+      <KycApproveConfirmDialog
+        open={approveConfirm.open}
+        message={`Approve KYC record ${approveConfirm.reference}? This marks the document as compliant.`}
+        loading={approving}
+        onCancel={() => !approving && setApproveConfirm({ open: false, reference: '' })}
+        onConfirm={runApproveKyc}
+      />
     </div>
   )
 }
