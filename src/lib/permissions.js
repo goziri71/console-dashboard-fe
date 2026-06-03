@@ -4,6 +4,8 @@ export const PERMISSION_FINANCIAL_READ = 'financial.read'
 export const PERMISSION_RBAC_MANAGE = 'rbac.manage'
 /** Tier upgrade — PATCH /customers/:identifier/tier */
 export const PERMISSION_CUSTOMER_UPDATE = 'customer.update'
+/** Merchant profile / integrations — PATCH /merchants/:account_key, Beamer link & update */
+export const PERMISSION_MERCHANT_UPDATE = 'merchant.update'
 /** KYC document approval — PATCH /kycs/:reference, POST /merchants/:account_key/kyc/approve */
 export const PERMISSION_KYC_UPDATE = 'kyc.update'
 
@@ -36,6 +38,16 @@ export function canUpdateCustomerRecord(permissions) {
 
 /** Roles that typically approve KYC in the console (when RBAC key not assigned yet). */
 export const KYC_APPROVER_ROLES = ['operations', 'compliance']
+
+export const MERCHANT_MUTATION_ROLES = ['operations', 'compliance']
+
+export function canUpdateMerchant(permissions, role) {
+  if (hasFullAccess(permissions) || permissions?.includes(PERMISSION_MERCHANT_UPDATE)) return true
+  const r = String(role ?? '')
+    .toLowerCase()
+    .trim()
+  return MERCHANT_MUTATION_ROLES.includes(r)
+}
 
 export function canKycUpdate(permissions, role) {
   if (hasFullAccess(permissions) || permissions?.includes(PERMISSION_KYC_UPDATE)) return true

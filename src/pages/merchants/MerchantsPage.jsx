@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Building2, Users, Clock, ShieldAlert, Link2, Loader2, X, TrendingUp } from 'lucide-react'
-import { beamerAccountUpdate, getMerchantStats, getMerchants, patchMerchantTier } from '../../services/merchants'
+import { Building2, Users, Clock, ShieldAlert, Loader2, TrendingUp, X } from 'lucide-react'
+import { getMerchantStats, getMerchants, patchMerchantTier } from '../../services/merchants'
+import UdaraLinkModal from '../../components/merchants/UdaraLinkModal'
 import { formatNumber, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -128,11 +129,6 @@ export default function MerchantsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkMerchant, setLinkMerchant] = useState(null)
-  const [accountNumber, setAccountNumber] = useState('')
-  const [clientId, setClientId] = useState('')
-  const [clientKey, setClientKey] = useState('')
-  const [linkSubmitting, setLinkSubmitting] = useState(false)
-  const [linkMsg, setLinkMsg] = useState(null)
 
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [upgradeMerchant, setUpgradeMerchant] = useState(null)
@@ -199,19 +195,11 @@ export default function MerchantsPage() {
     if (!merchant || merchant.udara360 != null) return
     setLinkMerchant(merchant)
     setLinkOpen(true)
-    setLinkMsg(null)
-    setAccountNumber('')
-    setClientId('')
-    setClientKey('')
   }
 
   function closeLinkModal() {
     setLinkOpen(false)
     setLinkMerchant(null)
-    setAccountNumber('')
-    setClientId('')
-    setClientKey('')
-    setLinkMsg(null)
   }
 
   function openUpgradeModal(merchant) {
@@ -255,34 +243,8 @@ export default function MerchantsPage() {
     }
   }
 
-  async function handleLinkSubmit(e) {
-    e.preventDefault()
-    if (!linkMerchant) return
-    if (!accountNumber.trim() || !clientId.trim() || !clientKey.trim()) {
-      setLinkMsg({ type: 'error', text: 'Account number, client id, and client key are required.' })
-      return
-    }
-    setLinkSubmitting(true)
-    setLinkMsg(null)
-    try {
-      const body = {
-        data: {
-          id: String(linkMerchant.id),
-          account_number: accountNumber.trim(),
-          client: {
-            id: clientId.trim(),
-            key: clientKey.trim(),
-          },
-        },
-      }
-      await beamerAccountUpdate(linkMerchant.account_key, body, crypto.randomUUID())
-      setLinkMsg({ type: 'success', text: `Linked ${linkMerchant.name || linkMerchant.account_key} successfully.` })
-      await fetchMerchants()
-    } catch (err) {
-      setLinkMsg({ type: 'error', text: err?.response?.data?.message || 'Link merchant failed.' })
-    } finally {
-      setLinkSubmitting(false)
-    }
+  async function handleLinkSuccess() {
+    await fetchMerchants()
   }
 
   const statCards = useMemo(() => (stats ? buildStatCards(stats) : []), [stats])
@@ -366,95 +328,12 @@ export default function MerchantsPage() {
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} label="Merchants" onPageChange={setPage} />
       </div>
 
-      {linkOpen ? (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-6"
-          role="presentation"
-          onClick={closeLinkModal}
-        >
-          <div
-            className="w-full max-w-xl overflow-hidden rounded-card border border-border bg-card shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h3 className="text-base font-medium text-text-primary">Link to Udara</h3>
-                <p className="text-xs text-text-muted">
-                  Enter Udara (Beamer) account number and client credentials for this merchant.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeLinkModal}
-                className="rounded-full p-1.5 text-text-muted transition-colors hover:bg-card-hover hover:text-text-primary"
-                aria-label="Close modal"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {linkMsg ? (
-              <div className={`mx-4 mt-3 rounded-lg border px-3 py-2 text-xs ${linkMsg.type === 'success' ? 'border-success/30 bg-success-bg text-success' : 'border-error/30 bg-error-bg text-error'}`}>
-                {linkMsg.text}
-              </div>
-            ) : null}
-
-            <div className="mx-auto max-w-lg p-4">
-              <form onSubmit={handleLinkSubmit} className="rounded-xl border border-border/70 p-4">
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-border bg-page px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-wide text-text-muted">Merchant</p>
-                    <p className="mt-1 text-sm text-text-primary">{linkMerchant?.name || '—'}</p>
-                    <p className="font-mono text-[11px] text-text-muted break-all">{linkMerchant?.account_key || '—'}</p>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs text-text-muted">Account Number</label>
-                    <input
-                      type="text"
-                      value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
-                      placeholder="Enter account number"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-text-muted">Client ID</label>
-                    <input
-                      type="text"
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
-                      placeholder="Enter client id"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-text-muted">Client Key</label>
-                    <input
-                      type="text"
-                      value={clientKey}
-                      onChange={(e) => setClientKey(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
-                      placeholder="Enter client key"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={!linkMerchant || linkSubmitting}
-                  className="mt-4 inline-flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent bg-[#F7F7F7] px-3 text-sm font-medium text-[#1a1c12] transition-all duration-150 hover:bg-[#e4e4e0] hover:text-[#0d0f0a] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {linkSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-                  Link to Udara
-                </button>
-              </form>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <UdaraLinkModal
+        open={linkOpen}
+        merchant={linkMerchant}
+        onClose={closeLinkModal}
+        onSuccess={handleLinkSuccess}
+      />
 
       {upgradeOpen ? (
         <div

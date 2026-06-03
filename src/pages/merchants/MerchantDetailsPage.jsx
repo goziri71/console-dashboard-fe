@@ -10,12 +10,13 @@ import {
   AlertCircle,
   MoreHorizontal,
   ShieldCheck,
+  Link2,
   X,
 } from 'lucide-react'
 import { getMerchant, getMerchantCustomers, updateMerchant, patchMerchantTier } from '../../services/merchants'
 import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
-import { canKycUpdate } from '../../lib/permissions'
+import { canKycUpdate, canUpdateMerchant } from '../../lib/permissions'
 import { cn, exportToCsv, formatNumber } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -37,6 +38,7 @@ import {
   customerWalletCount,
 } from './merchantCustomerUi'
 import MerchantKycPanel from './MerchantKycPanel'
+import MerchantUdaraPanel from './MerchantUdaraPanel'
 import { kycAggregateLabel, kycStatusPillClass, normalizeKycAggregateStatus } from '../../lib/kycUi'
 
 const CAN_MUTATE = ['operations', 'compliance']
@@ -73,6 +75,7 @@ export default function MerchantDetailsPage() {
   const { user } = useAuth()
   const canMutate = CAN_MUTATE.includes(user?.role)
   const canApproveMerchantKyc = canKycUpdate(user?.permissions, user?.role)
+  const canManageUdara = canUpdateMerchant(user?.permissions, user?.role)
 
   const [merchant, setMerchant] = useState(null)
   const [merchantLoading, setMerchantLoading] = useState(true)
@@ -92,6 +95,7 @@ export default function MerchantDetailsPage() {
   const [merchantKycPending, setMerchantKycPending] = useState(0)
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const [udaraModalOpen, setUdaraModalOpen] = useState(false)
   const [freezing, setFreezing] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
   const [msg, setMsg] = useState(null)
@@ -124,6 +128,12 @@ export default function MerchantDetailsPage() {
     return () => {
       cancelled = true
     }
+  }, [accountKey])
+
+  const refetchMerchant = useCallback(async () => {
+    if (!accountKey) return
+    const res = await getMerchant(accountKey)
+    setMerchant(unwrapPayload(res))
   }, [accountKey])
 
   const fetchCustomers = useCallback(async () => {
@@ -417,6 +427,18 @@ export default function MerchantDetailsPage() {
     document.getElementById('merchant-kyc')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const scrollToMerchantUdara = () => {
+    setMenuOpen(false)
+    document.getElementById('merchant-udara')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const openUdaraModal = () => {
+    setMenuOpen(false)
+    setUdaraModalOpen(true)
+  }
+
+  const udaraLinked = merchant?.udara360 != null && typeof merchant.udara360 === 'object'
+
   return (
     <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
       {msg && (
@@ -517,6 +539,16 @@ export default function MerchantDetailsPage() {
                       ? 'Approve merchant KYC'
                       : 'View merchant KYC'}
                   </button>
+                  {canManageUdara ? (
+                    <button
+                      type="button"
+                      onClick={udaraLinked ? openUdaraModal : scrollToMerchantUdara}
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-secondary hover:bg-card-hover sm:py-2"
+                    >
+                      <Link2 size={14} className="shrink-0 text-accent" />
+                      {udaraLinked ? 'Update Udara credentials' : 'Link Udara account'}
+                    </button>
+                  ) : null}
                 </div>
               </>
             )}
@@ -598,6 +630,13 @@ export default function MerchantDetailsPage() {
           </div>
         </div>
       </section>
+
+      <MerchantUdaraPanel
+        merchant={merchant}
+        onMerchantRefresh={refetchMerchant}
+        linkModalOpen={udaraModalOpen}
+        onLinkModalOpenChange={setUdaraModalOpen}
+      />
 
       <MerchantKycPanel
         accountKey={accountKey}
