@@ -28,6 +28,8 @@ import { useAuth } from '../../context/AuthContext'
 import { canReadFinancial, canKycUpdate, canUpdateCustomerRecord } from '../../lib/permissions'
 import { patchKycCompliance } from '../../services/kyc'
 import KycApproveConfirmDialog from '../../components/kyc/KycApproveConfirmDialog'
+import { kycKeyToUpper } from '../../lib/kycUi'
+import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
 import {
   isKycRowPending,
   kycRowReference,
@@ -469,13 +471,14 @@ export default function CustomerDetailsPage() {
     () => wallets.find((w) => (w.wallet_key || w.wallet_id) === selectedWalletKey) || null,
     [wallets, selectedWalletKey]
   )
-  const kycKey = customer ? customerKycKey(customer) : 'none'
+  const localKycKey = customer ? customerKycKey(customer) : 'none'
+  const { kycKey } = useKycDisplayStatus(customer, localKycKey)
   const acctKey = customer ? customerAccountStatusKey(customer) : 'active'
   const tierLine = customer ? customerTierLabel(customer) : '—'
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
   const typeDisplay = typeRaw === '—' ? '—' : String(typeRaw).toUpperCase()
 
-  const kycUpper = kycKey === 'verified' ? 'VERIFIED' : kycKey === 'pending' ? 'PENDING' : kycKey === 'rejected' ? 'REJECTED' : 'NONE'
+  const kycUpper = kycKeyToUpper(kycKey)
 
   const accountUpper =
     acctKey === 'active' ? 'ACTIVE' : acctKey === 'suspended' ? 'SUSPENDED' : acctKey === 'inactive' ? 'INACTIVE' : 'PENDING'

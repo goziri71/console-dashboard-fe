@@ -40,6 +40,7 @@ import {
 import MerchantKycPanel from './MerchantKycPanel'
 import MerchantUdaraPanel from './MerchantUdaraPanel'
 import { kycAggregateLabel, kycStatusPillClass, normalizeKycAggregateStatus } from '../../lib/kycUi'
+import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
 
 const CAN_MUTATE = ['operations', 'compliance']
 const LIMIT = 20
@@ -389,6 +390,9 @@ export default function MerchantDetailsPage() {
     setMerchantKycPending(Number(meta.pendingCount) || 0)
   }, [])
 
+  const localMerchantKycKey = normalizeKycAggregateStatus(merchantKycStatus ?? merchant?.kyc_status)
+  const { kycKey: merchantKycKey } = useKycDisplayStatus(merchant, localMerchantKycKey)
+
   if (merchantLoading && !merchant) {
     return (
       <div className="animate-fade-in-up mx-auto w-full max-w-[100vw] space-y-4 overflow-x-hidden px-3 pb-6 sm:space-y-6 sm:px-4 lg:px-0">
@@ -418,7 +422,6 @@ export default function MerchantDetailsPage() {
 
   const flag = countryToFlagEmoji(merchant.country_code ?? merchant.country)
   const accountTypeLabel = typeStr === '—' ? '—' : `${String(typeStr).slice(0, 1).toUpperCase()}${String(typeStr).slice(1).toLowerCase()}`
-  const merchantKycKey = normalizeKycAggregateStatus(merchantKycStatus ?? merchant.kyc_status)
   const showMerchantKycAlert =
     merchantKycKey === 'pending' || (Number(merchantKycPending) > 0 && merchantKycKey !== 'verified')
 

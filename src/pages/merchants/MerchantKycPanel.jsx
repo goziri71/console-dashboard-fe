@@ -17,6 +17,7 @@ import {
   parseMerchantKycApproveResponse,
   parseMerchantKycListResponse,
 } from '../../lib/kycUi'
+import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
 
 const KYC_PAGE_SIZE = 10
 
@@ -33,8 +34,6 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
   const onMetaRef = useRef(onKycMetaChange)
   onMetaRef.current = onKycMetaChange
 
-  const profileKycStatus = merchantProfile?.kyc_status ?? merchantProfile?.kyc_verification_status
-
   const [records, setRecords] = useState([])
   const [merchantKyc, setMerchantKyc] = useState(null)
   const [pendingCount, setPendingCount] = useState(0)
@@ -46,13 +45,13 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
   const [msg, setMsg] = useState(null)
   const [confirm, setConfirm] = useState({ open: false, reference: null, approveAll: false })
 
-  const aggregateKey = useMemo(
-    () =>
-      normalizeKycAggregateStatus(
-        merchantKyc?.kyc_status ?? profileKycStatus
-      ),
+  const profileKycStatus = merchantProfile?.kyc_status ?? merchantProfile?.kyc_verification_status
+
+  const localAggregateKey = useMemo(
+    () => normalizeKycAggregateStatus(merchantKyc?.kyc_status ?? profileKycStatus),
     [merchantKyc?.kyc_status, profileKycStatus]
   )
+  const { kycKey: aggregateKey } = useKycDisplayStatus(merchantProfile, localAggregateKey)
 
   const approvableRows = useMemo(() => records.filter(isKycRowApprovable), [records])
   const showApproveAll =

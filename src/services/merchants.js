@@ -13,16 +13,23 @@ export async function getMerchants(params = {}) {
 }
 
 /**
- * Udara / Beamer integration. Sends `Request-Id` as an HTTP header (not in JSON body).
- * @param {string} accountKey merchant account_key path segment
- * @param {string} action `account-link` | `account-update`
- * @param {Record<string, unknown>} body JSON body
- * @param {string} [requestId] optional idempotency / trace id
+ * Udara / Beamer — POST JSON `{ headers, data }` per ISVS contract.
+ * Also sends `Request-Id` as HTTP header (server accepts either).
  */
 async function postBeamerIntegration(accountKey, action, body, requestId) {
   const ak = encodeURIComponent(String(accountKey))
   const rid = requestId || crypto.randomUUID()
-  const { data } = await api.post(`/merchants/${ak}/integrations/beamer/${action}`, body, {
+  const payload =
+    body?.headers && body?.data
+      ? body
+      : {
+          headers: { 'Request-Id': rid },
+          data: body?.data ?? body,
+        }
+  if (!payload.headers['Request-Id']) {
+    payload.headers = { ...payload.headers, 'Request-Id': rid }
+  }
+  const { data } = await api.post(`/merchants/${ak}/integrations/beamer/${action}`, payload, {
     headers: { 'Request-Id': rid },
   })
   return data

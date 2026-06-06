@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link2, Loader2, X } from 'lucide-react'
-import { beamerAccountLink, beamerAccountUpdate } from '../../services/merchants'
+import { beamerAccountLink, beamerAccountUpdate, getMerchant } from '../../services/merchants'
 import {
   buildBeamerLinkBody,
   buildBeamerUpdateBody,
   getBeamerErrorMessage,
   isBeamerNoIntegrationError,
-  isBeamerSuccess,
   isUdaraLinked,
+  resolveBeamerLinkOutcome,
+  resolveBeamerUpdateOutcome,
 } from '../../lib/beamerUi'
 
 /**
@@ -59,33 +60,35 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
     try {
       const body = isUpdate
         ? buildBeamerUpdateBody({
+            merchant,
             udara360: udara,
             accountNumber,
             clientId,
             clientKey,
+            requestId,
           })
-        : buildBeamerLinkBody({ accountNumber, clientId, clientKey })
+        : buildBeamerLinkBody({
+            merchant,
+            accountNumber,
+            clientId,
+            clientKey,
+            requestId,
+          })
 
       const res = isUpdate
         ? await beamerAccountUpdate(accountKey, body, requestId)
         : await beamerAccountLink(accountKey, body, requestId)
 
-      if (!isBeamerSuccess(res)) {
-        const isvs = res?.data?.isvs ?? res?.isvs
-        if (isvs) console.warn('[beamer] ISVS response', isvs)
-        setMsg({
-          type: 'error',
-          text: isvs?.message || res?.message || 'Integration request did not succeed.',
-        })
+      const outcome = isUpdate
+        ? await resolveBeamerUpdateOutcome(res, accountKey, getMerchant)
+        : await resolveBeamerLinkOutcome(res, accountKey, getMerchant)
+
+      if (!outcome.ok) {
+        setMsg({ type: 'error', text: outcome.message })
         return
       }
 
-      setMsg({
-        type: 'success',
-        text: isUpdate
-          ? 'Udara credentials updated successfully.'
-          : `Linked ${merchant.name || accountKey} to Udara successfully.`,
-      })
+      setMsg({ type: 'success', text: outcome.message })
       await onSuccess?.()
       window.setTimeout(() => onClose?.(), 1200)
     } catch (err) {

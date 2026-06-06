@@ -22,6 +22,8 @@ import {
   customerTypeLabel,
   getCustomerIdentifier,
 } from './merchantCustomerUi'
+import { kycKeyToUpper } from '../../lib/kycUi'
+import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
 import Pagination from '../../components/ui/Pagination'
 
 const KYC_PAGE_SIZE = 10
@@ -342,12 +344,13 @@ export default function CustomerKycPage() {
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
   const displayNameUpper = useMemo(() => (displayName === '—' ? '—' : displayName.toUpperCase()), [displayName])
   const flag = countryToFlagEmoji(customer?.country_code ?? customer?.country)
-  const kycKey = customer ? customerKycKey(customer) : 'none'
+  const localKycKey = customer ? customerKycKey(customer) : 'none'
+  const { kycKey } = useKycDisplayStatus(customer, localKycKey)
   const acctKey = customer ? customerAccountStatusKey(customer) : 'active'
   const tierLine = customer ? customerTierLabel(customer) : '—'
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
   const typeDisplay = typeRaw === '—' ? '—' : String(typeRaw).toUpperCase()
-  const kycUpper = kycKey === 'verified' ? 'VERIFIED' : kycKey === 'pending' ? 'PENDING' : kycKey === 'rejected' ? 'REJECTED' : 'NONE'
+  const kycUpper = kycKeyToUpper(kycKey)
   const accountUpper =
     acctKey === 'active' ? 'ACTIVE' : acctKey === 'suspended' ? 'SUSPENDED' : acctKey === 'inactive' ? 'INACTIVE' : 'PENDING'
   const riskKey = customer ? deriveRiskLevel(customer) : 'low'

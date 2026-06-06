@@ -121,6 +121,14 @@ export function kycAggregateLabel(key) {
   return 'None'
 }
 
+export function kycKeyToUpper(key) {
+  const k = normalizeKycAggregateStatus(key)
+  if (k === 'verified') return 'VERIFIED'
+  if (k === 'pending') return 'PENDING'
+  if (k === 'rejected') return 'REJECTED'
+  return 'NONE'
+}
+
 export function kycStatusPillClass(key) {
   const k = key === 'verified' ? 'verified' : key === 'pending' ? 'pending' : key === 'rejected' ? 'rejected' : 'none'
   if (k === 'verified') return 'bg-success-bg text-success border border-success/30'

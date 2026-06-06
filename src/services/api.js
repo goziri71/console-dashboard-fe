@@ -24,11 +24,49 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+function isBeamerIntegrationUrl(config) {
+  const url = String(config?.url || '')
+  return url.includes('/integrations/beamer/')
+}
+
+function isKycEnableStatusPassthroughUrl(config) {
+  const url = String(config?.url || '')
+  return url.includes('/kyc/sub-account-enable-status')
+}
+
 api.interceptors.response.use(
   (response) => {
     const body = response.data
 
+    if (isKycEnableStatusPassthroughUrl(response.config)) {
+      response.data = body
+      return response
+    }
+
     if (!isConsoleEnvelope(body)) {
+      return response
+    }
+
+    if (isBeamerIntegrationUrl(response.config)) {
+      if (body.state !== true) {
+        const status = deriveHttpStatusFromApiCode(body.code)
+        const axiosResponse = {
+          data: body,
+          status,
+          statusText: body.message || 'Error',
+          headers: response.headers,
+          config: response.config,
+        }
+        const err = new axios.AxiosError(
+          body.message || 'Request failed',
+          axios.AxiosError.ERR_BAD_RESPONSE,
+          response.config,
+          response.request,
+          axiosResponse
+        )
+        return Promise.reject(err)
+      }
+      response.data = body
       return response
     }
 
