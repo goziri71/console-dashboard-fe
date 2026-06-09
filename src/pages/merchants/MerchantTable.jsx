@@ -25,7 +25,7 @@ const statusBadge = {
 
 const udaraLinkBadge = {
   linked: { label: 'Linked', cls: 'bg-success-bg text-success' },
-  unlinked: { label: 'Not linked', cls: 'bg-warning-bg text-warning text-[1px] px-0' },
+  unlinked: { label: 'Not linked', cls: 'bg-warning-bg text-warning text-[9.9px] px-0' },
 }
 
 function Badge({ config, value }) {
@@ -69,7 +69,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
   const rowOffset = (page - 1) * limit
   if (!merchants || merchants.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm text-text-muted">
+      <div className="flex justify-center items-center py-16 text-sm text-text-muted">
         No merchants found
       </div>
     )
@@ -78,7 +78,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
   return (
     <div className="p-4">
       <div className="overflow-x-auto rounded-2xl border border-border/70">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-sm text-left">
           <thead>
             <tr className="border-b border-border bg-card-hover/40">
               {COLUMNS.map((col) => (
@@ -103,7 +103,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
               return (
                 <tr
                   key={rowKey}
-                  className="cursor-pointer border-b border-border/40 transition-colors hover:bg-card-hover/30"
+                  className="border-b transition-colors cursor-pointer border-border/40 hover:bg-card-hover/30"
                   onClick={() => navigate(`/merchants/${merchant.account_key}`)}
                 >
                   <td className="px-4 py-2.5">
@@ -136,7 +136,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                   </td>
                   <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                     <div
-                      className="relative inline-flex"
+                      className="inline-flex relative"
                       data-merchant-action-wrap
                       data-menu-key={rowKey}
                     >
@@ -146,7 +146,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                           e.stopPropagation()
                           setOpenMenuKey((k) => (k === rowKey ? null : rowKey))
                         }}
-                        className="rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary active:scale-90"
+                        className="p-1 rounded-md transition-colors text-text-muted hover:bg-card-hover hover:text-text-secondary active:scale-90"
                         aria-expanded={menuOpen}
                         aria-haspopup="menu"
                         aria-label="Row actions"
@@ -161,7 +161,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                           <button
                             type="button"
                             role="menuitem"
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-text-primary transition-colors hover:bg-card-hover"
+                            className="flex gap-2 items-center px-3 py-2 w-full text-xs text-left transition-colors text-text-primary hover:bg-card-hover"
                             onClick={() => {
                               setOpenMenuKey(null)
                               navigate(`/merchants/${merchant.account_key}`)
@@ -174,7 +174,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                             <button
                               type="button"
                               role="menuitem"
-                              className="group flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-text-primary transition-colors duration-150 hover:bg-accent/15 hover:text-accent"
+                              className="flex gap-2 items-center px-3 py-2 w-full text-xs text-left rounded-md transition-colors duration-150 cursor-pointer group text-text-primary hover:bg-accent/15 hover:text-accent"
                               onClick={() => {
                                 setOpenMenuKey(null)
                                 onLinkUdara(merchant)
@@ -182,7 +182,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                             >
                               <Link2
                                 size={14}
-                                className="shrink-0 text-accent transition-colors duration-150 group-hover:text-accent"
+                                className="transition-colors duration-150 shrink-0 text-accent group-hover:text-accent"
                               />
                               Link to Udara
                             </button>
@@ -193,7 +193,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                               role="menuitem"
                               disabled={atMaxTier}
                               title={atMaxTier ? 'Merchant is already at Tier 3' : undefined}
-                              className="group flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-text-primary transition-colors duration-150 hover:bg-accent/15 hover:text-accent disabled:pointer-events-none disabled:opacity-40"
+                              className="flex gap-2 items-center px-3 py-2 w-full text-xs text-left rounded-md transition-colors duration-150 cursor-pointer group text-text-primary hover:bg-accent/15 hover:text-accent disabled:pointer-events-none disabled:opacity-40"
                               onClick={() => {
                                 if (atMaxTier) return
                                 setOpenMenuKey(null)
