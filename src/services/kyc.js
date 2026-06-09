@@ -34,15 +34,18 @@ export async function approveMerchantKyc(accountKey, body = {}) {
 }
 
 /**
- * KYC enable status (passthrough). Customer or merchant row — header `key` = user_key, `account_key`.
+ * KYC enable status (passthrough).
+ * Headers: `key` = user_key, `account_key`, `session_id` from customer/merchant record.
  */
-export async function getKycEnableStatus({ userKey, accountKey }, signal) {
+export async function getKycEnableStatus({ userKey, accountKey, sessionId }, signal) {
   const key = String(userKey ?? '').trim()
   const ak = String(accountKey ?? '').trim()
+  const sid = String(sessionId ?? '').trim()
   const response = await api.get('/customers/kyc/sub-account-enable-status', {
     headers: {
       key,
       account_key: ak,
+      session_id: sid,
     },
     signal,
     validateStatus: () => true,

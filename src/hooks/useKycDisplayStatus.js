@@ -9,7 +9,7 @@ import { mapKycEnableResponseToKey, pickEntityKycKeys } from '../lib/kycEnableSt
  */
 export function useKycDisplayStatus(entity, localKycRaw) {
   const localKey = useMemo(() => normalizeKycAggregateStatus(localKycRaw), [localKycRaw])
-  const { userKey, accountKey } = useMemo(() => pickEntityKycKeys(entity), [entity])
+  const { userKey, accountKey, sessionId } = useMemo(() => pickEntityKycKeys(entity), [entity])
 
   const [remoteKey, setRemoteKey] = useState(null)
   const [loadingRemote, setLoadingRemote] = useState(false)
@@ -21,7 +21,7 @@ export function useKycDisplayStatus(entity, localKycRaw) {
       return undefined
     }
 
-    if (!userKey || !accountKey) {
+    if (!userKey || !accountKey || !sessionId) {
       setRemoteKey(null)
       return undefined
     }
@@ -29,7 +29,7 @@ export function useKycDisplayStatus(entity, localKycRaw) {
     let cancelled = false
     setLoadingRemote(true)
 
-    getKycEnableStatus({ userKey, accountKey })
+    getKycEnableStatus({ userKey, accountKey, sessionId })
       .then((res) => {
         if (cancelled) return
         if (res.httpStatus >= 400) return
@@ -46,7 +46,7 @@ export function useKycDisplayStatus(entity, localKycRaw) {
     return () => {
       cancelled = true
     }
-  }, [localKey, userKey, accountKey])
+  }, [localKey, userKey, accountKey, sessionId])
 
   const kycKey = localKey !== 'none' ? localKey : remoteKey ?? 'none'
 

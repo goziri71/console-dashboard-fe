@@ -2,11 +2,12 @@ import { normalizeKycAggregateStatus } from './kycUi'
 
 export function pickEntityKycKeys(entity) {
   if (entity == null || typeof entity !== 'object') {
-    return { userKey: '', accountKey: '' }
+    return { userKey: '', accountKey: '', sessionId: '' }
   }
   return {
     userKey: String(entity.user_key ?? entity.userKey ?? '').trim(),
     accountKey: String(entity.account_key ?? entity.accountKey ?? '').trim(),
+    sessionId: String(entity.session_id ?? entity.sessionId ?? '').trim(),
   }
 }
 
