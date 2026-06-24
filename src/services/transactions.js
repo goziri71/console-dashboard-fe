@@ -44,3 +44,28 @@ export async function getCryptoPayouts(params = {}, signal) {
   const { data } = await api.get('/transactions/crypto-payouts', { params, signal })
   return data
 }
+
+/** Pending transaction review queue (ops approve / cancel). */
+export async function getPendingReviewTransactions(params = {}, signal) {
+  const { data } = await api.get('/transactions/pending-review', { params, signal })
+  return data
+}
+
+export async function getPendingReviewSummary(params = {}, signal) {
+  const { data } = await api.get('/transactions/pending-review/summary', { params, signal })
+  return data
+}
+
+export async function approvePendingReviewTransaction(transactionTypeSegment, reference) {
+  const segment = encodeURIComponent(String(transactionTypeSegment))
+  const ref = encodeURIComponent(String(reference))
+  const { data } = await api.post(`/transactions/review/${segment}/${ref}/approve`)
+  return data
+}
+
+export async function cancelPendingReviewTransaction(transactionTypeSegment, reference) {
+  const segment = encodeURIComponent(String(transactionTypeSegment))
+  const ref = encodeURIComponent(String(reference))
+  const { data } = await api.post(`/transactions/review/${segment}/${ref}/cancel`)
+  return data
+}

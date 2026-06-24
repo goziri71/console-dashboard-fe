@@ -8,6 +8,8 @@ export const PERMISSION_CUSTOMER_UPDATE = 'customer.update'
 export const PERMISSION_MERCHANT_UPDATE = 'merchant.update'
 /** KYC document approval — PATCH /kycs/:reference, POST /merchants/:account_key/kyc/approve */
 export const PERMISSION_KYC_UPDATE = 'kyc.update'
+/** Pending transaction review — POST /transactions/review/.../approve|cancel */
+export const PERMISSION_DISPUTE_UPDATE = 'dispute.update'
 
 /** Seeded management role: server rejects PATCH …/roles/:id/permissions for this slug only. */
 export const ROLE_SLUG_MANAGEMENT = 'management'
@@ -39,6 +41,8 @@ export function canUpdateCustomerRecord(permissions) {
 /** Roles that typically approve KYC in the console (when RBAC key not assigned yet). */
 export const KYC_APPROVER_ROLES = ['operations', 'compliance']
 
+export const DISPUTE_REVIEW_ROLES = ['operations', 'compliance']
+
 export const MERCHANT_MUTATION_ROLES = ['operations', 'compliance']
 
 export function canUpdateMerchant(permissions, role) {
@@ -55,6 +59,14 @@ export function canKycUpdate(permissions, role) {
     .toLowerCase()
     .trim()
   return KYC_APPROVER_ROLES.includes(r)
+}
+
+export function canDisputeUpdate(permissions, role) {
+  if (hasFullAccess(permissions) || permissions?.includes(PERMISSION_DISPUTE_UPDATE)) return true
+  const r = String(role ?? '')
+    .toLowerCase()
+    .trim()
+  return DISPUTE_REVIEW_ROLES.includes(r)
 }
 
 /**

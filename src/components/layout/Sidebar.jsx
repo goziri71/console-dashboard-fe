@@ -19,7 +19,7 @@ const navItems = [
   { label: 'Wallet', icon: Wallet, path: '/wallets' },
   { label: 'Transactions', icon: ArrowLeftRight, path: '/transactions' },
   { label: 'Compliance', icon: ShieldCheck, path: '/compliance' },
-  { label: 'Disputes', icon: AlertTriangle, path: '/disputes' },
+  { label: 'Pending review', icon: AlertTriangle, path: '/disputes' },
   { label: 'Settlements', icon: Landmark, path: '/settlements' },
   { label: 'Reports', icon: FileText, path: '/reports' },
   { label: 'Admin Tools', icon: Settings, path: '/admin' },
