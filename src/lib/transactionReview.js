@@ -1,4 +1,4 @@
-/** Normalized API transaction_type → kebab-case URL segment for review approve/cancel. */
+import { formatDate } from './utils'
 export const REVIEW_TYPE_TO_SEGMENT = {
   ngn_deposit: 'ngn-deposits',
   ngn_payout: 'ngn-payouts',
@@ -15,7 +15,7 @@ export const REVIEW_TYPE_TABS = [
   { value: 'ngn-payouts', label: 'NGN Payouts' },
   { value: 'transfers', label: 'Transfers' },
   { value: 'deposits', label: 'Deposits' },
-  { value: 'withdrawals', label: 'Withdrawals' },
+  { value: 'withdrawals', label: 'Payouts' },
   { value: 'crypto-deposits', label: 'Crypto Deposits' },
   { value: 'crypto-payouts', label: 'Crypto Payouts' },
 ]
@@ -26,14 +26,14 @@ const TYPE_LABELS = {
   crypto_deposit: 'Crypto Deposit',
   crypto_payout: 'Crypto Payout',
   deposit: 'Deposit',
-  withdrawal: 'Withdrawal',
+  withdrawal: 'Payout',
   transfer: 'Transfer',
   'ngn-deposits': 'NGN Deposit',
   'ngn-payouts': 'NGN Payout',
   'crypto-deposits': 'Crypto Deposit',
   'crypto-payouts': 'Crypto Payout',
   deposits: 'Deposit',
-  withdrawals: 'Withdrawal',
+  withdrawals: 'Payout',
   transfers: 'Transfer',
 }
 
@@ -135,7 +135,12 @@ export function detailFieldsForRow(row) {
     ['Amount', row?.amount ?? rec.amount ?? '—'],
     ['Status', pickRowStatus(row)],
     ['Session ID', rec.session_id ?? '—'],
-    ['Date created', row?.date_created ?? rec.date_created ?? '—'],
+    [
+      'Date created',
+      (row?.date_created ?? rec.date_created)
+        ? formatDate(row?.date_created ?? rec.date_created)
+        : '—',
+    ],
   ]
 
   if (type.includes('ngn') && type.includes('deposit')) {

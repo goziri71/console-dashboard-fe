@@ -30,7 +30,7 @@ const TABLE_LIMIT = 10
 
 const TAB_ITEMS = [
   { key: 'deposits', label: 'Deposits', icon: ArrowDownCircle, fetcher: getNgnDeposits },
-  { key: 'withdrawals', label: 'Withdrawals', icon: ArrowUpCircle, fetcher: getNgnPayouts },
+  { key: 'payouts', label: 'Payouts', icon: ArrowUpCircle, fetcher: getNgnPayouts },
   { key: 'transfers', label: 'Transfers', icon: ArrowLeftRight, fetcher: getTransferTransactions },
   { key: 'swaps', label: 'Swaps', icon: Shuffle, fetcher: getSwapTransactions },
   { key: 'statement', label: 'Statement', icon: BookOpenText, fetcher: getStatementTransactions },
@@ -245,7 +245,7 @@ export default function TransactionsPage() {
     const statusValue =
       (activeTab === 'deposits'
         ? pickFirst(tx, ['credit_status', 'status', 'transaction_status'])
-        : activeTab === 'withdrawals'
+        : activeTab === 'payouts'
           ? pickFirst(tx, ['payout_status', 'status', 'transaction_status'])
           : pickFirst(tx, ['status', 'transaction_status'])) || '--'
     const id = pickFirst(tx, ['reference', 'source_reference', 'target_reference', 'transaction_id']) || `TX-${sn}`
@@ -290,15 +290,6 @@ export default function TransactionsPage() {
     )
   }
 
-  function formatDateParts(value) {
-    if (!value) return { date: '--', time: '--' }
-    const d = new Date(value)
-    if (Number.isNaN(d.getTime())) return { date: '--', time: '--' }
-    const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    return { date, time }
-  }
-
   function copyText(value) {
     if (!value) return
     navigator.clipboard?.writeText(String(value)).catch(() => {})
@@ -306,7 +297,7 @@ export default function TransactionsPage() {
 
   function buildDetailRows(tx, tab) {
     if (!tx) return []
-    if (tab === 'withdrawals') {
+    if (tab === 'payouts') {
       return [
         ['Recipient', tx.recipientName],
         ['Recipient Account Number', pickFirstPath(tx.raw, ['recipient_account_number'])],
@@ -361,7 +352,7 @@ export default function TransactionsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Transactions</h1>
         <p className="mt-1 text-sm text-text-secondary">
-          Monitor and review all transactions across deposits, withdrawals, transfers, swaps, and statements.
+          Monitor and review all transactions across deposits, payouts, transfers, swaps, and statements.
         </p>
       </div>
 
@@ -462,9 +453,9 @@ export default function TransactionsPage() {
                         <p className="text-text-primary">{row.senderName}</p>
                         <p className="text-[11px] text-text-muted">{row.senderMeta}</p>
                       </td>
-                      <td className="px-4 py-2 text-text-secondary">{row.amount}</td>
-                      <td className="px-4 py-2 text-text-secondary">{row.date ? formatDate(row.date) : '--'}</td>
-                      <td className="px-4 py-2">
+                      <td className="whitespace-nowrap px-4 py-2 tabular-nums text-text-secondary">{row.amount}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-text-secondary">{row.date ? formatDate(row.date) : '--'}</td>
+                      <td className="whitespace-nowrap px-4 py-2">
                         <span className={cn('inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium', statusBadgeCls(row.status))}>
                           {statusFromBackend(row.status)}
                         </span>
@@ -501,66 +492,70 @@ export default function TransactionsPage() {
       </div>
 
       {selectedTx && (
-        <div
-          className={cn(
-            'fixed inset-0 z-40 flex justify-end bg-black/45 p-3 backdrop-blur-sm sm:p-6',
-            modalState === 'failed' ? 'items-start' : 'items-center'
-          )}
-        >
-          <div className="h-[934px] max-h-[calc(100dvh-24px)] w-full max-w-[532px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100vh-48px)]">
-            <div className="relative border-b border-border px-6 pb-6 pt-6">
+        <div className="fixed inset-0 z-40 flex items-stretch justify-end bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+          <div className="flex max-h-[calc(100dvh-24px)] w-full max-w-[532px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="relative shrink-0 border-b border-border px-5 py-4">
               <button
                 onClick={() => setSelectedTx(null)}
-                className="absolute right-5 top-5 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+                className="absolute right-4 top-4 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
               >
                 <X size={18} />
               </button>
-              <div
-                className={cn(
-                  'mx-auto mb-5 flex h-28 w-28 items-center justify-center rounded-full',
-                  modalState === 'completed' && 'bg-success-bg/20',
-                  modalState === 'failed' && 'bg-error-bg/20',
-                  modalState === 'processing' && 'bg-card-hover',
-                  modalState === 'neutral' && 'bg-card-hover'
-                )}
-              >
-                {modalState === 'completed' && <CheckCircle2 size={44} className="text-success" />}
-                {modalState === 'failed' && <XCircle size={44} className="text-error" />}
-                {modalState === 'processing' && <Clock3 size={44} className="text-warning" />}
-                {modalState === 'neutral' && <Clock3 size={44} className="text-text-muted" />}
+              <div className="flex items-center gap-4 pr-8">
+                <div
+                  className={cn(
+                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
+                    modalState === 'completed' && 'bg-success-bg/20',
+                    modalState === 'failed' && 'bg-error-bg/20',
+                    modalState === 'processing' && 'bg-card-hover',
+                    modalState === 'neutral' && 'bg-card-hover'
+                  )}
+                >
+                  {modalState === 'completed' && <CheckCircle2 size={22} className="text-success" />}
+                  {modalState === 'failed' && <XCircle size={22} className="text-error" />}
+                  {modalState === 'processing' && <Clock3 size={22} className="text-warning" />}
+                  {modalState === 'neutral' && <Clock3 size={22} className="text-text-muted" />}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-base font-semibold uppercase tracking-wide text-text-primary">
+                    {statusFromBackend(selectedTx.status)}
+                  </p>
+                  <p className="truncate text-2xl font-semibold tabular-nums text-text-primary">{selectedTx.amount}</p>
+                  <p className="text-xs text-text-secondary">{formatDate(selectedTx.date)}</p>
+                </div>
               </div>
-              <p className="text-center text-xl font-semibold text-text-primary">
-                {statusFromBackend(selectedTx.status)}
-              </p>
             </div>
 
-            <div className="h-[calc(100%-196px)] overflow-y-auto px-6 py-5">
-              <div className="mb-6 text-center">
-                <p className="text-sm text-text-muted">Amount</p>
-                <p className="mt-1 text-3xl font-semibold text-text-primary">{selectedTx.amount}</p>
-                <p className="mt-1 text-sm text-text-secondary">{formatDate(selectedTx.date)}</p>
-              </div>
-
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <div className="overflow-hidden rounded-xl border border-border">
                 <div className="border-b border-border bg-card-hover px-4 py-3 text-sm font-medium text-text-primary">
                   Payment Details
                 </div>
 
-                {buildDetailRows(selectedTx, activeTab).map(([label, value], idx, arr) => (
+                {buildDetailRows(selectedTx, activeTab).map(([label, value], idx, arr) => {
+                  const isAmountField = ['Amount', 'Charge', 'VAT', 'Settlement', 'Opening Balance', 'Closing Balance'].includes(
+                    label
+                  )
+                  return (
                   <div
                     key={label}
                     className={cn(
-                      'flex items-center justify-between px-4 py-3',
+                      'flex items-start justify-between gap-3 px-4 py-3',
                       idx < arr.length - 1 && 'border-b border-border/60'
                     )}
                   >
-                    <span className="text-sm text-text-secondary">{label}</span>
-                    <span className="flex items-center gap-2 text-sm text-text-primary">
+                    <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                    <span
+                      className={cn(
+                        'flex min-w-0 items-center justify-end gap-2 text-right text-sm text-text-primary',
+                        isAmountField && 'shrink-0 whitespace-nowrap tabular-nums'
+                      )}
+                    >
                       {String(value || '--')}
                       {label === 'Reference ID' && value && (
                         <button
                           onClick={() => copyText(value)}
-                          className="rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
+                          className="shrink-0 rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
                           title="Copy reference"
                         >
                           <Copy size={14} />
@@ -568,7 +563,8 @@ export default function TransactionsPage() {
                       )}
                     </span>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>

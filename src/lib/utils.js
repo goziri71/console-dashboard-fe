@@ -130,18 +130,19 @@ export function formatBalance(amount, currencyCode) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(num)
-  return `${symbol} ${formatted}`
+  return `${symbol}\u00A0${formatted}`
 }
 
+/** Unified datetime: yyyy-mm-dd hh:mm:ss (24-hour). */
 export function formatDate(dateStr) {
   if (!dateStr) return '--'
   const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return '--'
+  const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
-  const yyyy = d.getFullYear()
   const hh = String(d.getHours()).padStart(2, '0')
   const min = String(d.getMinutes()).padStart(2, '0')
-  const ampm = d.getHours() >= 12 ? 'PM' : 'AM'
-  const h12 = d.getHours() % 12 || 12
-  return `${mm}-${dd}-${yyyy} ${String(h12).padStart(2, '0')}:${min}${ampm}`
+  const sec = String(d.getSeconds()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${sec}`
 }

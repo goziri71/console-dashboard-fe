@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { BookOpen, XCircle, ChevronDown } from 'lucide-react'
 
 const REPORT_TYPES = [
-  { value: 'transaction', label: 'Transaction Report', desc: 'Includes transfers, deposits, withdrawals, exchanges.' },
+  { value: 'transaction', label: 'Transaction Report', desc: 'Includes transfers, deposits, payouts, exchanges.' },
   { value: 'compliance', label: 'Compliance Report', desc: 'Jurisdiction-specific regulatory reports (NG, GH, SA, KE).' },
   { value: 'ledger', label: 'Ledger Report', desc: 'Detailed wallet ledger entries and balances.' },
   { value: 'settlement', label: 'Settlement Report', desc: 'Settlement statement and reconciliation data.' },

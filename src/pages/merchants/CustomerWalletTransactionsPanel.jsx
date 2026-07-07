@@ -14,7 +14,7 @@ const CRYPTO_PAYOUT_CURRENCIES = new Set(['USDT', 'BTC', 'ETH', 'USDC', 'USD'])
 
 const TAB_ITEMS = [
   { key: 'deposits', label: 'Deposits', icon: ArrowDownCircle, fetcher: getNgnDeposits },
-  { key: 'withdrawals', label: 'Withdrawals', icon: ArrowUpCircle, fetcher: getNgnPayouts },
+  { key: 'withdrawals', label: 'Payouts', icon: ArrowUpCircle, fetcher: getNgnPayouts },
   { key: 'swaps', label: 'Swaps', icon: Shuffle, fetcher: getSwapTransactions },
   { key: 'payout', label: 'Payout', icon: Send, fetcher: null },
   { key: 'statement', label: 'Statement', icon: BookOpenText, fetcher: getStatementTransactions },
@@ -191,13 +191,13 @@ function mapTxRow(row, index, page, activeTab) {
     service,
     amount: amountRaw != null && amountRaw !== '' ? formatBalance(amountRaw, currency) : '—',
     balanceDisplay,
-    date: dateRaw ? formatDate(dateRaw).split(' ')[0] : '—',
+    date: dateRaw ? formatDate(dateRaw) : '—',
     statusKind: txStatusKind(statusRaw),
   }
 }
 
 /**
- * Customer-scoped deposits, withdrawals, swaps, payouts, and statement for the selected wallet.
+ * Customer-scoped deposits, payouts, swaps, and statement for the selected wallet.
  */
 export default function CustomerWalletTransactionsPanel({
   customerIdentifier,

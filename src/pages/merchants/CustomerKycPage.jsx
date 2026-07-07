@@ -103,19 +103,9 @@ function maskValue(s) {
   return `*** ****** ${str.slice(-4)}`
 }
 
-/** Submitted line to match design: "12 Mar 2024 . 10:30 AM" */
+/** Submitted timestamp uses unified formatDate (yyyy-mm-dd hh:mm:ss). */
 function formatKycSubmittedAt(dateStr) {
-  if (!dateStr) return '—'
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return '—'
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const day = d.getDate()
-  const mon = months[d.getMonth()]
-  const y = d.getFullYear()
-  const h12 = d.getHours() % 12 || 12
-  const min = String(d.getMinutes()).padStart(2, '0')
-  const ampm = d.getHours() >= 12 ? 'PM' : 'AM'
-  return `${day} ${mon} ${y} . ${h12}:${min} ${ampm}`
+  return formatDate(dateStr) || '—'
 }
 
 function humanizeDocTitle(row) {

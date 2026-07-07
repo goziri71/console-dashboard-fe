@@ -13,7 +13,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
-import { cn, formatBalance } from '../../lib/utils'
+import { cn, formatBalance, formatDate } from '../../lib/utils'
 import { getSettlementBatch, getSettlementBatches, getSettlementSummary } from '../../services/settlements'
 
 const TABLE_LIMIT = 10
@@ -33,13 +33,6 @@ function statusBadge(status) {
 
 function currency(value, currencyCode = 'NGN') {
   return formatBalance(Number(value || 0), currencyCode)
-}
-
-function formatDate(value) {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('en-GB')
 }
 
 function normalizeSummary(payload) {
@@ -71,18 +64,6 @@ function pickFirst(obj, paths, fallback = '--') {
     if (value !== undefined && value !== null && value !== '') return value
   }
   return fallback
-}
-
-function formatDateTime(value) {
-  if (!value) return '--'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return `${date.toLocaleDateString('en-GB')} | ${date.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })}`
 }
 
 function StatCard({ label, value, sub, icon: Icon, iconCls }) {
@@ -650,7 +631,7 @@ export default function SettlementsPage() {
               <div className="mb-4 text-center">
                 <p className="text-xs text-text-muted">Amount</p>
                 <p className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-text-primary">{currency(selectedAmount, selectedCurrency)}</p>
-                <p className="mt-1.5 text-xs text-text-muted">{formatDateTime(selectedCreated)}</p>
+                <p className="mt-1.5 text-xs text-text-muted">{formatDate(selectedCreated)}</p>
               </div>
 
               {detailsLoading ? (
@@ -667,8 +648,8 @@ export default function SettlementsPage() {
                       ['Batch ID', referenceCode, true],
                       ['Settlement Type', pickFirst(selectedNode, ['settlement_type'], '--')],
                       ['Currency', pickFirst(selectedNode, ['currency_name', 'currency', 'currency_code'], selectedCurrency)],
-                      ['Created At', formatDateTime(pickFirst(selectedNode, ['date_created', 'created_at'], ''))],
-                      ['Approved At', formatDateTime(pickFirst(selectedNode, ['date_approved', 'approved_at'], ''))],
+                      ['Created At', formatDate(pickFirst(selectedNode, ['date_created', 'created_at'], ''))],
+                      ['Approved At', formatDate(pickFirst(selectedNode, ['date_approved', 'approved_at'], ''))],
                       ['Charge', currency(pickFirst(selectedNode, ['charges', 'charge', 'fees_deducted'], 0), selectedCurrency)],
                       ['VAT', currency(pickFirst(selectedNode, ['vat', 'tax_amount'], 0), selectedCurrency)],
                     ].map(([label, value, allowCopy], idx) => (
