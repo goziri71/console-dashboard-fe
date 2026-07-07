@@ -12,7 +12,7 @@ const CONSOLE_ROLE_OPTIONS = [
 ]
 
 /**
- * Admin-only console user provisioning (POST /auth/register).
+ * Admin-only console user provisioning.
  */
 export default function AdminCreateUserForm({
   disabled,
@@ -76,7 +76,7 @@ export default function AdminCreateUserForm({
           </div>
           <div>
             <h2 className="text-base font-medium text-text-primary">Create console account</h2>
-            <p className="text-xs text-text-muted">POST /auth/register · rbac.manage required</p>
+            <p className="text-xs text-text-muted">Add a new team member who can sign in from the login page.</p>
           </div>
         </div>
       </div>
