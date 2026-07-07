@@ -6,7 +6,6 @@ import {
   normalizeKycKey,
   normalizeAccountStatusKey,
   tierLabel,
-  merchantCustomerCount,
 } from './merchantUi'
 
 const kycBadge = {
@@ -39,7 +38,6 @@ function Badge({ config, value }) {
 const COLUMNS = [
   { key: 'index', label: '#', width: 'w-[52px]' },
   { key: 'name', label: 'Name', width: 'min-w-[140px] sm:min-w-[200px]' },
-  { key: 'customers', label: 'Customers', width: 'w-[100px]', hide: 'hidden sm:table-cell' },
   { key: 'tier', label: 'Tier Level', width: 'w-[92px]', hide: 'hidden lg:table-cell' },
   { key: 'kyc', label: 'KYC Status', width: 'w-[120px]' },
   { key: 'status', label: 'Account Status', width: 'w-[140px]', hide: 'hidden lg:table-cell' },
@@ -76,7 +74,7 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
   return (
     <div className="p-2 sm:p-4">
       <div className="table-scroll rounded-2xl border border-border/70">
-        <table className="w-full min-w-[640px] text-left text-sm">
+        <table className="w-full min-w-[580px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-card-hover/40">
               {COLUMNS.map((col) => (
@@ -117,9 +115,6 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                     {merchant.trade_name && (
                       <span className="mt-0.5 block text-[11px] text-text-muted">{merchant.trade_name}</span>
                     )}
-                  </td>
-                  <td className="hidden px-2 py-2.5 tabular-nums text-text-secondary sm:table-cell sm:px-4">
-                    {merchantCustomerCount(merchant) ?? '—'}
                   </td>
                   <td className="hidden px-2 py-2.5 text-text-secondary lg:table-cell sm:px-4">{tierLabel(merchant)}</td>
                   <td className="px-2 py-2.5 sm:px-4">

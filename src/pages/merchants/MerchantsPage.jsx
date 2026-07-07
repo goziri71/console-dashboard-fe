@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Building2, Users, Clock, ShieldAlert, Loader2, TrendingUp, X } from 'lucide-react'
+import { Building2, Clock, ShieldAlert, Loader2, TrendingUp, X } from 'lucide-react'
 import { getMerchantStats, getMerchants, patchMerchantTier } from '../../services/merchants'
 import UdaraLinkModal from '../../components/merchants/UdaraLinkModal'
 import { formatNumber, exportToCsv } from '../../lib/utils'
@@ -15,8 +15,8 @@ import {
 const LIMIT = 20
 function StatsSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4">
-      {[...Array(4)].map((_, i) => (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3">
+      {[...Array(3)].map((_, i) => (
         <div key={i} className="h-[140px] skeleton rounded-card" />
       ))}
     </div>
@@ -65,12 +65,10 @@ function trendFrom(field, stats, key) {
 
 function buildStatCards(stats) {
   const tm = stats?.total_merchants
-  const tc = stats?.total_customers
   const kyc = stats?.kyc_pending ?? stats?.kyc_pending_count
   const ra = stats?.restricted_accounts ?? stats?.restricted_accounts_count
 
   const tmPct = trendFrom(tm, stats, 'total_merchants_change_pct')
-  const tcPct = trendFrom(tc, stats, 'total_customers_change_pct')
   const kycPct = trendFrom(kyc, stats, 'kyc_pending_change_pct')
 
   const cmp = (pct, label) =>
@@ -85,13 +83,6 @@ function buildStatCards(stats) {
       icon: Building2,
       iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-accent-bg text-accent',
       comparison: cmp(tmPct, 'Compared to last month'),
-    },
-    {
-      label: 'Total Customers',
-      value: formatNumber(asNumber(tc)),
-      icon: Users,
-      iconWrapCls: 'flex h-6 w-6 items-center justify-center rounded-full bg-success-bg text-success',
-      comparison: cmp(tcPct, 'Compared to last month'),
     },
     {
       label: 'KYC Pending',
@@ -183,7 +174,6 @@ export default function MerchantsPage() {
       Tier: tierLabel(merchant),
       KYC_Status: normalizeKycKey(merchant),
       Account_Status: normalizeAccountStatusKey(merchant),
-      Customers: merchant.customer_count ?? 0,
       Last_Activity: merchant.date_modified || merchant.date_created || '',
     }))
     exportToCsv(rows, `merchants-page-${page}.csv`)
@@ -252,15 +242,15 @@ export default function MerchantsPage() {
       <div className="animate-fade-in-up mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Merchants</h1>
         <p className="mt-1 max-w-3xl text-sm text-text-secondary">
-          View, monitor, and manage all individual and business customers across the Sterllo platform, including
-          compliance status, wallet activity, and account health.
+          View, monitor, and manage all merchants on the Sterllo platform, including compliance status,
+          wallet activity, and account health.
         </p>
       </div>
 
       {statsLoading ? (
         <StatsSkeleton />
       ) : stats ? (
-        <div className="animate-fade-in-up grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-4" style={{ animationDelay: '60ms' }}>
+        <div className="animate-fade-in-up stat-grid xl:grid-cols-3" style={{ animationDelay: '60ms' }}>
           {statCards.map((card) => (
             <SummaryCard
               key={card.label}
