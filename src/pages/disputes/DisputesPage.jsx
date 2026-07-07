@@ -97,12 +97,12 @@ function DetailDrawer({ row, canAct, acting, onClose, onApprove, onCancel }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+      className="drawer-overlay"
       onClick={onClose}
       role="presentation"
     >
       <aside
-        className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-[532px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100vh-48px)]"
+        className="drawer-panel"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative shrink-0 border-b border-border px-5 py-4">
@@ -389,7 +389,7 @@ export default function DisputesPage() {
         </div>
       ) : null}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 stat-grid">
         <SummaryCard
           label="Total pending"
           value={summaryLoading ? '…' : formatNumber(summary.total_pending)}
@@ -407,7 +407,7 @@ export default function DisputesPage() {
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-card border border-border bg-card">
+      <div className="card-shell">
         <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative min-w-0 flex-1 max-w-xl">
             <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -437,7 +437,7 @@ export default function DisputesPage() {
           </div>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2">
+        <div className="tab-scroll">
           {REVIEW_TYPE_TABS.map((tab) => (
             <button
               key={tab.value || 'all'}
@@ -464,7 +464,7 @@ export default function DisputesPage() {
         ) : error ? (
           <div className="py-16 text-center text-sm text-error">{error}</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-scroll">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-card-hover/50 text-xs text-text-muted">
@@ -498,7 +498,7 @@ export default function DisputesPage() {
                         <td className="max-w-[200px] truncate px-4 py-3 font-mono text-xs text-text-primary" title={ref}>
                           {ref || '—'}
                         </td>
-                        <td className="px-4 py-3 tabular-nums text-text-primary">{formatAmount(row)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums text-text-primary">{formatAmount(row)}</td>
                         <td className="max-w-[140px] truncate px-4 py-3 font-mono text-xs text-text-muted" title={row.wallet_key}>
                           {row.wallet_key || '—'}
                         </td>
@@ -507,13 +507,13 @@ export default function DisputesPage() {
                             {badge.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-text-secondary">
+                        <td className="whitespace-nowrap px-4 py-3 text-xs text-text-secondary">
                           {row.date_created ? formatDate(row.date_created) : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1.5">
                             {showActions ? (
-                              <>
+                              <div className="hidden items-center gap-1.5 sm:flex">
                                 <button
                                   type="button"
                                   disabled={busy}
@@ -530,7 +530,7 @@ export default function DisputesPage() {
                                 >
                                   Cancel
                                 </button>
-                              </>
+                              </div>
                             ) : null}
                             <button
                               type="button"
@@ -551,12 +551,10 @@ export default function DisputesPage() {
           </div>
         )}
 
-        <div className="border-t border-border px-4 py-3">
-          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} label="pending transactions" />
-          {!loading && total > 0 ? (
-            <p className="mt-2 text-center text-xs text-text-muted">{formatNumber(total)} pending total</p>
-          ) : null}
-        </div>
+        <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} label="pending transactions" limit={LIMIT} />
+        {!loading && total > 0 ? (
+          <p className="border-t border-border px-4 py-2 text-center text-xs text-text-muted">{formatNumber(total)} pending total</p>
+        ) : null}
       </div>
 
       <DetailDrawer

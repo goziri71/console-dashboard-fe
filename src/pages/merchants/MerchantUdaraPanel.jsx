@@ -97,15 +97,15 @@ export default function MerchantUdaraPanel({
         ) : null}
 
         <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border border-border/60 bg-[#0b0d12] px-4 py-3">
+          <div className="rounded-xl border border-border/60 bg-page px-4 py-3">
             <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Account number</p>
             <p className="mt-1 font-mono text-sm text-text-primary">{udara?.account_number || '—'}</p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-[#0b0d12] px-4 py-3">
+          <div className="rounded-xl border border-border/60 bg-page px-4 py-3">
             <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Client ID</p>
             <p className="mt-1 font-mono text-sm text-text-primary break-all">{udara?.client_id || '—'}</p>
           </div>
-          <div className="rounded-xl border border-border/60 bg-[#0b0d12] px-4 py-3 sm:col-span-2 lg:col-span-1">
+          <div className="rounded-xl border border-border/60 bg-page px-4 py-3 sm:col-span-2 lg:col-span-1">
             <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Expiry date</p>
             <p className="mt-1 text-sm text-text-primary">
               {udara?.expiry_date ? formatDate(udara.expiry_date) : '—'}

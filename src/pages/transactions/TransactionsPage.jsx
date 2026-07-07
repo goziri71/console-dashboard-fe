@@ -77,14 +77,14 @@ function statusBadgeCls(status) {
 
 function FilterPill({ icon: Icon, label, value, options, onChange }) {
   return (
-    <div className="relative">
-      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#979797]">
+    <div className="relative min-w-0">
+      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
         <Icon size={14} />
       </div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 appearance-none rounded-full bg-[#494949] pl-8 pr-8 text-xs font-medium text-[#979797] outline-none"
+        className="filter-select w-full min-w-[120px] sm:w-auto"
       >
         {options.map((option) => (
           <option key={option || 'all'} value={option}>
@@ -92,7 +92,7 @@ function FilterPill({ icon: Icon, label, value, options, onChange }) {
           </option>
         ))}
       </select>
-      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-page">
+      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-text-muted">
         <ChevronDown size={14} />
       </div>
     </div>
@@ -356,8 +356,8 @@ export default function TransactionsPage() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-card border border-border bg-card">
-        <div className="flex overflow-x-auto border-b border-border bg-page [-ms-overflow-style:none] [scrollbar-width:none] lg:grid lg:grid-cols-5 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
+      <div className="card-shell">
+        <div className="tab-scroll bg-page lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0">
           {TAB_ITEMS.map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.key
@@ -366,9 +366,10 @@ export default function TransactionsPage() {
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  'flex h-[62px] min-w-[42%] shrink-0 items-center justify-center gap-2 border-r border-border px-4 text-sm transition-colors last:border-r-0 sm:min-w-[33%] md:min-w-[28%]',
-                  'lg:min-w-0',
-                  active ? 'bg-card-hover text-text-primary' : 'text-text-secondary hover:bg-card-hover/60 hover:text-text-primary'
+                  'flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-sm transition-colors lg:h-[62px] lg:min-w-0 lg:rounded-none lg:border-r lg:border-border lg:px-4 lg:last:border-r-0',
+                  active
+                    ? 'bg-accent text-page lg:bg-card-hover lg:text-text-primary'
+                    : 'bg-card-hover text-text-secondary hover:text-text-primary lg:bg-transparent lg:hover:bg-card-hover/60'
                 )}
               >
                 <span>{tab.label}</span>
@@ -409,7 +410,7 @@ export default function TransactionsPage() {
 
           <button
             onClick={handleExport}
-            className="flex h-10 items-center gap-1.5 rounded-full bg-[#F8FAEA] px-4 text-xs font-semi text-page transition-colors hover:brightness-95"
+            className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-accent px-4 text-xs font-semi text-page transition-colors hover:brightness-95"
           >
             <Download size={14} />
             Export
@@ -427,8 +428,8 @@ export default function TransactionsPage() {
         ) : error ? (
           <div className="flex items-center justify-center py-16 text-sm text-error">{error}</div>
         ) : (
-          <div className="overflow-x-auto p-2">
-            <table className="w-full text-left text-sm">
+          <div className="table-scroll p-2">
+            <table className="w-full min-w-[800px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-card-hover">
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">S/N</th>
@@ -492,8 +493,8 @@ export default function TransactionsPage() {
       </div>
 
       {selectedTx && (
-        <div className="fixed inset-0 z-40 flex items-stretch justify-end bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6">
-          <div className="flex max-h-[calc(100dvh-24px)] w-full max-w-[532px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="drawer-overlay" onClick={() => setSelectedTx(null)} role="presentation">
+          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
             <div className="relative shrink-0 border-b border-border px-5 py-4">
               <button
                 onClick={() => setSelectedTx(null)}

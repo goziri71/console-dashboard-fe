@@ -636,7 +636,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          <div className="overflow-x-auto">
+          <div className="table-scroll">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs text-text-muted">

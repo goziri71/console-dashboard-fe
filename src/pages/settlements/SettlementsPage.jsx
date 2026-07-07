@@ -75,7 +75,7 @@ function StatCard({ label, value, sub, icon: Icon, iconCls }) {
         </div>
         <span>{label}</span>
       </div>
-      <p className="text-[38px] font-semibold leading-[1.1] tracking-[0.32px] text-text-primary">{value}</p>
+      <p className="text-2xl font-semibold leading-tight tracking-tight text-text-primary sm:text-3xl">{value}</p>
       <p className="mt-1 text-xs text-text-muted">{sub}</p>
     </div>
   )
@@ -258,7 +258,7 @@ export default function SettlementsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
+      <div className="stat-grid">
         <StatCard
           label="Pending Settlements"
           value={currency(summary.pending_total)}
@@ -302,14 +302,15 @@ export default function SettlementsPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <button className="inline-flex h-10 items-center gap-2 rounded-full bg-[#494949] px-4 text-xs text-text-secondary">
+          <button type="button" className="filter-pill">
             <ArrowUpDown size={14} />
             Sort By: Newest
             <ChevronDown size={14} />
           </button>
           <button
+            type="button"
             onClick={() => setShowFilter(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-[#494949] px-4 text-xs text-text-secondary"
+            className="filter-pill"
           >
             <SlidersHorizontal size={14} />
             Filter
@@ -317,8 +318,8 @@ export default function SettlementsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto p-2">
-          <table className="w-full text-left text-sm">
+        <div className="table-scroll p-2">
+          <table className="w-full min-w-[960px] text-left text-sm">
             <thead>
               <tr className="bg-card-hover text-text-muted">
                 <th className="px-3 py-3 font-normal"> </th>
@@ -355,15 +356,15 @@ export default function SettlementsPage() {
                     </td>
                     <td className="px-3 py-2.5 text-text-secondary">{row.batch_id || '--'}</td>
                     <td className="px-3 py-2.5 text-text-secondary">{row.settlement_type || '--'}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.gross_amount, row.currency_code)}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.fees_deducted, row.currency_code)}</td>
-                    <td className="px-3 py-2.5 text-text-secondary">{currency(row.net_payable, row.currency_code)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-text-secondary">{currency(row.gross_amount, row.currency_code)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-text-secondary">{currency(row.fees_deducted, row.currency_code)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-text-secondary">{currency(row.net_payable, row.currency_code)}</td>
                     <td className="px-3 py-2.5">
                       <span className={cn('inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium', statusBadge(row.status || 'pending'))}>
                         {(row.status || 'pending').replace(/^./, (ch) => ch.toUpperCase())}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-text-secondary">{formatDate(row.date_created)}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-text-secondary">{formatDate(row.date_created)}</td>
                     <td className="px-3 py-2.5 text-right">
                       <button
                         onClick={() => openBatchDetails(row)}
@@ -395,8 +396,11 @@ export default function SettlementsPage() {
       </div>
 
       {showFilter && (
-        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm">
-          <div className="absolute left-1/2 top-1/2 flex max-h-[calc(100vh-24px)] w-[384px] max-w-[calc(100%-24px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl">
+        <div className="modal-overlay" onClick={() => setShowFilter(false)} role="presentation">
+          <div
+            className="modal-panel sm:max-w-[384px]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-border/50 px-4 py-3.5">
               <h3 className="text-sm font-medium text-text-secondary">Filters</h3>
               <button
@@ -599,51 +603,68 @@ export default function SettlementsPage() {
       )}
 
       {selectedBatch && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-          <aside className="absolute left-2 right-2 top-2 h-[calc(100%-16px)] w-auto max-w-none overflow-hidden rounded-2xl border border-border/70 bg-card shadow-xl sm:left-auto sm:right-4 sm:top-4 sm:h-[calc(100%-32px)] sm:w-full sm:max-w-[420px]">
-            <div className="border-b border-border/60 px-4 py-3">
-              <div className="flex items-start gap-2.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-[#0a0a0a]">
+        <div
+          className="drawer-overlay"
+          onClick={() => {
+            setSelectedBatch(null)
+            setSelectedBatchDetails(null)
+          }}
+          role="presentation"
+        >
+          <aside className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="relative shrink-0 border-b border-border px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBatch(null)
+                  setSelectedBatchDetails(null)
+                }}
+                className="absolute right-4 top-4 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex items-center gap-4 pr-8">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-page">
                   <span className="text-base leading-none">🧾</span>
                 </div>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="truncate text-sm font-semibold text-text-primary">{pickFirst(selectedNode, ['batch_id'], '--')}</p>
-                  <p className={cn(
-                    'mt-0.5 text-[11px] font-medium uppercase tracking-wide',
-                    selectedStatus.includes('completed') ? 'text-success' : selectedStatus.includes('failed') ? 'text-error' : 'text-warning'
-                  )}>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-text-primary">
+                    {pickFirst(selectedNode, ['batch_id'], '--')}
+                  </p>
+                  <p
+                    className={cn(
+                      'text-[11px] font-medium uppercase tracking-wide',
+                      selectedStatus.includes('completed')
+                        ? 'text-success'
+                        : selectedStatus.includes('failed')
+                          ? 'text-error'
+                          : 'text-warning'
+                    )}
+                  >
                     {selectedStatus}
                   </p>
+                  <p className="truncate text-xl font-semibold tabular-nums text-text-primary">
+                    {currency(selectedAmount, selectedCurrency)}
+                  </p>
+                  <p className="text-xs text-text-secondary">{formatDate(selectedCreated)}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedBatch(null)
-                    setSelectedBatchDetails(null)
-                  }}
-                  className="shrink-0 rounded-full p-1 text-text-muted hover:bg-card-hover"
-                >
-                  <X size={16} />
-                </button>
               </div>
             </div>
 
-            <div className="h-[calc(100%-72px)] overflow-y-auto p-4">
-              <div className="mb-4 text-center">
-                <p className="text-xs text-text-muted">Amount</p>
-                <p className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-text-primary">{currency(selectedAmount, selectedCurrency)}</p>
-                <p className="mt-1.5 text-xs text-text-muted">{formatDate(selectedCreated)}</p>
-              </div>
-
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               {detailsLoading ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, idx) => (
-                    <div key={idx} className="h-28 animate-pulse rounded-xl border border-border/60 bg-card-hover/40" />
+                    <div key={idx} className="h-20 animate-pulse rounded-xl border border-border bg-card-hover/40" />
                   ))}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
-                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">Batch Summary</div>
+                  <div className="overflow-hidden rounded-xl border border-border">
+                    <div className="border-b border-border bg-card-hover px-4 py-2.5 text-sm font-medium text-text-primary">
+                      Batch Summary
+                    </div>
                     {[
                       ['Batch ID', referenceCode, true],
                       ['Settlement Type', pickFirst(selectedNode, ['settlement_type'], '--')],
@@ -652,47 +673,83 @@ export default function SettlementsPage() {
                       ['Approved At', formatDate(pickFirst(selectedNode, ['date_approved', 'approved_at'], ''))],
                       ['Charge', currency(pickFirst(selectedNode, ['charges', 'charge', 'fees_deducted'], 0), selectedCurrency)],
                       ['VAT', currency(pickFirst(selectedNode, ['vat', 'tax_amount'], 0), selectedCurrency)],
-                    ].map(([label, value, allowCopy], idx) => (
-                      <div key={label} className={cn('flex items-center gap-2 px-4 py-2', idx < 6 && 'border-b border-border/60')}>
-                        <span className="min-w-0 flex-1 text-xs text-text-muted">{label}</span>
-                        <span className="flex max-w-[55%] items-center justify-end gap-1.5 text-right text-xs text-text-primary">
-                          <span className="truncate">{value}</span>
-                          {allowCopy && (
-                            <button type="button" onClick={() => copyToClipboard(value)} className="shrink-0 rounded-full border border-border/70 bg-[#313131] p-1">
-                              <Copy size={12} className="text-accent" />
-                            </button>
+                    ].map(([label, value, allowCopy], idx, arr) => {
+                      const isAmount = ['Charge', 'VAT'].includes(label)
+                      return (
+                        <div
+                          key={label}
+                          className={cn(
+                            'flex items-start justify-between gap-3 px-4 py-2.5',
+                            idx < arr.length - 1 && 'border-b border-border/60'
                           )}
-                        </span>
-                      </div>
-                    ))}
+                        >
+                          <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                          <span
+                            className={cn(
+                              'flex min-w-0 items-center justify-end gap-1.5 text-right text-sm text-text-primary',
+                              isAmount ? 'shrink-0 whitespace-nowrap tabular-nums' : 'break-all'
+                            )}
+                          >
+                            {value}
+                            {allowCopy ? (
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(value)}
+                                className="shrink-0 rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
+                              >
+                                <Copy size={12} />
+                              </button>
+                            ) : null}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
 
-                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
-                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">Financial Breakdown</div>
+                  <div className="overflow-hidden rounded-xl border border-border">
+                    <div className="border-b border-border bg-card-hover px-4 py-2.5 text-sm font-medium text-text-primary">
+                      Financial Breakdown
+                    </div>
                     {[
                       ['Total Gross Amount', currency(pickFirst(selectedNode, ['gross_amount', 'total_gross_amount'], 0), selectedCurrency)],
                       ['Total Fees', currency(pickFirst(selectedNode, ['fees_deducted', 'total_fees'], 0), selectedCurrency)],
                       ['Tax', currency(pickFirst(selectedNode, ['tax', 'tax_amount', 'vat'], 0), selectedCurrency)],
                       ['Net Payable', currency(pickFirst(selectedNode, ['net_payable'], 0), selectedCurrency)],
-                    ].map(([label, value], idx) => (
-                      <div key={label} className={cn('flex items-center gap-2 px-4 py-2', idx < 3 && 'border-b border-border/60')}>
-                        <span className="min-w-0 flex-1 text-xs text-text-muted">{label}</span>
-                        <span className="max-w-[55%] truncate text-right text-xs text-text-primary">{value}</span>
+                    ].map(([label, value], idx, arr) => (
+                      <div
+                        key={label}
+                        className={cn(
+                          'flex items-start justify-between gap-3 px-4 py-2.5',
+                          idx < arr.length - 1 && 'border-b border-border/60'
+                        )}
+                      >
+                        <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                        <span className="shrink-0 whitespace-nowrap text-right text-sm tabular-nums text-text-primary">
+                          {value}
+                        </span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="overflow-hidden rounded-xl border border-border/70 bg-card/80">
-                    <div className="border-b border-border/70 px-4 py-2.5 text-sm font-semibold text-text-secondary">Destination Details</div>
+                  <div className="overflow-hidden rounded-xl border border-border">
+                    <div className="border-b border-border bg-card-hover px-4 py-2.5 text-sm font-medium text-text-primary">
+                      Destination Details
+                    </div>
                     {[
                       ['Partner / Merchant Name', pickFirst(selectedNode, ['partner_name', 'merchant_name', 'destination.partner_name'], '--')],
                       ['Bank Name', pickFirst(selectedNode, ['bank_name', 'destination.bank_name'], '--')],
                       ['Settlement Channel', pickFirst(selectedNode, ['settlement_channel', 'channel'], '--')],
                       ['External Reference Code', pickFirst(selectedNode, ['external_reference_code', 'reference'], '--')],
-                    ].map(([label, value], idx) => (
-                      <div key={label} className={cn('flex items-center gap-2 px-4 py-2', idx < 3 && 'border-b border-border/60')}>
-                        <span className="min-w-0 flex-1 text-xs text-text-muted">{label}</span>
-                        <span className="max-w-[55%] truncate text-right text-xs text-text-primary">{value}</span>
+                    ].map(([label, value], idx, arr) => (
+                      <div
+                        key={label}
+                        className={cn(
+                          'flex items-start justify-between gap-3 px-4 py-2.5',
+                          idx < arr.length - 1 && 'border-b border-border/60'
+                        )}
+                      >
+                        <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                        <span className="min-w-0 break-all text-right text-sm text-text-primary">{value}</span>
                       </div>
                     ))}
                   </div>

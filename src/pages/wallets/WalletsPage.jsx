@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Activity, Search, Wallet, WalletCards } from 'lucide-react'
 import MetricCard from '../../components/ui/MetricCard'
 import Pagination from '../../components/ui/Pagination'
-import { cn, formatCurrency, formatNumber } from '../../lib/utils'
+import { cn, formatCurrency, formatDate, formatNumber } from '../../lib/utils'
 import {
   parseWalletsPageResponse,
   resolveWalletRowNavigation,
@@ -174,7 +174,7 @@ export default function WalletsPage() {
         />
       </div>
 
-      <div className="mt-6 rounded-card border border-border bg-card">
+      <div className="mt-6 card-shell">
         {navError ? (
             <div className="border-b border-error/30 bg-error-bg px-4 py-3 text-sm text-error">{navError}</div>
         ) : null}
@@ -218,8 +218,8 @@ export default function WalletsPage() {
         ) : error ? (
           <div className="flex items-center justify-center py-16 text-sm text-error">{error}</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="table-scroll">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border bg-card-hover/30">
                   <th className="px-4 py-3 text-xs font-medium text-text-muted">Owner</th>
@@ -268,7 +268,7 @@ export default function WalletsPage() {
                         <td className="px-4 py-2.5 font-mono text-xs text-text-secondary">
                           {row.wallet_key || row.wallet_id || '--'}
                         </td>
-                        <td className="px-4 py-2.5 text-text-secondary">
+                        <td className="whitespace-nowrap px-4 py-2.5 tabular-nums text-text-secondary">
                           {row.current_balance != null
                             ? formatNumber(Number(row.current_balance))
                             : '--'}
@@ -286,8 +286,8 @@ export default function WalletsPage() {
                             {row.status || '--'}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-text-secondary">
-                          {row.date_created ? row.date_created.slice(0, 10) : '--'}
+                        <td className="whitespace-nowrap px-4 py-2.5 text-text-secondary">
+                          {row.date_created ? formatDate(row.date_created) : '--'}
                         </td>
                         <td className="px-4 py-2.5 text-text-secondary">{row.environment || '--'}</td>
                       </tr>

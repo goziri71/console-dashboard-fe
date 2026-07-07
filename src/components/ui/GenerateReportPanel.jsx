@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { BookOpen, XCircle, ChevronDown } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
 const REPORT_TYPES = [
   { value: 'transaction', label: 'Transaction Report', desc: 'Includes transfers, deposits, payouts, exchanges.' },
@@ -134,52 +135,47 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-stretch justify-end transition-all duration-300 ${
-        isOpen
-          ? 'visible bg-black/50 backdrop-blur-[7px]'
-          : 'invisible bg-black/0 backdrop-blur-0'
-      }`}
+      className={cn(
+        'drawer-overlay transition-all duration-300',
+        isOpen ? 'visible opacity-100' : 'invisible opacity-0 pointer-events-none'
+      )}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
       <div
         ref={panelRef}
-        className={`flex h-full w-full max-w-full flex-col overflow-hidden rounded-t-[28px] bg-card transition-transform duration-300 ease-out sm:max-w-[532px] sm:rounded-none sm:rounded-l-[40px] ${
+        className={cn(
+          'drawer-panel transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        )}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="relative border-b border-border px-6 pb-6 pt-6">
-          <div className="relative mb-4 inline-flex h-[72px] w-[72px] items-center justify-center rounded-full border border-border bg-page">
-            <BookOpen size={20} className="text-info" />
-            <div className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-info">
-              <span className="text-[10px] font-bold text-white">+</span>
+        <div className="relative shrink-0 border-b border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+            aria-label="Close"
+          >
+            <XCircle size={20} />
+          </button>
+          <div className="flex items-center gap-4 pr-8">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-page">
+              <BookOpen size={20} className="text-info" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-text-primary">Generate Report</h2>
+              <p className="text-xs text-text-muted">
+                Analyse platform activity, compliance, or financial operations.
+              </p>
             </div>
           </div>
-
-          <button
-            onClick={onClose}
-            className="absolute right-6 top-6 text-text-muted transition-colors hover:text-text-secondary"
-          >
-            <XCircle size={28} />
-          </button>
-
-          <h2 className="text-lg font-semibold text-text-primary">
-            Generate Report
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-text-muted">
-            Select the type of report you want to create to analyse platform
-            activity, compliance data, or financial operations.
-          </p>
         </div>
 
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-1 flex-col justify-between overflow-y-auto px-6 pt-6"
-        >
-          <div className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="px-1 text-sm text-text-secondary">
                 Report Name <span className="text-accent">*</span>
@@ -217,32 +213,26 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
               value={outputFormat}
               onChange={setOutputFormat}
             />
+            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-4 pb-6 pt-8">
+          <div className="flex shrink-0 gap-3 border-t border-border px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 rounded-full border border-accent py-3.5 text-sm font-medium text-accent transition-all hover:bg-accent/10 active:scale-[0.97]"
+              className="flex-1 rounded-full border border-accent py-2.5 text-sm font-medium text-accent transition-all hover:bg-accent/10 active:scale-[0.97]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!isValid || submitting}
-              className="flex-1 rounded-full bg-accent py-3.5 text-sm font-medium text-page transition-all hover:opacity-90 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none"
+              className="flex-1 rounded-full bg-accent py-2.5 text-sm font-medium text-page transition-all hover:opacity-90 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40"
             >
               {submitting ? 'Generating...' : 'Generate Report'}
             </button>
           </div>
         </form>
-
-        {/* Footer */}
-        <div className="border-t border-border px-6 py-5 text-center text-sm">
-          <span className="text-accent underline">Need Help?</span>{' '}
-          <span className="text-text-muted">Contact Support</span>
-        </div>
       </div>
     </div>
   )

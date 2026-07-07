@@ -76,13 +76,13 @@ export default function MerchantCustomersTable({
   }
 
   return (
-    <div className="p-4">
-      <div className="overflow-x-auto rounded-2xl border border-border/70">
-        <table className="w-full text-left text-sm">
+    <div className="p-2 sm:p-4">
+      <div className="table-scroll rounded-2xl border border-border/70">
+        <table className="w-full min-w-[680px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-card-hover/40">
               {COLUMNS.map((col) => (
-                <th key={col.key} className={cn('px-4 py-3 text-xs font-medium text-text-muted', col.width)}>
+                <th key={col.key} className={cn('whitespace-nowrap px-2 py-3 text-xs font-medium text-text-muted sm:px-4', col.width)}>
                   {col.label}
                 </th>
               ))}

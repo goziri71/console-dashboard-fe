@@ -813,7 +813,7 @@ export default function CustomerDetailsPage() {
           </div>
         ) : kycRows.length ? (
           <>
-            <div className="overflow-x-auto px-2 pb-2">
+            <div className="table-scroll px-2 pb-2">
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border/60 text-xs text-text-muted">

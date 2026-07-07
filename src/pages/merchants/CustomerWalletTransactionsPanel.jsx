@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDownCircle, ArrowUpCircle, BookOpenText, Filter, Send, Shuffle } from 'lucide-react'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
+import Pagination from '../../components/ui/Pagination'
 import {
   getCryptoPayouts,
   getNgnDeposits,
@@ -211,6 +212,7 @@ export default function CustomerWalletTransactionsPanel({
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [currencyFilter, setCurrencyFilter] = useState('')
@@ -240,6 +242,7 @@ export default function CustomerWalletTransactionsPanel({
     if (!financial || !customerIdentifier || !walletKey) {
       setRows([])
       setTotalPages(1)
+      setTotal(0)
       setLoading(false)
       setError(null)
       return
@@ -267,13 +270,16 @@ export default function CustomerWalletTransactionsPanel({
           ? await fetchCustomerPayouts(params, controller.signal)
           : await selectedTab.fetcher(params, controller.signal)
       const records = pickRecords(res)
+      const pag = pickPagination(res)
       setRows(records)
       setTotalPages(inferTotalPages(res, TX_PAGE_SIZE, page))
+      setTotal(Number(pag.total) || records.length)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       setError(err.response?.data?.message || 'Failed to load transactions.')
       setRows([])
       setTotalPages(1)
+      setTotal(0)
     } finally {
       setLoading(false)
     }
@@ -308,7 +314,7 @@ export default function CustomerWalletTransactionsPanel({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex min-w-0 overflow-x-auto border-b border-border/60 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="tab-scroll border-border/60 px-3">
         {TAB_ITEMS.map((tab) => {
           const Icon = tab.icon
           const active = activeTab === tab.key
@@ -318,14 +324,14 @@ export default function CustomerWalletTransactionsPanel({
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                'flex h-12 min-w-[28%] shrink-0 items-center justify-center gap-2 border-r border-border/60 px-3 text-sm transition-colors last:border-r-0 sm:min-w-[22%] lg:min-w-0 lg:flex-1',
+                'flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-4 text-sm transition-colors',
                 active
-                  ? 'border-b-2 border-b-accent bg-[#0b0d12] text-text-primary'
-                  : 'text-text-secondary hover:bg-[#0b0d12]/60 hover:text-text-primary'
+                  ? 'bg-accent text-page'
+                  : 'bg-card-hover text-text-secondary hover:text-text-primary'
               )}
             >
               <span>{tab.label}</span>
-              <Icon size={16} className={active ? 'text-accent' : undefined} />
+              <Icon size={16} className={active ? 'text-page' : undefined} />
             </button>
           )
         })}
@@ -335,7 +341,7 @@ export default function CustomerWalletTransactionsPanel({
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs text-text-secondary hover:bg-card-hover hover:text-text-primary"
+          className="filter-pill"
         >
           <Filter size={14} />
           Filter
@@ -373,10 +379,10 @@ export default function CustomerWalletTransactionsPanel({
         <p className="py-12 text-center text-sm text-error">{error}</p>
       ) : (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-3 pt-2">
-          <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain rounded-xl border border-border/60 bg-[#0b0d12] [-webkit-overflow-scrolling:touch]">
-            <table className="w-full min-w-[min(100%,520px)] text-left text-sm sm:min-w-[600px]">
-              <thead className="sticky top-0 z-10 bg-linear-to-b from-[#3a3d44] to-[#2d3037] shadow-sm">
-                <tr className="text-xs font-medium text-[#c6cad1]">
+          <div className="table-scroll min-h-0 flex-1 overflow-y-auto overscroll-x-contain rounded-xl border border-border bg-page">
+            <table className="w-full min-w-[520px] text-left text-sm sm:min-w-[600px]">
+              <thead className="sticky top-0 z-10 bg-card-hover">
+                <tr className="text-xs font-medium text-text-muted">
                   <th className="whitespace-nowrap px-2 py-3 sm:px-3">S/N</th>
                   <th className="min-w-[140px] px-2 py-3 sm:min-w-[180px] sm:px-3">Service</th>
                   <th className="whitespace-nowrap px-2 py-3 sm:px-3">Amount</th>
@@ -388,23 +394,23 @@ export default function CustomerWalletTransactionsPanel({
               <tbody>
                 {displayRows.length ? (
                   displayRows.map((row) => (
-                    <tr key={`${row.sn}-${row.service}`} className="border-t border-[#171b24] hover:bg-[#10141b]">
-                      <td className="px-2 py-2.5 tabular-nums text-[#8c939f] sm:px-3">{row.sn}</td>
-                      <td className="max-w-[min(220px,45vw)] px-2 py-2.5 text-[#c8e64a] sm:max-w-[260px] sm:px-3 xl:max-w-[320px]">
+                    <tr key={`${row.sn}-${row.service}`} className="border-t border-border/60 hover:bg-card-hover/30">
+                      <td className="px-2 py-2.5 tabular-nums text-text-muted sm:px-3">{row.sn}</td>
+                      <td className="max-w-[min(220px,45vw)] px-2 py-2.5 text-accent sm:max-w-[260px] sm:px-3 xl:max-w-[320px]">
                         <span className="line-clamp-3 wrap-break-word text-[11px] font-medium uppercase leading-snug sm:line-clamp-2 sm:text-[12px] sm:leading-4">
                           {row.service}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-[#8e95a1] sm:px-3">
+                      <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-text-secondary sm:px-3">
                         {row.amount}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-[#17b26a] sm:px-3">
+                      <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-success sm:px-3">
                         {row.balanceDisplay}
                       </td>
                       <td className="px-2 py-2.5 sm:px-3">
                         {txStatusPill(row.statusKind.kind, row.statusKind.label)}
                       </td>
-                      <td className="whitespace-nowrap px-2 py-2.5 text-xs text-[#8e95a1] sm:px-3">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-xs text-text-secondary sm:px-3">
                         {row.date}
                       </td>
                     </tr>
@@ -420,29 +426,14 @@ export default function CustomerWalletTransactionsPanel({
             </table>
           </div>
 
-          <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 bg-[#0b0d12] px-3 py-2 text-[10px] text-[#8e95a1]">
-            <span className="min-w-0">
-              Page {page} of {totalPages}
-            </span>
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage((p) => p + 1)}
-                className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={TX_PAGE_SIZE}
+            label="transactions"
+            onPageChange={setPage}
+          />
         </div>
       )}
     </div>

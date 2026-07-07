@@ -256,7 +256,7 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
           ))}
         </div>
       ) : records.length ? (
-        <div className="overflow-x-auto p-2">
+        <div className="table-scroll p-2">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-border/60 text-xs text-text-muted">
