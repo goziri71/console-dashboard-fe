@@ -55,6 +55,136 @@ function pickFirstPath(obj, paths) {
   return ''
 }
 
+/** Deposits credit the merchant wallet; API often maps merchant under sender_* and external payer under recipient_*. */
+function extractDepositParties(tx) {
+  const merchantName = pickFirstPath(tx, [
+    'sender_account_name',
+    'sender_name',
+    'account_name',
+    'target_account_name',
+    'recipient_account_name',
+    'recipient_name',
+    'wallet.name',
+    'target.name',
+  ]) || '--'
+
+  const merchantMeta = pickFirstPath(tx, [
+    'sender_account_number',
+    'target_account_number',
+    'recipient_account_number',
+    'target_account_key',
+    'account_key',
+  ]) || '--'
+
+  const externalSenderName = pickFirstPath(tx, [
+    'recipient_account_name',
+    'recipient_name',
+    'beneficiary_name',
+    'debit_party_name',
+    'origin.name',
+  ]) || '--'
+
+  const externalSenderMeta = pickFirstPath(tx, [
+    'recipient_account_number',
+    'sender_account_number',
+    'source_account_number',
+    'source_reference',
+  ]) || '--'
+
+  return {
+    primaryName: merchantName,
+    primaryMeta: merchantMeta,
+    secondaryName: externalSenderName,
+    secondaryMeta: externalSenderMeta,
+  }
+}
+
+function extractDefaultParties(tx) {
+  const recipientName = pickFirstPath(tx, [
+    'recipient_account_name',
+    'recipient_name',
+    'beneficiary_name',
+    'target_name',
+    'target_account_name',
+    'to_name',
+    'recipient.name',
+    'beneficiary.name',
+    'target.name',
+    'to.name',
+    'destination.name',
+    'credit_party_name',
+    'wallet.name',
+    'account_name',
+    'target_account_key',
+    'recipient_account_key',
+    'to_account',
+  ]) || '--'
+
+  const recipientMeta = pickFirstPath(tx, [
+    'recipient_account_number',
+    'target_account_key',
+    'recipient_account_key',
+    'to_account',
+    'recipient.account_key',
+    'target.account_key',
+    'destination.account_key',
+    'account_key',
+    'target_reference',
+  ]) || '--'
+
+  const senderName = pickFirstPath(tx, [
+    'sender_account_name',
+    'sender_name',
+    'source_name',
+    'initiator_name',
+    'source_account_name',
+    'from_name',
+    'sender.name',
+    'source.name',
+    'from.name',
+    'origin.name',
+    'debit_party_name',
+    'initiator',
+    'source_account_key',
+    'sender_account_key',
+    'from_account',
+  ]) || '--'
+
+  const senderMeta = pickFirstPath(tx, [
+    'sender_account_number',
+    'source_account_key',
+    'sender_account_key',
+    'from_account',
+    'sender.account_key',
+    'source.account_key',
+    'origin.account_key',
+    'account_key',
+    'source_reference',
+  ]) || '--'
+
+  return {
+    primaryName: recipientName,
+    primaryMeta: recipientMeta,
+    secondaryName: senderName,
+    secondaryMeta: senderMeta,
+  }
+}
+
+function tableColumnsForTab(tab) {
+  if (tab === 'deposits') {
+    return { primary: 'Merchant', secondary: 'Sender' }
+  }
+  if (tab === 'transfers') {
+    return { primary: 'Recipient', secondary: 'Sender' }
+  }
+  return { primary: 'Recipient', secondary: 'Merchant' }
+}
+
+function partiesForTab(tab, tx) {
+  if (tab === 'deposits') return extractDepositParties(tx)
+  return extractDefaultParties(tx)
+}
+
 function statusFromBackend(status) {
   const value = String(status ?? '').trim()
   return value || '--'
@@ -179,67 +309,7 @@ export default function TransactionsPage() {
 
   function mapRow(tx, index) {
     const sn = (page - 1) * TABLE_LIMIT + index + 1
-    const recipientName = pickFirstPath(tx, [
-      'recipient_account_name',
-      'recipient_name',
-      'beneficiary_name',
-      'target_name',
-      'target_account_name',
-      'to_name',
-      'recipient.name',
-      'beneficiary.name',
-      'target.name',
-      'to.name',
-      'destination.name',
-      'credit_party_name',
-      'wallet.name',
-      'account_name',
-      'target_account_key',
-      'recipient_account_key',
-      'to_account',
-    ]) || '--'
-
-    const recipientMeta = pickFirstPath(tx, [
-      'recipient_account_number',
-      'target_account_key',
-      'recipient_account_key',
-      'to_account',
-      'recipient.account_key',
-      'target.account_key',
-      'destination.account_key',
-      'account_key',
-      'target_reference',
-    ]) || '--'
-
-    const senderName = pickFirstPath(tx, [
-      'sender_account_name',
-      'sender_name',
-      'source_name',
-      'initiator_name',
-      'source_account_name',
-      'from_name',
-      'sender.name',
-      'source.name',
-      'from.name',
-      'origin.name',
-      'debit_party_name',
-      'initiator',
-      'source_account_key',
-      'sender_account_key',
-      'from_account',
-    ]) || '--'
-
-    const senderMeta = pickFirstPath(tx, [
-      'sender_account_number',
-      'source_account_key',
-      'sender_account_key',
-      'from_account',
-      'sender.account_key',
-      'source.account_key',
-      'origin.account_key',
-      'account_key',
-      'source_reference',
-    ]) || '--'
+    const parties = partiesForTab(activeTab, tx)
     const currency = pickFirst(tx, ['currency_code', 'currency', 'asset_code']) || 'NGN'
     const amountRaw = pickFirst(tx, ['amount', 'value', 'gross_amount', 'net_amount']) || 0
     const date = pickFirst(tx, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date']) || ''
@@ -257,10 +327,10 @@ export default function TransactionsPage() {
     return {
       sn,
       id,
-      recipientName,
-      recipientMeta,
-      senderName,
-      senderMeta,
+      primaryName: parties.primaryName,
+      primaryMeta: parties.primaryMeta,
+      secondaryName: parties.secondaryName,
+      secondaryMeta: parties.secondaryMeta,
       amount: formatBalance(amountRaw, currency),
       amountRaw,
       currency,
@@ -274,6 +344,7 @@ export default function TransactionsPage() {
   }
 
   const displayRows = useMemo(() => rows.map(mapRow), [rows, page, activeTab])
+  const columnLabels = useMemo(() => tableColumnsForTab(activeTab), [activeTab])
 
   function handleExport() {
     if (!displayRows.length) return
@@ -281,8 +352,8 @@ export default function TransactionsPage() {
       displayRows.map((row) => ({
         SN: row.sn,
         Transaction_ID: row.id,
-        Recipient: row.recipientName,
-        Sender: row.senderName,
+        [columnLabels.primary]: row.primaryName,
+        [columnLabels.secondary]: row.secondaryName,
         Amount: row.amount,
         Date: row.date ? formatDate(row.date) : '--',
         Status: row.status,
@@ -300,13 +371,14 @@ export default function TransactionsPage() {
     if (!tx) return []
     if (tab === 'payouts') {
       return [
-        ['Recipient', tx.recipientName],
+        ['Recipient', tx.primaryName],
         ['Recipient Account Number', pickFirstPath(tx.raw, ['recipient_account_number'])],
         ['Recipient Account Name', pickFirstPath(tx.raw, ['recipient_account_name'])],
         ['Recipient Institution', pickFirstPath(tx.raw, ['recipient_institution_name'])],
         ['Recipient Institution ID', pickFirstPath(tx.raw, ['recipient_institution_identifier'])],
-        ['Source Account Name', pickFirstPath(tx.raw, ['source_account_name'])],
-        ['Source Account Number', pickFirstPath(tx.raw, ['source_account_number'])],
+        ['Merchant', tx.secondaryName],
+        ['Merchant Account Name', pickFirstPath(tx.raw, ['source_account_name', 'sender_account_name'])],
+        ['Merchant Account Number', pickFirstPath(tx.raw, ['source_account_number', 'sender_account_number'])],
         ['Amount', formatBalance(tx.amountRaw, tx.currency)],
         ['Charge', formatBalance(pickFirst(tx.raw, ['charge', 'charges', 'transaction_fee', 'fee']) || 0, tx.currency)],
         ['VAT', formatBalance(pickFirst(tx.raw, ['vat']) || 0, tx.currency)],
@@ -326,11 +398,33 @@ export default function TransactionsPage() {
       ]
     }
 
+    if (tab === 'deposits') {
+      return [
+        ['Merchant', tx.primaryName],
+        ['Merchant Account Number', pickFirstPath(tx.raw, ['sender_account_number', 'target_account_number'])],
+        ['Sender', tx.secondaryName],
+        ['Sender Account Number', pickFirstPath(tx.raw, ['recipient_account_number', 'source_account_number'])],
+        ['Sender Bank Name', pickFirstPath(tx.raw, ['sender_bank_name', 'recipient_bank_name'])],
+        ['Reference ID', tx.id],
+        ['Deposit Reference', pickFirstPath(tx.raw, ['deposit_reference'])],
+        ['Amount', formatBalance(tx.amountRaw, tx.currency)],
+        ['Charge', formatBalance(pickFirst(tx.raw, ['charge', 'charges', 'transaction_fee', 'fee']) || 0, tx.currency)],
+        ['VAT', formatBalance(pickFirst(tx.raw, ['vat']) || 0, tx.currency)],
+        ['Settlement', formatBalance(pickFirst(tx.raw, ['settlement']) || 0, tx.currency)],
+        ['Credit Status', pickFirst(tx.raw, ['credit_status', 'status', 'transaction_status'])],
+        ['Opening Balance', formatBalance(tx.openingBalanceRaw, tx.currency)],
+        ['Closing Balance', formatBalance(tx.closingBalanceRaw, tx.currency)],
+        ['Session ID', pickFirst(tx.raw, ['session_id'])],
+        ['Date Modified', pickFirst(tx.raw, ['date_modified']) ? formatDate(pickFirst(tx.raw, ['date_modified'])) : '--'],
+        ['Status', statusFromBackend(tx.status)],
+      ]
+    }
+
     return [
-      ['Recipient', tx.recipientName],
+      ['Recipient', tx.primaryName],
       ['Recipient Account Number', pickFirstPath(tx.raw, ['recipient_account_number'])],
-      ['Sender', tx.senderName],
-      ['Sender Bank Name', pickFirstPath(tx.raw, ['sender_bank_name'])],
+      ['Merchant', tx.secondaryName],
+      ['Merchant Bank Name', pickFirstPath(tx.raw, ['sender_bank_name'])],
       ['Reference ID', tx.id],
       ['Deposit Reference', pickFirstPath(tx.raw, ['deposit_reference'])],
       ['Amount', formatBalance(tx.amountRaw, tx.currency)],
@@ -434,8 +528,8 @@ export default function TransactionsPage() {
               <thead>
                 <tr className="border-b border-border bg-card-hover">
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">S/N</th>
-                  <th className="px-4 py-3 text-sm font-medium text-text-muted">Recipient</th>
-                  <th className="px-4 py-3 text-sm font-medium text-text-muted">Sender</th>
+                  <th className="px-4 py-3 text-sm font-medium text-text-muted">{columnLabels.primary}</th>
+                  <th className="px-4 py-3 text-sm font-medium text-text-muted">{columnLabels.secondary}</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">Amount</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">Date</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">Status</th>
@@ -448,12 +542,12 @@ export default function TransactionsPage() {
                     <tr key={row.id} className="h-[59px] border-b border-border/40 hover:bg-card-hover/30">
                       <td className="px-4 py-2 text-text-secondary">{row.sn}</td>
                       <td className="px-4 py-2">
-                        <p className="text-text-primary">{row.recipientName}</p>
-                        <p className="text-[11px] text-text-muted">{row.recipientMeta}</p>
+                        <p className="text-text-primary">{row.primaryName}</p>
+                        <p className="text-[11px] text-text-muted">{row.primaryMeta}</p>
                       </td>
                       <td className="px-4 py-2">
-                        <p className="text-text-primary">{row.senderName}</p>
-                        <p className="text-[11px] text-text-muted">{row.senderMeta}</p>
+                        <p className="text-text-primary">{row.secondaryName}</p>
+                        <p className="text-[11px] text-text-muted">{row.secondaryMeta}</p>
                       </td>
                       <td className="whitespace-nowrap px-4 py-2 tabular-nums text-text-secondary">{row.amount}</td>
                       <td className="whitespace-nowrap px-4 py-2 text-text-secondary">{row.date ? formatDate(row.date) : '--'}</td>
