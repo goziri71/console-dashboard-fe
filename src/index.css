@@ -75,7 +75,6 @@ body {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -96,7 +95,7 @@ body {
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.45s ease-out both;
+  animation: fadeInUp 0.45s ease-out forwards;
 }
 
 .animate-fade-in {
@@ -186,11 +185,11 @@ tbody tr {
   }
 
   .drawer-overlay {
-    @apply fixed inset-0 z-50 flex items-stretch justify-end bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6;
+    @apply fixed inset-0 z-[100] flex items-stretch justify-end bg-black/45 backdrop-blur-sm;
   }
 
   .drawer-panel {
-    @apply flex max-h-[calc(100dvh-24px)] w-full max-w-[532px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100vh-48px)];
+    @apply flex h-dvh max-h-dvh w-full max-w-[532px] flex-col overflow-hidden border-l border-border bg-card shadow-2xl sm:m-4 sm:h-auto sm:max-h-[calc(100dvh-32px)] sm:rounded-2xl sm:border;
   }
 
   .modal-overlay {

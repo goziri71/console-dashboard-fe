@@ -1,4 +1,4 @@
-import { formatDate } from './utils'
+import { formatDate, formatBalance } from './utils'
 export const REVIEW_TYPE_TO_SEGMENT = {
   ngn_deposit: 'ngn-deposits',
   ngn_payout: 'ngn-payouts',
@@ -132,7 +132,15 @@ export function detailFieldsForRow(row) {
     ['Reference', pickReference(row)],
     ['Transaction type', transactionTypeLabel(row?.transaction_type)],
     ['Wallet key', row?.wallet_key ?? rec.wallet_key ?? '—'],
-    ['Amount', row?.amount ?? rec.amount ?? '—'],
+    [
+      'Amount',
+      (() => {
+        const raw = row?.amount ?? rec.amount
+        if (raw == null || raw === '') return '—'
+        const n = Number(raw)
+        return Number.isNaN(n) ? String(raw) : formatBalance(n, rec.currency_code || row?.currency_code || 'NGN')
+      })(),
+    ],
     ['Status', pickRowStatus(row)],
     ['Session ID', rec.session_id ?? '—'],
     [

@@ -11,12 +11,14 @@ import {
   XCircle,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
+import OverlayPortal from '../../components/ui/OverlayPortal'
 import { useAuth } from '../../context/AuthContext'
 import { canDisputeUpdate, canReadFinancial } from '../../lib/permissions'
 import {
   canReviewRowActions,
   detailFieldsForRow,
   pickReference,
+  pickRecord,
   pickRowStatus,
   reviewStatusBadge,
   reviewUrlSegment,
@@ -52,8 +54,12 @@ function SummaryCard({ label, value, icon: Icon, iconCls }) {
 function ConfirmDialog({ open, title, message, confirmLabel, danger, loading, onClose, onConfirm }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-card border border-border bg-card p-5 shadow-xl">
+    <OverlayPortal open={open}>
+      <div className="modal-overlay" onClick={onClose} role="presentation">
+        <div
+          className="modal-panel max-h-none p-5"
+          onClick={(e) => e.stopPropagation()}
+        >
         <h3 className="text-base font-semibold text-text-primary">{title}</h3>
         <p className="mt-2 text-sm text-text-secondary">{message}</p>
         <div className="mt-5 flex justify-end gap-2">
@@ -80,31 +86,42 @@ function ConfirmDialog({ open, title, message, confirmLabel, danger, loading, on
             {confirmLabel}
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </OverlayPortal>
   )
 }
 
-function DetailDrawer({ row, canAct, acting, onClose, onApprove, onCancel }) {
+function formatDrawerAmount(row, canShowAmounts) {
+  const rec = pickRecord(row)
+  const raw = row?.amount ?? rec?.amount
+  if (!canShowAmounts) return '••••'
+  const n = Number(raw)
+  if (Number.isNaN(n)) return raw ?? '—'
+  return formatBalance(n, 'NGN')
+}
+
+function DetailDrawer({ row, canAct, canShowAmounts, acting, onClose, onApprove, onCancel }) {
   if (!row) return null
   const status = pickRowStatus(row)
   const badge = reviewStatusBadge(status)
   const fields = detailFieldsForRow(row)
   const showActions = canAct && canReviewRowActions(row)
-  const amountValue = fields.find(([label]) => label === 'Amount')?.[1]
+  const amountDisplay = formatDrawerAmount(row, canShowAmounts)
   const dateValue = fields.find(([label]) => label === 'Date created')?.[1]
   const amountLabels = new Set(['Amount', 'Opening balance', 'Closing balance'])
 
   return (
-    <div
-      className="drawer-overlay"
-      onClick={onClose}
-      role="presentation"
-    >
-      <aside
-        className="drawer-panel"
-        onClick={(e) => e.stopPropagation()}
+    <OverlayPortal open>
+      <div
+        className="drawer-overlay"
+        onClick={onClose}
+        role="presentation"
       >
+        <aside
+          className="drawer-panel"
+          onClick={(e) => e.stopPropagation()}
+        >
         <div className="relative shrink-0 border-b border-border px-5 py-4">
           <button
             type="button"
@@ -127,8 +144,8 @@ function DetailDrawer({ row, canAct, acting, onClose, onApprove, onCancel }) {
                   {badge.label}
                 </span>
               </div>
-              {amountValue != null && amountValue !== '—' ? (
-                <p className="truncate text-xl font-semibold tabular-nums text-text-primary">{amountValue}</p>
+              {amountDisplay !== '—' ? (
+                <p className="truncate text-xl font-semibold tabular-nums text-text-primary">{amountDisplay}</p>
               ) : null}
               <p className="truncate font-mono text-[11px] text-text-muted">{pickReference(row) || '—'}</p>
               {dateValue ? <p className="text-xs text-text-secondary">{dateValue}</p> : null}
@@ -187,8 +204,9 @@ function DetailDrawer({ row, canAct, acting, onClose, onApprove, onCancel }) {
             </button>
           </div>
         ) : null}
-      </aside>
-    </div>
+        </aside>
+      </div>
+    </OverlayPortal>
   )
 }
 
@@ -365,6 +383,7 @@ export default function DisputesPage() {
   }, [summary.by_type])
 
   return (
+    <>
     <div className="animate-fade-in-up">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Pending review</h1>
@@ -556,10 +575,12 @@ export default function DisputesPage() {
           <p className="border-t border-border px-4 py-2 text-center text-xs text-text-muted">{formatNumber(total)} pending total</p>
         ) : null}
       </div>
+    </div>
 
       <DetailDrawer
         row={selected}
         canAct={canAct}
+        canShowAmounts={canShowAmounts}
         acting={actingRef === pickReference(selected)}
         onClose={() => setSelected(null)}
         onApprove={() => selected && runReviewAction(selected, 'approve')}
@@ -576,6 +597,6 @@ export default function DisputesPage() {
         onClose={() => setConfirmCancel(null)}
         onConfirm={() => confirmCancel && runReviewAction(confirmCancel, 'cancel')}
       />
-    </div>
+    </>
   )
 }
