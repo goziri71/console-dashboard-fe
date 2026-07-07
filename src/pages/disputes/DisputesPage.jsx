@@ -90,50 +90,88 @@ function DetailDrawer({ row, canAct, acting, onClose, onApprove, onCancel }) {
   const status = pickRowStatus(row)
   const badge = reviewStatusBadge(status)
   const fields = detailFieldsForRow(row)
+  const showActions = canAct && canReviewRowActions(row)
+  const amountValue = fields.find(([label]) => label === 'Amount')?.[1]
+  const dateValue = fields.find(([label]) => label === 'Date created')?.[1]
+  const amountLabels = new Set(['Amount', 'Opening balance', 'Closing balance'])
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]">
-      <button type="button" className="flex-1 cursor-default" aria-label="Close detail" onClick={onClose} />
-      <aside className="flex h-screen max-h-screen w-full max-w-lg shrink-0 flex-col overflow-hidden border-l border-border bg-card shadow-2xl">
-        <div className="flex shrink-0 items-start justify-between border-b border-border px-4 py-4">
-          <div className="min-w-0 pr-4">
-            <p className="text-xs uppercase tracking-wide text-text-muted">Transaction review</p>
-            <h2 className="mt-1 break-all font-mono text-sm text-text-primary">{pickReference(row) || '—'}</h2>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs text-text-secondary">{transactionTypeLabel(row.transaction_type)}</span>
-              <span className={cn('inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium', badge.cls)}>
-                {badge.label}
-              </span>
-            </div>
-          </div>
+    <div
+      className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+      onClick={onClose}
+      role="presentation"
+    >
+      <aside
+        className="relative flex max-h-[calc(100dvh-24px)] w-full max-w-[532px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100vh-48px)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative shrink-0 border-b border-border px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-full p-1.5 text-text-muted hover:bg-card-hover hover:text-text-primary"
+            className="absolute right-4 top-4 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
             aria-label="Close"
           >
             <X size={18} />
           </button>
+          <div className="flex items-center gap-4 pr-8">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning-bg/20">
+              <Clock3 size={22} className="text-warning" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-semibold text-text-primary">
+                  {transactionTypeLabel(row.transaction_type)}
+                </p>
+                <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium', badge.cls)}>
+                  {badge.label}
+                </span>
+              </div>
+              {amountValue != null && amountValue !== '—' ? (
+                <p className="truncate text-xl font-semibold tabular-nums text-text-primary">{amountValue}</p>
+              ) : null}
+              <p className="truncate font-mono text-[11px] text-text-muted">{pickReference(row) || '—'}</p>
+              {dateValue ? <p className="text-xs text-text-secondary">{dateValue}</p> : null}
+            </div>
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-          <dl className="space-y-3">
-            {fields.map(([label, value]) => (
-              <div key={label} className="rounded-lg border border-border/60 bg-page/40 px-3 py-2.5">
-                <dt className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{label}</dt>
-                <dd className="mt-1 break-all text-sm text-text-primary">{value ?? '—'}</dd>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          <div className="overflow-hidden rounded-xl border border-border">
+            <div className="border-b border-border bg-card-hover px-4 py-2.5 text-sm font-medium text-text-primary">
+              Transaction details
+            </div>
+            {fields.map(([label, value], idx, arr) => (
+              <div
+                key={label}
+                className={cn(
+                  'flex items-start justify-between gap-3 px-4 py-2.5',
+                  idx < arr.length - 1 && 'border-b border-border/60'
+                )}
+              >
+                <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                <span
+                  className={cn(
+                    'min-w-0 text-right text-sm text-text-primary',
+                    amountLabels.has(label)
+                      ? 'shrink-0 whitespace-nowrap tabular-nums'
+                      : 'break-all'
+                  )}
+                >
+                  {value ?? '—'}
+                </span>
               </div>
             ))}
-          </dl>
+          </div>
         </div>
 
-        {canAct && canReviewRowActions(row) ? (
-          <div className="flex shrink-0 gap-2 border-t border-border bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {showActions ? (
+          <div className="flex shrink-0 gap-2 border-t border-border px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               disabled={acting}
               onClick={onApprove}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-semibold text-page hover:brightness-105 disabled:opacity-50"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2 text-sm font-semibold text-page hover:brightness-105 disabled:opacity-50"
             >
               {acting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
               Approve
@@ -142,7 +180,7 @@ function DetailDrawer({ row, canAct, acting, onClose, onApprove, onCancel }) {
               type="button"
               disabled={acting}
               onClick={onCancel}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-error/40 bg-error-bg py-2.5 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-50"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-error/40 bg-error-bg py-2 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-50"
             >
               <XCircle size={14} />
               Cancel
