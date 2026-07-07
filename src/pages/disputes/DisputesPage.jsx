@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Copy,
   Loader2,
   Search,
   X,
@@ -22,6 +23,7 @@ import {
   pickRowStatus,
   reviewStatusBadge,
   reviewUrlSegment,
+  normalizeReviewStatus,
   REVIEW_TYPE_TABS,
   transactionTypeLabel,
   unwrapPendingReviewList,
@@ -92,6 +94,24 @@ function ConfirmDialog({ open, title, message, confirmLabel, danger, loading, on
   )
 }
 
+function reviewStatusKind(status) {
+  const s = normalizeReviewStatus(status)
+  if (s === 'SUCCESSFUL' || s === 'SUCCESS') return 'completed'
+  if (s === 'FAILED' || s === 'FAIL') return 'failed'
+  if (s === 'PENDING' || s === 'PROCESSING') return 'processing'
+  return 'neutral'
+}
+
+function reviewStatusLabel(status) {
+  const s = normalizeReviewStatus(status)
+  return s || 'PENDING'
+}
+
+function copyText(value) {
+  if (!value) return
+  navigator.clipboard?.writeText(String(value)).catch(() => {})
+}
+
 function formatDrawerAmount(row, canShowAmounts) {
   const rec = pickRecord(row)
   const raw = row?.amount ?? rec?.amount
@@ -104,106 +124,121 @@ function formatDrawerAmount(row, canShowAmounts) {
 function DetailDrawer({ row, canAct, canShowAmounts, acting, onClose, onApprove, onCancel }) {
   if (!row) return null
   const status = pickRowStatus(row)
-  const badge = reviewStatusBadge(status)
+  const statusKind = reviewStatusKind(status)
   const fields = detailFieldsForRow(row)
   const showActions = canAct && canReviewRowActions(row)
   const amountDisplay = formatDrawerAmount(row, canShowAmounts)
-  const dateValue = fields.find(([label]) => label === 'Date created')?.[1]
-  const amountLabels = new Set(['Amount', 'Opening balance', 'Closing balance'])
+  const dateValue = fields.find(([label]) => label === 'Date created')?.[1] ?? '—'
+  const detailRows = fields.filter(([label]) => !['Amount', 'Date created'].includes(label))
+  const amountLabels = new Set([
+    'Amount',
+    'Charge',
+    'VAT',
+    'Settlement',
+    'Opening balance',
+    'Closing balance',
+    'Opening Balance',
+    'Closing Balance',
+  ])
 
   return (
     <OverlayPortal open>
-      <div
-        className="drawer-overlay"
-        onClick={onClose}
-        role="presentation"
-      >
-        <aside
-          className="drawer-panel"
-          onClick={(e) => e.stopPropagation()}
-        >
-        <div className="relative shrink-0 border-b border-border px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-4 top-4 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-          <div className="flex items-center gap-4 pr-8">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-warning-bg/20">
-              <Clock3 size={22} className="text-warning" />
+      <div className="drawer-overlay" onClick={onClose} role="presentation">
+        <aside className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+          <div className="relative shrink-0 border-b border-border px-6 pb-5 pt-6">
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-5 top-5 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+            <div
+              className={cn(
+                'mx-auto flex h-20 w-20 items-center justify-center rounded-full',
+                statusKind === 'completed' && 'bg-success-bg/20',
+                statusKind === 'failed' && 'bg-error-bg/20',
+                statusKind === 'processing' && 'bg-warning-bg/20',
+                statusKind === 'neutral' && 'bg-card-hover'
+              )}
+            >
+              {statusKind === 'completed' && <CheckCircle2 size={36} className="text-success" />}
+              {statusKind === 'failed' && <XCircle size={36} className="text-error" />}
+              {statusKind === 'processing' && <Clock3 size={36} className="text-warning" />}
+              {statusKind === 'neutral' && <Clock3 size={36} className="text-text-muted" />}
             </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-base font-semibold text-text-primary">
-                  {transactionTypeLabel(row.transaction_type)}
-                </p>
-                <span className={cn('inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium', badge.cls)}>
-                  {badge.label}
-                </span>
-              </div>
-              {amountDisplay !== '—' ? (
-                <p className="truncate text-xl font-semibold tabular-nums text-text-primary">{amountDisplay}</p>
-              ) : null}
-              <p className="truncate font-mono text-[11px] text-text-muted">{pickReference(row) || '—'}</p>
-              {dateValue ? <p className="text-xs text-text-secondary">{dateValue}</p> : null}
-            </div>
+            <p className="mt-4 text-center text-xl font-semibold uppercase tracking-wide text-text-primary">
+              {reviewStatusLabel(status)}
+            </p>
           </div>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-          <div className="overflow-hidden rounded-xl border border-border">
-            <div className="border-b border-border bg-card-hover px-4 py-2.5 text-sm font-medium text-text-primary">
-              Transaction details
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+            <div className="mb-6 text-center">
+              <p className="text-sm text-text-muted">Amount</p>
+              <p className="mt-1 text-3xl font-semibold tabular-nums text-text-primary">{amountDisplay}</p>
+              <p className="mt-1 text-sm text-text-secondary">{dateValue}</p>
             </div>
-            {fields.map(([label, value], idx, arr) => (
-              <div
-                key={label}
-                className={cn(
-                  'flex items-start justify-between gap-3 px-4 py-2.5',
-                  idx < arr.length - 1 && 'border-b border-border/60'
-                )}
-              >
-                <span className="shrink-0 text-sm text-text-secondary">{label}</span>
-                <span
+
+            <div className="overflow-hidden rounded-xl border border-border">
+              <div className="border-b border-border bg-card-hover px-4 py-3 text-sm font-medium text-text-primary">
+                Payment Details
+              </div>
+              {detailRows.map(([label, value], idx, arr) => (
+                <div
+                  key={label}
                   className={cn(
-                    'min-w-0 text-right text-sm text-text-primary',
-                    amountLabels.has(label)
-                      ? 'shrink-0 whitespace-nowrap tabular-nums'
-                      : 'break-all'
+                    'flex items-start justify-between gap-3 px-4 py-3',
+                    idx < arr.length - 1 && 'border-b border-border/60'
                   )}
                 >
-                  {value ?? '—'}
-                </span>
-              </div>
-            ))}
+                  <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                  <span
+                    className={cn(
+                      'flex min-w-0 items-center justify-end gap-2 text-right text-sm text-text-primary',
+                      amountLabels.has(label) && 'shrink-0 whitespace-nowrap tabular-nums',
+                      !amountLabels.has(label) && 'break-all'
+                    )}
+                  >
+                    {value ?? '—'}
+                    {label === 'Reference' && value && value !== '—' ? (
+                      <button
+                        type="button"
+                        onClick={() => copyText(value)}
+                        className="shrink-0 rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
+                        title="Copy reference"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    ) : null}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {showActions ? (
-          <div className="flex shrink-0 gap-2 border-t border-border px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <button
-              type="button"
-              disabled={acting}
-              onClick={onApprove}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2 text-sm font-semibold text-page hover:brightness-105 disabled:opacity-50"
-            >
-              {acting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-              Approve
-            </button>
-            <button
-              type="button"
-              disabled={acting}
-              onClick={onCancel}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-error/40 bg-error-bg py-2 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-50"
-            >
-              <XCircle size={14} />
-              Cancel
-            </button>
-          </div>
-        ) : null}
+          {showActions ? (
+            <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                disabled={acting}
+                onClick={onApprove}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-semibold text-page hover:brightness-105 disabled:opacity-50"
+              >
+                {acting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                Approve
+              </button>
+              <button
+                type="button"
+                disabled={acting}
+                onClick={onCancel}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-error/40 bg-error-bg py-2.5 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-50"
+              >
+                <XCircle size={14} />
+                Cancel
+              </button>
+            </div>
+          ) : null}
         </aside>
       </div>
     </OverlayPortal>

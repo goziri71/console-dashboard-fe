@@ -128,19 +128,19 @@ export function pickRowStatus(row) {
 export function detailFieldsForRow(row) {
   const rec = pickRecord(row)
   const type = String(row?.transaction_type ?? '').toLowerCase()
+  const currency = rec.currency_code || row?.currency_code || 'NGN'
+
+  function fmtAmount(raw) {
+    if (raw == null || raw === '') return '—'
+    const n = Number(raw)
+    return Number.isNaN(n) ? String(raw) : formatBalance(n, currency)
+  }
+
   const common = [
     ['Reference', pickReference(row)],
     ['Transaction type', transactionTypeLabel(row?.transaction_type)],
     ['Wallet key', row?.wallet_key ?? rec.wallet_key ?? '—'],
-    [
-      'Amount',
-      (() => {
-        const raw = row?.amount ?? rec.amount
-        if (raw == null || raw === '') return '—'
-        const n = Number(raw)
-        return Number.isNaN(n) ? String(raw) : formatBalance(n, rec.currency_code || row?.currency_code || 'NGN')
-      })(),
-    ],
+    ['Amount', fmtAmount(row?.amount ?? rec.amount)],
     ['Status', pickRowStatus(row)],
     ['Session ID', rec.session_id ?? '—'],
     [
@@ -154,14 +154,44 @@ export function detailFieldsForRow(row) {
   if (type.includes('ngn') && type.includes('deposit')) {
     return [
       ...common,
+      ['Recipient', rec.recipient_account_name ?? rec.recipient_name ?? '—'],
+      ['Recipient Account Number', rec.recipient_account_number ?? rec.account_number ?? '—'],
+      ['Sender', rec.sender_account_name ?? rec.sender_name ?? '—'],
+      ['Sender Bank Name', rec.sender_bank_name ?? rec.sender_bank ?? '—'],
       ['Deposit reference', rec.deposit_reference ?? '—'],
-      ['Sender bank', rec.sender_bank_name ?? rec.sender_bank ?? '—'],
-      ['Sender name', rec.sender_account_name ?? rec.sender_name ?? '—'],
-      ['Sender account', rec.sender_account_number ?? '—'],
-      ['Recipient account', rec.recipient_account_number ?? rec.account_number ?? '—'],
+      ['Charge', fmtAmount(rec.charge ?? rec.charges ?? rec.transaction_fee ?? rec.fee)],
+      ['VAT', fmtAmount(rec.vat)],
+      ['Settlement', fmtAmount(rec.settlement)],
       ['Credit status', rec.credit_status ?? '—'],
-      ['Opening balance', rec.opening_balance ?? '—'],
-      ['Closing balance', rec.closing_balance ?? '—'],
+      ['Opening balance', fmtAmount(rec.opening_balance)],
+      ['Closing balance', fmtAmount(rec.closing_balance)],
+    ]
+  }
+
+  if (type.includes('payout') || type.includes('withdrawal')) {
+    return [
+      ...common,
+      ['Recipient', rec.recipient_account_name ?? rec.recipient_name ?? '—'],
+      ['Recipient Account Number', rec.recipient_account_number ?? '—'],
+      ['Recipient Institution', rec.recipient_institution_name ?? '—'],
+      ['Source Account Name', rec.source_account_name ?? '—'],
+      ['Source Account Number', rec.source_account_number ?? '—'],
+      ['Charge', fmtAmount(rec.charge ?? rec.charges ?? rec.transaction_fee ?? rec.fee)],
+      ['VAT', fmtAmount(rec.vat)],
+      ['Narration', rec.narration ?? '—'],
+      ['Payout status', rec.payout_status ?? '—'],
+      ['Opening balance', fmtAmount(rec.opening_balance)],
+      ['Closing balance', fmtAmount(rec.closing_balance)],
+    ]
+  }
+
+  if (type.includes('transfer')) {
+    return [
+      ...common,
+      ['Sender', rec.sender_account_name ?? rec.sender_name ?? '—'],
+      ['Recipient', rec.recipient_account_name ?? rec.recipient_name ?? '—'],
+      ['Sender account', rec.sender_account_number ?? '—'],
+      ['Recipient account', rec.recipient_account_number ?? '—'],
     ]
   }
 

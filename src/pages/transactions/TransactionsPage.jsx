@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
+import OverlayPortal from '../../components/ui/OverlayPortal'
 import { cn, exportToCsv, formatBalance, formatDate } from '../../lib/utils'
 import {
   getNgnDeposits,
@@ -493,83 +494,85 @@ export default function TransactionsPage() {
       </div>
 
       {selectedTx && (
-        <div className="drawer-overlay" onClick={() => setSelectedTx(null)} role="presentation">
-          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="relative shrink-0 border-b border-border px-5 py-4">
-              <button
-                onClick={() => setSelectedTx(null)}
-                className="absolute right-4 top-4 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
-              >
-                <X size={18} />
-              </button>
-              <div className="flex items-center gap-4 pr-8">
+        <OverlayPortal open>
+          <div className="drawer-overlay" onClick={() => setSelectedTx(null)} role="presentation">
+            <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+              <div className="relative shrink-0 border-b border-border px-6 pb-5 pt-6">
+                <button
+                  onClick={() => setSelectedTx(null)}
+                  className="absolute right-5 top-5 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
+                >
+                  <X size={18} />
+                </button>
                 <div
                   className={cn(
-                    'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
+                    'mx-auto flex h-20 w-20 items-center justify-center rounded-full',
                     modalState === 'completed' && 'bg-success-bg/20',
                     modalState === 'failed' && 'bg-error-bg/20',
-                    modalState === 'processing' && 'bg-card-hover',
+                    modalState === 'processing' && 'bg-warning-bg/20',
                     modalState === 'neutral' && 'bg-card-hover'
                   )}
                 >
-                  {modalState === 'completed' && <CheckCircle2 size={22} className="text-success" />}
-                  {modalState === 'failed' && <XCircle size={22} className="text-error" />}
-                  {modalState === 'processing' && <Clock3 size={22} className="text-warning" />}
-                  {modalState === 'neutral' && <Clock3 size={22} className="text-text-muted" />}
+                  {modalState === 'completed' && <CheckCircle2 size={36} className="text-success" />}
+                  {modalState === 'failed' && <XCircle size={36} className="text-error" />}
+                  {modalState === 'processing' && <Clock3 size={36} className="text-warning" />}
+                  {modalState === 'neutral' && <Clock3 size={36} className="text-text-muted" />}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-base font-semibold uppercase tracking-wide text-text-primary">
-                    {statusFromBackend(selectedTx.status)}
-                  </p>
-                  <p className="truncate text-2xl font-semibold tabular-nums text-text-primary">{selectedTx.amount}</p>
-                  <p className="text-xs text-text-secondary">{formatDate(selectedTx.date)}</p>
-                </div>
+                <p className="mt-4 text-center text-xl font-semibold uppercase tracking-wide text-text-primary">
+                  {statusFromBackend(selectedTx.status)}
+                </p>
               </div>
-            </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <div className="overflow-hidden rounded-xl border border-border">
-                <div className="border-b border-border bg-card-hover px-4 py-3 text-sm font-medium text-text-primary">
-                  Payment Details
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <div className="mb-6 text-center">
+                  <p className="text-sm text-text-muted">Amount</p>
+                  <p className="mt-1 text-3xl font-semibold tabular-nums text-text-primary">{selectedTx.amount}</p>
+                  <p className="mt-1 text-sm text-text-secondary">{formatDate(selectedTx.date)}</p>
                 </div>
 
-                {buildDetailRows(selectedTx, activeTab).map(([label, value], idx, arr) => {
-                  const isAmountField = ['Amount', 'Charge', 'VAT', 'Settlement', 'Opening Balance', 'Closing Balance'].includes(
-                    label
-                  )
-                  return (
-                  <div
-                    key={label}
-                    className={cn(
-                      'flex items-start justify-between gap-3 px-4 py-3',
-                      idx < arr.length - 1 && 'border-b border-border/60'
-                    )}
-                  >
-                    <span className="shrink-0 text-sm text-text-secondary">{label}</span>
-                    <span
-                      className={cn(
-                        'flex min-w-0 items-center justify-end gap-2 text-right text-sm text-text-primary',
-                        isAmountField && 'shrink-0 whitespace-nowrap tabular-nums'
-                      )}
-                    >
-                      {String(value || '--')}
-                      {label === 'Reference ID' && value && (
-                        <button
-                          onClick={() => copyText(value)}
-                          className="shrink-0 rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
-                          title="Copy reference"
-                        >
-                          <Copy size={14} />
-                        </button>
-                      )}
-                    </span>
+                <div className="overflow-hidden rounded-xl border border-border">
+                  <div className="border-b border-border bg-card-hover px-4 py-3 text-sm font-medium text-text-primary">
+                    Payment Details
                   </div>
-                  )
-                })}
+
+                  {buildDetailRows(selectedTx, activeTab).map(([label, value], idx, arr) => {
+                    const isAmountField = ['Amount', 'Charge', 'VAT', 'Settlement', 'Opening Balance', 'Closing Balance'].includes(
+                      label
+                    )
+                    return (
+                      <div
+                        key={label}
+                        className={cn(
+                          'flex items-start justify-between gap-3 px-4 py-3',
+                          idx < arr.length - 1 && 'border-b border-border/60'
+                        )}
+                      >
+                        <span className="shrink-0 text-sm text-text-secondary">{label}</span>
+                        <span
+                          className={cn(
+                            'flex min-w-0 items-center justify-end gap-2 text-right text-sm text-text-primary',
+                            isAmountField && 'shrink-0 whitespace-nowrap tabular-nums'
+                          )}
+                        >
+                          {String(value || '--')}
+                          {label === 'Reference ID' && value && (
+                            <button
+                              onClick={() => copyText(value)}
+                              className="shrink-0 rounded-md p-1 text-text-muted hover:bg-card-hover hover:text-text-secondary"
+                              title="Copy reference"
+                            >
+                              <Copy size={14} />
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   )
