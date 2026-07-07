@@ -7,7 +7,6 @@ import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
 import MerchantTable from './MerchantTable'
 import {
-  typeLabel,
   normalizeKycKey,
   normalizeAccountStatusKey,
   tierLabel,
@@ -181,7 +180,6 @@ export default function MerchantsPage() {
     const rows = merchants.map((merchant) => ({
       Name: merchant.name || '',
       Trade_Name: merchant.trade_name || '',
-      Type: typeLabel(merchant),
       Tier: tierLabel(merchant),
       KYC_Status: normalizeKycKey(merchant),
       Account_Status: normalizeAccountStatusKey(merchant),
