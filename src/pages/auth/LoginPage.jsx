@@ -12,6 +12,8 @@ const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
 /** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
 let inflightCrosslink = null
 let inflightCrosslinkToken = null
+/** Keep the MFA challenge UI alive if the login effect re-runs after the URL token is cleared. */
+let activeMfaChallenge = null
 
 function takeCrosslinkTokenFromUrl() {
   const params = new URLSearchParams(window.location.search)
@@ -28,6 +30,20 @@ function clearPendingCrosslinkToken() {
   sessionStorage.removeItem(PENDING_CROSSLINK_KEY)
   inflightCrosslink = null
   inflightCrosslinkToken = null
+}
+
+function clearActiveMfaChallenge() {
+  activeMfaChallenge = null
+  clearPendingCrosslinkToken()
+}
+
+function isMfaFlowStatus(status) {
+  return (
+    status === 'enrollment' ||
+    status === 'verification' ||
+    status === 'recovery_codes' ||
+    status === 'processing'
+  )
 }
 
 function authErrorMessage(error, stage) {
@@ -79,15 +95,21 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (token) {
-      clearPendingCrosslinkToken()
+      clearActiveMfaChallenge()
       navigate('/', { replace: true })
+      return undefined
+    }
+
+    // Restore MFA UI if a prior Crosslink challenge already succeeded in this tab.
+    if (activeMfaChallenge) {
+      setFlow(activeMfaChallenge)
       return undefined
     }
 
     // One-time Crosslink token — never expect a dashboard JWT from this call.
     const crosslinkToken = takeCrosslinkTokenFromUrl()
     if (!crosslinkToken) {
-      setFlow({ status: 'waiting' })
+      setFlow((current) => (isMfaFlowStatus(current.status) ? current : { status: 'waiting' }))
       return undefined
     }
 
@@ -102,19 +124,23 @@ export default function LoginPage() {
 
     inflightCrosslink
       .then((data) => {
-        if (cancelled) return
-        clearPendingCrosslinkToken()
-
-        // MFA challenge responses intentionally have no token / authToken yet.
+        // Cache MFA challenge even if this effect instance was cancelled (StrictMode),
+        // so the remount can restore the screen instead of bouncing to Login.
         if (data?.state === 'mfa_enrollment_required') {
-          setFlow({ status: 'enrollment', data })
+          activeMfaChallenge = { status: 'enrollment', data }
+          clearPendingCrosslinkToken()
+          if (!cancelled) setFlow(activeMfaChallenge)
           return
         }
         if (data?.state === 'mfa_required') {
-          setFlow({ status: 'verification', data })
+          activeMfaChallenge = { status: 'verification', data }
+          clearPendingCrosslinkToken()
+          if (!cancelled) setFlow(activeMfaChallenge)
           return
         }
         if (data?.state === 'authenticated') {
+          clearActiveMfaChallenge()
+          if (cancelled) return
           completeAuthentication(data)
           navigate('/', { replace: true })
           return
@@ -125,7 +151,7 @@ export default function LoginPage() {
       })
       .catch((err) => {
         if (cancelled) return
-        clearPendingCrosslinkToken()
+        clearActiveMfaChallenge()
         setError(authErrorMessage(err, 'crosslink'))
         setFlow({ status: 'waiting' })
       })
@@ -156,8 +182,10 @@ export default function LoginPage() {
         const recoveryCodes = Array.isArray(data.recovery_codes) ? data.recovery_codes : []
         if (recoveryCodes.length) {
           setCode('')
-          setFlow({ status: 'recovery_codes', data, recoveryCodes })
+          activeMfaChallenge = { status: 'recovery_codes', data, recoveryCodes }
+          setFlow(activeMfaChallenge)
         } else {
+          clearActiveMfaChallenge()
           completeAuthentication(data)
           navigate('/', { replace: true })
         }
@@ -166,6 +194,7 @@ export default function LoginPage() {
           type: useRecoveryCode ? 'recovery_code' : 'totp',
           value,
         })
+        clearActiveMfaChallenge()
         completeAuthentication(data)
         navigate('/', { replace: true })
       }
@@ -182,6 +211,7 @@ export default function LoginPage() {
   }
 
   const finishEnrollment = () => {
+    clearActiveMfaChallenge()
     completeAuthentication(flow.data)
     navigate('/', { replace: true })
   }
