@@ -74,8 +74,7 @@ export function extractTokenFromAuthPayload(payload) {
 }
 
 /**
- * Normalize auth responses without weakening the rule that credentials are only
- * accepted after MFA has completed.
+ * Normalize unwrapped or wrapped auth payloads.
  * @param {unknown} payload
  * @returns {Record<string, unknown> | null}
  */
@@ -83,7 +82,11 @@ export function extractAuthData(payload) {
   if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) return null
 
   // Already-unwrapped challenge / authenticated payload from the Axios interceptor.
-  if (typeof payload.state === 'string') {
+  if (
+    typeof payload.state === 'string' ||
+    typeof payload.token === 'string' ||
+    typeof payload.authToken === 'string'
+  ) {
     return /** @type {Record<string, unknown>} */ (payload)
   }
 
@@ -99,6 +102,8 @@ export function extractAuthData(payload) {
 }
 
 /**
+ * Crosslink returns a JWT immediately (`authToken` / `token`).
+ * Password login may still return MFA challenge states without a JWT.
  * @param {unknown} payload
  * @returns {{
  *   token: string,
@@ -110,15 +115,27 @@ export function extractAuthData(payload) {
  */
 export function extractAuthenticatedSession(payload) {
   const data = extractAuthData(payload)
-  if (!data || data.state !== 'authenticated') return null
+  if (!data) return null
+
+  // MFA challenge responses must not be treated as logged-in sessions.
+  if (
+    data.state === 'mfa_required' ||
+    data.state === 'mfa_enrollment_required'
+  ) {
+    return null
+  }
 
   const token =
-    typeof data.token === 'string'
-      ? data.token
-      : typeof data.authToken === 'string'
-        ? data.authToken
+    typeof data.authToken === 'string'
+      ? data.authToken
+      : typeof data.token === 'string'
+        ? data.token
         : null
-  if (!token || !data.user || typeof data.user !== 'object' || Array.isArray(data.user)) {
+  if (!token) return null
+
+  if (data.state && data.state !== 'authenticated') return null
+
+  if (!data.user || typeof data.user !== 'object' || Array.isArray(data.user)) {
     return null
   }
 
