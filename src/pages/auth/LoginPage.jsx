@@ -4,7 +4,6 @@ import { Check, Copy, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../context/AuthContext'
 import { consumeAuthNotice } from '../../lib/authStorage'
-import { extractAuthenticatedSession } from '../../lib/authUser'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
 const REDBILLER_LOGIN_URL = import.meta.env.VITE_REDBILLER_LOGIN_URL
@@ -107,7 +106,7 @@ export default function LoginPage() {
       return undefined
     }
 
-    // One-time Crosslink token — success returns a dashboard JWT immediately.
+    // One-time Crosslink token — expects MFA challenge, not a JWT yet.
     const crosslinkToken = takeCrosslinkTokenFromUrl()
     if (!crosslinkToken) {
       setFlow((current) => (isMfaFlowStatus(current.status) ? current : { status: 'waiting' }))
@@ -125,19 +124,7 @@ export default function LoginPage() {
 
     inflightCrosslink
       .then((data) => {
-        // Crosslink now returns a JWT immediately (same shape as the other backend).
-        const session = extractAuthenticatedSession(data)
-        if (session || data?.state === 'authenticated') {
-          // Always persist the session — even if this effect instance was cancelled —
-          // so StrictMode remounts do not bounce back to Login.
-          clearPendingCrosslinkToken()
-          activeMfaChallenge = null
-          completeAuthentication(data)
-          if (!cancelled) navigate('/', { replace: true })
-          return
-        }
-
-        // Password-style MFA responses — kept as a fallback if the API still returns them.
+        // Crosslink must not store a JWT here — only MFA challenge states.
         if (data?.state === 'mfa_enrollment_required') {
           activeMfaChallenge = { status: 'enrollment', data }
           clearPendingCrosslinkToken()
@@ -152,7 +139,7 @@ export default function LoginPage() {
         }
 
         throw new Error(
-          `Unexpected Crosslink state "${data?.state ?? 'unknown'}". Expected authenticated session.`
+          `Unexpected Crosslink state "${data?.state ?? 'unknown'}". Expected mfa_enrollment_required or mfa_required.`
         )
       })
       .catch((err) => {

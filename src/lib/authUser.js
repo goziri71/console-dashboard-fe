@@ -102,8 +102,8 @@ export function extractAuthData(payload) {
 }
 
 /**
- * Crosslink returns a JWT immediately (`authToken` / `token`).
- * Password login may still return MFA challenge states without a JWT.
+ * Crosslink only returns a JWT after MFA enroll/verify (`state: "authenticated"`).
+ * Challenge responses (`mfa_required` / `mfa_enrollment_required`) must not be stored.
  * @param {unknown} payload
  * @returns {{
  *   token: string,
@@ -125,6 +125,9 @@ export function extractAuthenticatedSession(payload) {
     return null
   }
 
+  // Require explicit authenticated state so a bare Crosslink response cannot log in.
+  if (data.state !== 'authenticated') return null
+
   const token =
     typeof data.authToken === 'string'
       ? data.authToken
@@ -132,8 +135,6 @@ export function extractAuthenticatedSession(payload) {
         ? data.token
         : null
   if (!token) return null
-
-  if (data.state && data.state !== 'authenticated') return null
 
   if (!data.user || typeof data.user !== 'object' || Array.isArray(data.user)) {
     return null
