@@ -6,7 +6,6 @@ import { useAuth } from '../../context/AuthContext'
 import { consumeAuthNotice } from '../../lib/authStorage'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
-const REDBILLER_LOGIN_URL = import.meta.env.VITE_REDBILLER_LOGIN_URL
 const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
 
 /** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
@@ -79,19 +78,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  const beginFreshLogin = () => {
-    setError('')
-    if (REDBILLER_LOGIN_URL) {
-      window.location.assign(REDBILLER_LOGIN_URL)
-      return
-    }
-    if (window.history.length > 1) {
-      window.history.back()
-      return
-    }
-    setError('Open Sterllo Console from Redbiller to sign in with Crosslink.')
-  }
 
   useEffect(() => {
     const notice = consumeAuthNotice()
@@ -343,14 +329,11 @@ export default function LoginPage() {
 
     return (
       <div className="space-y-5 text-center">
-        {error && <p className="rounded-xl border border-error/30 bg-error/10 p-3 text-sm text-error">{error}</p>}
-        <button
-          type="button"
-          onClick={beginFreshLogin}
-          className="relative z-10 min-h-12 w-full cursor-pointer rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90 active:scale-[0.98]"
-        >
-          Login
-        </button>
+        {error ? (
+          <p className="rounded-xl border border-error/30 bg-error/10 p-3 text-sm text-error">{error}</p>
+        ) : (
+          <p className="text-sm text-text-secondary">Waiting for Crosslink login…</p>
+        )}
       </div>
     )
   }
