@@ -81,11 +81,16 @@ export default function LoginPage() {
   const [copied, setCopied] = useState(false)
 
   const beginFreshLogin = () => {
+    setError('')
     if (REDBILLER_LOGIN_URL) {
       window.location.assign(REDBILLER_LOGIN_URL)
-    } else if (window.history.length > 1) {
-      window.history.back()
+      return
     }
+    if (window.history.length > 1) {
+      window.history.back()
+      return
+    }
+    setError('Open Sterllo Console from Redbiller to sign in with Crosslink.')
   }
 
   useEffect(() => {
@@ -342,8 +347,7 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={beginFreshLogin}
-          disabled={!REDBILLER_LOGIN_URL && window.history.length <= 1}
-          className="min-h-12 w-full rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="relative z-10 min-h-12 w-full cursor-pointer rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90 active:scale-[0.98]"
         >
           Login
         </button>
