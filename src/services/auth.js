@@ -1,14 +1,41 @@
 import api from './api'
+import { clearStoredAuth } from '../lib/authStorage'
 
-export async function login(email, password) {
-  const { data } = await api.post('/auth/login', { email, password })
+export async function loginWithCrosslink(token, deviceLabel) {
+  const { data } = await api.post('/auth/login/crosslink', {
+    token,
+    device_label: deviceLabel,
+  })
   return data
 }
 
-/**
- * Admin-provisioned console user — `POST /auth/register` (not public; call from Admin Tools only).
- * @param {{ email: string, password: string, first_name: string, last_name: string, role: string }} payload
- */
+export async function confirmMfaEnrollment(challengeToken, code, deviceLabel) {
+  const { data } = await api.post('/auth/mfa/enroll/confirm', {
+    challenge_token: challengeToken,
+    code,
+    device_label: deviceLabel,
+  })
+  return data
+}
+
+export async function verifyMfaChallenge(challengeToken, credential, deviceLabel) {
+  const payload = {
+    challenge_token: challengeToken,
+    device_label: deviceLabel,
+    ...(credential.type === 'recovery_code'
+      ? { recovery_code: credential.value }
+      : { code: credential.value }),
+  }
+  const { data } = await api.post('/auth/mfa/challenge/verify', payload)
+  return data
+}
+
+export async function stepUpMfa(code) {
+  const { data } = await api.post('/auth/mfa/step-up', { code })
+  return data
+}
+
+/** Admin-provisioned console user. */
 export async function register(payload) {
   const { data } = await api.post('/auth/register', payload)
   return data
@@ -18,8 +45,7 @@ export async function logout() {
   try {
     await api.post('/auth/logout')
   } finally {
-    localStorage.removeItem('sterllo_token')
-    localStorage.removeItem('sterllo_user')
+    clearStoredAuth()
   }
 }
 

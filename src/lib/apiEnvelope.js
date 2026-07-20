@@ -15,8 +15,34 @@ export function isConsoleEnvelope(payload) {
   )
 }
 
+/**
+ * Newer auth/console responses use `{ success, code, data }` instead of `{ state, code, data }`.
+ * @param {unknown} payload
+ */
+export function isSuccessEnvelope(payload) {
+  return (
+    payload != null &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    typeof payload.success === 'boolean' &&
+    'data' in payload
+  )
+}
+
+/** Accept both legacy `2000` and HTTP-style `200` success codes. */
+export function isSuccessfulApiCode(code) {
+  if (code === undefined || code === null || code === '') return true
+  const codeNum = Number(code)
+  if (!Number.isFinite(codeNum)) return true
+  if (codeNum === API_SUCCESS_CODE) return true
+  return codeNum >= 200 && codeNum < 300
+}
+
 /** Map body `code` (e.g. 4040) to HTTP-like status (e.g. 404) for Axios error shape. */
 export function deriveHttpStatusFromApiCode(code) {
-  if (typeof code !== 'number' || code < 1000) return 400
+  if (typeof code !== 'number' || code < 1000) {
+    if (typeof code === 'number' && code >= 200 && code < 600) return code
+    return 400
+  }
   return Math.min(599, Math.max(200, Math.floor(code / 10)))
 }

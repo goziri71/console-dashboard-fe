@@ -1,9 +1,16 @@
 import axios from 'axios'
 import {
-  API_SUCCESS_CODE,
   deriveHttpStatusFromApiCode,
   isConsoleEnvelope,
+  isSuccessEnvelope,
+  isSuccessfulApiCode,
 } from '../lib/apiEnvelope'
+import {
+  clearStoredAuth,
+  getAuthToken,
+  setAuthNotice,
+} from '../lib/authStorage'
+import { requestMfaStepUp } from '../lib/mfaStepUp'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -17,12 +24,33 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('sterllo_token')
+  const token = getAuthToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
+
+function requestHadAuthentication(config) {
+  return Boolean(config?.headers?.Authorization)
+}
+
+function expireAuthenticatedSession(config) {
+  if (!requestHadAuthentication(config)) return
+  clearStoredAuth()
+  setAuthNotice('Your session expired or was replaced by a login on another device.')
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login')
+  }
+}
+
+function requiresRecentMfa(error) {
+  const body = error.response?.data
+  return (
+    error.response?.status === 403 &&
+    (body?.data?.code === 'recent_mfa_required' || body?.code === 'recent_mfa_required')
+  )
+}
 
 function isBeamerIntegrationUrl(config) {
   const url = String(config?.url || '')
@@ -40,6 +68,35 @@ api.interceptors.response.use(
 
     if (isKycEnableStatusPassthroughUrl(response.config)) {
       response.data = body
+      return response
+    }
+
+    // Auth MFA challenge responses use `{ success, code: 200, data: { state: "mfa_*" } }`.
+    // Unwrap them so callers receive the challenge object, not a missing JWT.
+    if (isSuccessEnvelope(body)) {
+      if (body.success !== true || !isSuccessfulApiCode(body.code)) {
+        const status =
+          typeof body.code === 'number' && body.code >= 400 && body.code < 600
+            ? body.code
+            : deriveHttpStatusFromApiCode(body.code)
+        if (status === 401) expireAuthenticatedSession(response.config)
+        const axiosResponse = {
+          data: body,
+          status,
+          statusText: body.message || 'Error',
+          headers: response.headers,
+          config: response.config,
+        }
+        const err = new axios.AxiosError(
+          body.message || 'Request failed',
+          axios.AxiosError.ERR_BAD_RESPONSE,
+          response.config,
+          response.request,
+          axiosResponse
+        )
+        return Promise.reject(err)
+      }
+      response.data = body.data
       return response
     }
 
@@ -72,6 +129,7 @@ api.interceptors.response.use(
 
     if (body.state !== true) {
       const status = deriveHttpStatusFromApiCode(body.code)
+      if (status === 401) expireAuthenticatedSession(response.config)
       const axiosResponse = {
         data: body,
         status,
@@ -89,10 +147,7 @@ api.interceptors.response.use(
       return Promise.reject(err)
     }
 
-    const codeNum = Number(body.code)
-    const hasExplicitCode =
-      body.code !== undefined && body.code !== null && body.code !== '' && Number.isFinite(codeNum)
-    if (hasExplicitCode && codeNum !== API_SUCCESS_CODE) {
+    if (!isSuccessfulApiCode(body.code)) {
       const status = deriveHttpStatusFromApiCode(body.code)
       const axiosResponse = {
         data: body,
@@ -114,13 +169,22 @@ api.interceptors.response.use(
     response.data = body.data
     return response
   },
-  (error) => {
+  async (error) => {
+    const config = error.config
+
+    if (
+      requiresRecentMfa(error) &&
+      requestHadAuthentication(config) &&
+      !config?._mfaRetry &&
+      !String(config?.url || '').includes('/auth/mfa/step-up')
+    ) {
+      await requestMfaStepUp()
+      config._mfaRetry = true
+      return api(config)
+    }
+
     if (error.response?.status === 401) {
-      localStorage.removeItem('sterllo_token')
-      localStorage.removeItem('sterllo_user')
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      expireAuthenticatedSession(config)
     }
     const data = error.response?.data
     if (isConsoleEnvelope(data) && data.state !== true && error.response) {

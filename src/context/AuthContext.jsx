@@ -1,46 +1,102 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import * as authService from '../services/auth'
 import {
-  extractTokenFromAuthPayload,
+  extractAuthData,
+  extractAuthenticatedSession,
   extractUserFromProfilePayload,
 } from '../lib/authUser'
+import {
+  clearStoredAuth,
+  getStoredAuth,
+  storeAuthenticatedSession,
+  updateStoredUser,
+} from '../lib/authStorage'
+import { getDeviceLabel } from '../lib/deviceLabel'
 
 const AuthContext = createContext(null)
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000
+const initialAuth = getStoredAuth()
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('sterllo_user')
-    return stored ? JSON.parse(stored) : null
-  })
-  const [token, setToken] = useState(() => localStorage.getItem('sterllo_token'))
-  const [loading, setLoading] = useState(!!localStorage.getItem('sterllo_token'))
+  const [user, setUser] = useState(initialAuth.user)
+  const [token, setToken] = useState(initialAuth.token)
+  const [sessionID, setSessionID] = useState(initialAuth.sessionID)
+  const [userKey, setUserKey] = useState(initialAuth.userKey)
+  const [session, setSession] = useState(initialAuth.session)
+  const [loading, setLoading] = useState(Boolean(initialAuth.token))
+  const [deviceLabel] = useState(getDeviceLabel)
+
+  useEffect(() => {
+    localStorage.removeItem('sterllo_token')
+    localStorage.removeItem('sterllo_user')
+    localStorage.removeItem('sterllo_session_id')
+    localStorage.removeItem('sterllo_user_key')
+    localStorage.removeItem('sterllo_device_session')
+  }, [])
+
+  const clearSessionState = useCallback(() => {
+    clearStoredAuth()
+    setToken(null)
+    setUser(null)
+    setSessionID(null)
+    setUserKey(null)
+    setSession(null)
+  }, [])
 
   const logout = useCallback(async () => {
     try {
       await authService.logout()
     } finally {
-      setToken(null)
-      setUser(null)
+      clearSessionState()
       if (window.location.pathname !== '/login') {
         window.location.replace('/login')
       } else {
         window.location.reload()
       }
     }
+  }, [clearSessionState])
+
+  const completeAuthentication = useCallback((payload) => {
+    const authenticated = extractAuthenticatedSession(payload)
+    if (!authenticated) {
+      throw new Error('Authentication did not return a valid console session.')
+    }
+    storeAuthenticatedSession(authenticated)
+    setToken(authenticated.token)
+    setUser(authenticated.user)
+    setSessionID(authenticated.sessionID)
+    setUserKey(authenticated.userKey)
+    setSession(authenticated.session)
+    return authenticated
   }, [])
 
-  const login = async (email, password) => {
-    const res = await authService.login(email, password)
-    const jwt = extractTokenFromAuthPayload(res)
-    if (!jwt) {
-      throw new Error('No token in login response.')
-    }
-    localStorage.setItem('sterllo_token', jwt)
-    setToken(jwt)
-    // Profile (roles, permissions, role) is loaded in the token effect via GET /auth/profile.
-    return res
-  }
+  const startCrosslink = useCallback(
+    async (crosslinkToken) => {
+      const res = await authService.loginWithCrosslink(crosslinkToken, deviceLabel)
+      return extractAuthData(res)
+    },
+    [deviceLabel]
+  )
+
+  const confirmMfaEnrollment = useCallback(
+    async (challengeToken, code) => {
+      const res = await authService.confirmMfaEnrollment(challengeToken, code, deviceLabel)
+      return extractAuthData(res)
+    },
+    [deviceLabel]
+  )
+
+  const verifyMfaChallenge = useCallback(
+    async (challengeToken, credential) => {
+      const res = await authService.verifyMfaChallenge(
+        challengeToken,
+        credential,
+        deviceLabel
+      )
+      return extractAuthData(res)
+    },
+    [deviceLabel]
+  )
 
   /** Whenever a token exists, GET /auth/profile is the source of truth for roles & permissions (guide §0.1). */
   useEffect(() => {
@@ -59,18 +115,15 @@ export function AuthProvider({ children }) {
         const profile = extractUserFromProfilePayload(res)
         if (profile) {
           setUser(profile)
-          localStorage.setItem('sterllo_user', JSON.stringify(profile))
+          updateStoredUser(profile)
         } else {
           setUser(null)
-          localStorage.removeItem('sterllo_user')
+          updateStoredUser(null)
         }
       })
       .catch(() => {
         if (cancelled) return
-        localStorage.removeItem('sterllo_token')
-        localStorage.removeItem('sterllo_user')
-        setToken(null)
-        setUser(null)
+        clearSessionState()
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -79,7 +132,7 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, clearSessionState])
 
   useEffect(() => {
     if (!token) return
@@ -137,12 +190,29 @@ export function AuthProvider({ children }) {
   }, [token, logout])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        sessionID,
+        userKey,
+        session,
+        loading,
+        deviceLabel,
+        startCrosslink,
+        confirmMfaEnrollment,
+        verifyMfaChallenge,
+        completeAuthentication,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
 }
 
+// Context and hook intentionally live together as the app-wide auth boundary.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')

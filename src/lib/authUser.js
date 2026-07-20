@@ -65,9 +65,71 @@ export function extractUserFromProfilePayload(payload) {
 export function extractTokenFromAuthPayload(payload) {
   if (payload == null || typeof payload !== 'object') return null
   if (typeof payload.token === 'string') return payload.token
+  if (typeof payload.authToken === 'string') return payload.authToken
   if (payload.data != null && typeof payload.data === 'object') {
-    const t = payload.data.token ?? payload.data.access_token
+    const t = payload.data.token ?? payload.data.authToken ?? payload.data.access_token
     if (typeof t === 'string') return t
   }
   return null
+}
+
+/**
+ * Normalize auth responses without weakening the rule that credentials are only
+ * accepted after MFA has completed.
+ * @param {unknown} payload
+ * @returns {Record<string, unknown> | null}
+ */
+export function extractAuthData(payload) {
+  if (payload == null || typeof payload !== 'object' || Array.isArray(payload)) return null
+
+  // Already-unwrapped challenge / authenticated payload from the Axios interceptor.
+  if (typeof payload.state === 'string') {
+    return /** @type {Record<string, unknown>} */ (payload)
+  }
+
+  if (
+    'data' in payload &&
+    payload.data != null &&
+    typeof payload.data === 'object' &&
+    !Array.isArray(payload.data)
+  ) {
+    return /** @type {Record<string, unknown>} */ (payload.data)
+  }
+  return /** @type {Record<string, unknown>} */ (payload)
+}
+
+/**
+ * @param {unknown} payload
+ * @returns {{
+ *   token: string,
+ *   sessionID: string | null,
+ *   userKey: string | null,
+ *   user: Record<string, unknown>,
+ *   session: Record<string, unknown> | null
+ * } | null}
+ */
+export function extractAuthenticatedSession(payload) {
+  const data = extractAuthData(payload)
+  if (!data || data.state !== 'authenticated') return null
+
+  const token =
+    typeof data.token === 'string'
+      ? data.token
+      : typeof data.authToken === 'string'
+        ? data.authToken
+        : null
+  if (!token || !data.user || typeof data.user !== 'object' || Array.isArray(data.user)) {
+    return null
+  }
+
+  return {
+    token,
+    sessionID: typeof data.sessionID === 'string' ? data.sessionID : null,
+    userKey: typeof data.userKey === 'string' ? data.userKey : null,
+    user: /** @type {Record<string, unknown>} */ (data.user),
+    session:
+      data.session && typeof data.session === 'object' && !Array.isArray(data.session)
+        ? /** @type {Record<string, unknown>} */ (data.session)
+        : null,
+  }
 }

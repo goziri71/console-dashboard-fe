@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
@@ -14,9 +14,11 @@ import DisputesPage from './pages/disputes/DisputesPage'
 import SettlementsPage from './pages/settlements/SettlementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import AdminPage from './pages/admin/AdminPage'
+import MfaStepUpProvider from './components/auth/MfaStepUpProvider'
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -27,17 +29,23 @@ function ProtectedRoute({ children }) {
   }
 
   if (!token) {
-    return <Navigate to="/login" replace />
+    return <Navigate to={{ pathname: '/login', search: location.search }} replace />
   }
 
   return children
+}
+
+/** Send unknown paths to /login, keeping the query string so a Crosslink `?token=` survives. */
+function RedirectToLogin() {
+  const location = useLocation()
+  return <Navigate to={{ pathname: '/login', search: location.search }} replace />
 }
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<Navigate to="/login" replace />} />
+      <Route path="/register" element={<RedirectToLogin />} />
       <Route
         element={
           <ProtectedRoute>
@@ -60,6 +68,7 @@ function AppRoutes() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Route>
+      <Route path="*" element={<RedirectToLogin />} />
     </Routes>
   )
 }
@@ -68,7 +77,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <MfaStepUpProvider>
+          <AppRoutes />
+        </MfaStepUpProvider>
       </AuthProvider>
     </BrowserRouter>
   )
