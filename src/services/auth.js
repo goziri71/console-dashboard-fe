@@ -1,10 +1,8 @@
 import api from './api'
 import { clearStoredAuth } from '../lib/authStorage'
 
-export async function loginWithCrosslink(token, deviceLabel) {
-  const payload = { token }
-  if (deviceLabel) payload.device_label = deviceLabel
-  const { data } = await api.post('/auth/login/crosslink', payload)
+export async function loginWithCrosslink(token) {
+  const { data } = await api.post('/auth/login/crosslink', { token })
   return data
 }
 

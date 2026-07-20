@@ -16,7 +16,7 @@ export function isConsoleEnvelope(payload) {
 }
 
 /**
- * Newer auth/console responses use `{ success, code, data }` instead of `{ state, code, data }`.
+ * Crosslink / console responses may use `{ success, data }` or `{ status, data }`.
  * @param {unknown} payload
  */
 export function isSuccessEnvelope(payload) {
@@ -24,9 +24,17 @@ export function isSuccessEnvelope(payload) {
     payload != null &&
     typeof payload === 'object' &&
     !Array.isArray(payload) &&
-    typeof payload.success === 'boolean' &&
-    'data' in payload
+    'data' in payload &&
+    (typeof payload.success === 'boolean' || typeof payload.status === 'boolean')
   )
+}
+
+export function isEnvelopeSuccessful(payload) {
+  if (!payload || typeof payload !== 'object') return false
+  if (payload.success === true) return true
+  if (payload.status === true) return true
+  if (payload.state === true) return true
+  return false
 }
 
 /** Accept both legacy `2000` and HTTP-style `200` success codes. */

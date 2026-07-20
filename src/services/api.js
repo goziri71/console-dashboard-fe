@@ -2,6 +2,7 @@ import axios from 'axios'
 import {
   deriveHttpStatusFromApiCode,
   isConsoleEnvelope,
+  isEnvelopeSuccessful,
   isSuccessEnvelope,
   isSuccessfulApiCode,
 } from '../lib/apiEnvelope'
@@ -71,10 +72,9 @@ api.interceptors.response.use(
       return response
     }
 
-    // Auth MFA challenge responses use `{ success, code: 200, data: { state: "mfa_*" } }`.
-    // Unwrap them so callers receive the challenge object, not a missing JWT.
+    // Crosslink uses `{ status: true, code: 200, data: { authToken, ... } }`.
     if (isSuccessEnvelope(body)) {
-      if (body.success !== true || !isSuccessfulApiCode(body.code)) {
+      if (!isEnvelopeSuccessful(body) || !isSuccessfulApiCode(body.code)) {
         const status =
           typeof body.code === 'number' && body.code >= 400 && body.code < 600
             ? body.code

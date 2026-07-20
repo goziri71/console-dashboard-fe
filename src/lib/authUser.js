@@ -102,8 +102,8 @@ export function extractAuthData(payload) {
 }
 
 /**
- * Crosslink only returns a JWT after MFA enroll/verify (`state: "authenticated"`).
- * Challenge responses (`mfa_required` / `mfa_enrollment_required`) must not be stored.
+ * Crosslink success: `{ authToken, sessionID, userKey }` (no MFA).
+ * MFA challenge responses must not be stored as sessions.
  * @param {unknown} payload
  * @returns {{
  *   token: string,
@@ -117,16 +117,9 @@ export function extractAuthenticatedSession(payload) {
   const data = extractAuthData(payload)
   if (!data) return null
 
-  // MFA challenge responses must not be treated as logged-in sessions.
-  if (
-    data.state === 'mfa_required' ||
-    data.state === 'mfa_enrollment_required'
-  ) {
+  if (data.state === 'mfa_required' || data.state === 'mfa_enrollment_required') {
     return null
   }
-
-  // Require explicit authenticated state so a bare Crosslink response cannot log in.
-  if (data.state !== 'authenticated') return null
 
   const token =
     typeof data.authToken === 'string'
@@ -136,15 +129,19 @@ export function extractAuthenticatedSession(payload) {
         : null
   if (!token) return null
 
-  if (!data.user || typeof data.user !== 'object' || Array.isArray(data.user)) {
-    return null
-  }
+  // If an explicit auth state is present, only accept authenticated.
+  if (typeof data.state === 'string' && data.state !== 'authenticated') return null
+
+  const user =
+    data.user && typeof data.user === 'object' && !Array.isArray(data.user)
+      ? /** @type {Record<string, unknown>} */ (data.user)
+      : {}
 
   return {
     token,
     sessionID: typeof data.sessionID === 'string' ? data.sessionID : null,
     userKey: typeof data.userKey === 'string' ? data.userKey : null,
-    user: /** @type {Record<string, unknown>} */ (data.user),
+    user,
     session:
       data.session && typeof data.session === 'object' && !Array.isArray(data.session)
         ? /** @type {Record<string, unknown>} */ (data.session)
