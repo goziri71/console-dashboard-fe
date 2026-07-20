@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
@@ -41,35 +42,55 @@ function RedirectToLogin() {
   return <Navigate to={{ pathname: '/login', search: location.search }} replace />
 }
 
+/** Hosts often 301 `/login` → `/login/`; keep `?token=` and normalize the path. */
+function TrailingSlashFix({ children }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+      navigate(
+        { pathname: location.pathname.replace(/\/+$/, ''), search: location.search, hash: location.hash },
+        { replace: true }
+      )
+    }
+  }, [location.pathname, location.search, location.hash, navigate])
+
+  return children
+}
+
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RedirectToLogin />} />
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/merchants" element={<MerchantsPage />} />
-        <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />
-        <Route path="/merchants/:accountKey/customers/:identifier/kyc" element={<CustomerKycPage />} />
-        <Route path="/merchants/:accountKey/customers/:identifier" element={<CustomerDetailsPage />} />
-        <Route path="/customers/:identifier" element={<CustomerDetailsPage />} />
-        <Route path="/customers" element={<Navigate to="/merchants" replace />} />
-        <Route path="/wallets" element={<WalletsPage />} />
-        <Route path="/transactions" element={<TransactionsPage />} />
-        <Route path="/compliance" element={<CompliancePage />} />
-        <Route path="/disputes" element={<DisputesPage />} />
-        <Route path="/settlements" element={<SettlementsPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Route>
-      <Route path="*" element={<RedirectToLogin />} />
-    </Routes>
+    <TrailingSlashFix>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login/" element={<LoginPage />} />
+        <Route path="/register" element={<RedirectToLogin />} />
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/merchants" element={<MerchantsPage />} />
+          <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />
+          <Route path="/merchants/:accountKey/customers/:identifier/kyc" element={<CustomerKycPage />} />
+          <Route path="/merchants/:accountKey/customers/:identifier" element={<CustomerDetailsPage />} />
+          <Route path="/customers/:identifier" element={<CustomerDetailsPage />} />
+          <Route path="/customers" element={<Navigate to="/merchants" replace />} />
+          <Route path="/wallets" element={<WalletsPage />} />
+          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/compliance" element={<CompliancePage />} />
+          <Route path="/disputes" element={<DisputesPage />} />
+          <Route path="/settlements" element={<SettlementsPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+        </Route>
+        <Route path="*" element={<RedirectToLogin />} />
+      </Routes>
+    </TrailingSlashFix>
   )
 }
 

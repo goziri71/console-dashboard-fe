@@ -8,6 +8,22 @@ import authBranding from '../../assets/Authlogo/Container.svg'
 
 const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
 
+/** Capture Crosslink token as soon as this module loads, before any router redirects. */
+function captureCrosslinkTokenEarly() {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const fromUrl = params.get('token')
+    if (!fromUrl) return
+    sessionStorage.setItem(PENDING_CROSSLINK_KEY, fromUrl)
+    const path = window.location.pathname.replace(/\/+$/, '') || '/'
+    window.history.replaceState({}, '', `${path}${window.location.hash}`)
+  } catch {
+    // Ignore storage/history failures during boot.
+  }
+}
+
+captureCrosslinkTokenEarly()
+
 /** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
 let inflightCrosslink = null
 let inflightCrosslinkToken = null
@@ -19,7 +35,8 @@ function takeCrosslinkTokenFromUrl() {
   const fromUrl = params.get('token')
   if (fromUrl) {
     sessionStorage.setItem(PENDING_CROSSLINK_KEY, fromUrl)
-    window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+    const path = window.location.pathname.replace(/\/+$/, '') || '/'
+    window.history.replaceState({}, '', `${path}${window.location.hash}`)
     return fromUrl
   }
   return sessionStorage.getItem(PENDING_CROSSLINK_KEY)
