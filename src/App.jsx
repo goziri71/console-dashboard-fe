@@ -73,7 +73,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/merchants" element={<MerchantsPage />} />
           <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />
           <Route path="/merchants/:accountKey/customers/:identifier/kyc" element={<CustomerKycPage />} />

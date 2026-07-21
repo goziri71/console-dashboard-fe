@@ -14,7 +14,7 @@ import {
 import logo from '../../assets/Authlogo/Sterllologo.svg'
 
 const navItems = [
-  { label: 'Dashboard', icon: LayoutDashboard, path: '/' },
+  { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Merchants', icon: Users, path: '/merchants' },
   { label: 'Wallet', icon: Wallet, path: '/wallets' },
   { label: 'Transactions', icon: ArrowLeftRight, path: '/transactions' },
@@ -45,7 +45,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
           <NavLink
             key={item.path}
             to={item.path}
-            end={item.path === '/'}
+            end={item.path === '/dashboard'}
             onClick={() => onNavigate?.()}
             className={({ isActive }) =>
               `motion-surface flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium ${
