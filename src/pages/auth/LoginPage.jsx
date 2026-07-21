@@ -7,6 +7,8 @@ import { extractAuthenticatedSession } from '../../lib/authUser'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
 const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
+const ACCOUNT_LOGIN_URL =
+  'https://account.redbiller.com/login?rr=https%3A%2F%2Fwww.console.sterllo.com%2F'
 
 /** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
 let inflightCrosslink = null
@@ -14,8 +16,16 @@ let inflightCrosslinkToken = null
 
 function readCrosslinkTokenFromLocation() {
   const params = new URLSearchParams(window.location.search)
-  const value = params.get('token')
+  const value = params.get('x92Qko8x9UwMs8') ?? params.get('token')
   return value ? value.trim() : null
+}
+
+function removeCrosslinkTokenFromLocation() {
+  window.history.replaceState({}, '', window.location.pathname)
+}
+
+function redirectToAccountLogin() {
+  window.location.replace(ACCOUNT_LOGIN_URL)
 }
 
 function captureCrosslinkTokenEarly() {
@@ -23,7 +33,7 @@ function captureCrosslinkTokenEarly() {
     const fromUrl = readCrosslinkTokenFromLocation()
     if (!fromUrl) return
     sessionStorage.setItem(PENDING_CROSSLINK_KEY, fromUrl)
-    window.history.replaceState({}, '', '/login')
+    removeCrosslinkTokenFromLocation()
   } catch {
     // Ignore storage/history failures during boot.
   }
@@ -35,7 +45,7 @@ function takeCrosslinkTokenFromUrl() {
   const fromUrl = readCrosslinkTokenFromLocation()
   if (fromUrl) {
     sessionStorage.setItem(PENDING_CROSSLINK_KEY, fromUrl)
-    window.history.replaceState({}, '', '/login')
+    removeCrosslinkTokenFromLocation()
     return fromUrl
   }
   return sessionStorage.getItem(PENDING_CROSSLINK_KEY)
@@ -61,7 +71,7 @@ function crosslinkErrorMessage(error) {
     return serverMessage || 'Your account has not been provisioned for the Sterllo Console.'
   }
   if (status === 500 || status === 502) {
-    return serverMessage || 'Redbiller is temporarily unavailable. Try again shortly.'
+    return serverMessage || 'The login service is temporarily unavailable. Try again shortly.'
   }
   return serverMessage || error.message || 'Crosslink login failed.'
 }
@@ -79,9 +89,12 @@ export default function LoginPage() {
       return undefined
     }
 
-    // Normal /login with no token: do not call the backend and do not show a Crosslink error.
+    // Normal /login with no token starts the external account login flow.
     const crosslinkToken = takeCrosslinkTokenFromUrl()
-    if (!crosslinkToken) return undefined
+    if (!crosslinkToken) {
+      redirectToAccountLogin()
+      return undefined
+    }
 
     let cancelled = false
 
@@ -169,7 +182,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => {
                   setError('')
-                  if (window.history.length > 1) window.history.back()
+                  redirectToAccountLogin()
                 }}
                 className="min-h-12 w-full cursor-pointer rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90 active:scale-[0.98]"
               >
