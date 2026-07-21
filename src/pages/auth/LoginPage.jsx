@@ -8,7 +8,7 @@ import authBranding from '../../assets/Authlogo/Container.svg'
 
 const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
 const ACCOUNT_LOGIN_URL =
-  'https://account.redbiller.com/login?rr=https%3A%2F%2Fwww.console.sterllo.com%2F'
+  'https://account.redbiller.com/login?rr=https%3A%2F%2Fwww.console.sterllo.com%2Flogin'
 
 /** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
 let inflightCrosslink = null
@@ -100,9 +100,6 @@ export default function LoginPage() {
     inflightCrosslink
       .then((data) => {
         if (!extractAuthenticatedSession(data)) {
-          if (data?.state === 'mfa_enrollment_required' || data?.state === 'mfa_required') {
-            throw new Error('Multi-factor authentication is required for this account.')
-          }
           throw new Error('Login did not return an authenticated session.')
         }
         clearPendingCrosslinkToken()
