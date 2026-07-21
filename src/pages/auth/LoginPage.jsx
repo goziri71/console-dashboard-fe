@@ -362,6 +362,9 @@ export default function LoginPage() {
         >
           Login
         </button>
+        <p className="text-xs leading-relaxed text-text-muted">
+          Signing in successfully on this device will sign out the previously active device.
+        </p>
       </div>
     )
   }

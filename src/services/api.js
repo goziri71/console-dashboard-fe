@@ -11,6 +11,7 @@ import {
   getAuthToken,
   setAuthNotice,
 } from '../lib/authStorage'
+import { requestMfaStepUp } from '../lib/mfaStepUp'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -52,6 +53,24 @@ function isBeamerIntegrationUrl(config) {
 function isKycEnableStatusPassthroughUrl(config) {
   const url = String(config?.url || '')
   return url.includes('/kyc/sub-account-enable-status')
+}
+
+function requiresRecentMfa(error) {
+  const body = error.response?.data
+  return (
+    error.response?.status === 403 &&
+    (body?.data?.code === 'recent_mfa_required' || body?.code === 'recent_mfa_required')
+  )
+}
+
+function isPricingWrite(config) {
+  const method = String(config?.method || 'get').toLowerCase()
+  const url = String(config?.url || '')
+  return (
+    method !== 'get' &&
+    (url.includes('/fees/defaults/') ||
+      (url.includes('/merchants/') && url.includes('/fees/')))
+  )
 }
 
 api.interceptors.response.use(
@@ -173,5 +192,19 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+api.interceptors.response.use(undefined, async (error) => {
+  const config = error.config
+  if (
+    requiresRecentMfa(error) &&
+    isPricingWrite(config) &&
+    !config?._mfaRetry
+  ) {
+    await requestMfaStepUp()
+    config._mfaRetry = true
+    return api(config)
+  }
+  return Promise.reject(error)
+})
 
 export default api

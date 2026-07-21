@@ -30,6 +30,11 @@ export async function verifyMfaChallenge(challengeToken, credential, deviceLabel
   return data
 }
 
+export async function stepUpMfa(code) {
+  const { data } = await api.post('/auth/mfa/step-up', { code })
+  return data
+}
+
 export async function logout() {
   try {
     await api.post('/auth/logout')

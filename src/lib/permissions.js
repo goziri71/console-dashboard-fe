@@ -10,6 +10,8 @@ export const PERMISSION_MERCHANT_UPDATE = 'merchant.update'
 export const PERMISSION_KYC_UPDATE = 'kyc.update'
 /** Pending transaction review — POST /transactions/review/.../approve|cancel */
 export const PERMISSION_DISPUTE_UPDATE = 'dispute.update'
+export const PERMISSION_PRICING_READ = 'pricing.read'
+export const PERMISSION_PRICING_MANAGE = 'pricing.manage'
 
 /** Seeded management role: server rejects PATCH …/roles/:id/permissions for this slug only. */
 export const ROLE_SLUG_MANAGEMENT = 'management'
@@ -31,6 +33,16 @@ export function canReadFinancial(permissions) {
 export function canManageRbac(permissions) {
   if (!permissions?.length) return false
   return hasFullAccess(permissions) || permissions.includes(PERMISSION_RBAC_MANAGE)
+}
+
+export function canReadPricing(permissions) {
+  if (!permissions?.length) return false
+  return hasFullAccess(permissions) || permissions.includes(PERMISSION_PRICING_READ)
+}
+
+export function canManagePricing(permissions) {
+  if (!permissions?.length) return false
+  return hasFullAccess(permissions) || permissions.includes(PERMISSION_PRICING_MANAGE)
 }
 
 export function canUpdateCustomerRecord(permissions) {

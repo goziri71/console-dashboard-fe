@@ -15,6 +15,8 @@ import DisputesPage from './pages/disputes/DisputesPage'
 import SettlementsPage from './pages/settlements/SettlementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import AdminPage from './pages/admin/AdminPage'
+import MerchantPricingPage from './features/pricing/MerchantPricingPage'
+import MfaStepUpProvider from './components/auth/MfaStepUpProvider'
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth()
@@ -75,6 +77,7 @@ function AppRoutes() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/merchants" element={<MerchantsPage />} />
+          <Route path="/merchants/:accountKey/pricing" element={<MerchantPricingPage />} />
           <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />
           <Route path="/merchants/:accountKey/customers/:identifier/kyc" element={<CustomerKycPage />} />
           <Route path="/merchants/:accountKey/customers/:identifier" element={<CustomerDetailsPage />} />
@@ -98,7 +101,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <MfaStepUpProvider>
+          <AppRoutes />
+        </MfaStepUpProvider>
       </AuthProvider>
     </BrowserRouter>
   )

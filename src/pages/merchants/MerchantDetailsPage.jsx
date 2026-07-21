@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  BadgeDollarSign,
   Snowflake,
   TrendingUp,
   Loader2,
@@ -16,7 +17,7 @@ import {
 import { getMerchant, getMerchantCustomers, updateMerchant, patchMerchantTier } from '../../services/merchants'
 import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
-import { canKycUpdate, canUpdateMerchant } from '../../lib/permissions'
+import { canKycUpdate, canReadPricing, canUpdateMerchant } from '../../lib/permissions'
 import { cn, exportToCsv, formatNumber } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -77,6 +78,7 @@ export default function MerchantDetailsPage() {
   const canMutate = CAN_MUTATE.includes(user?.role)
   const canApproveMerchantKyc = canKycUpdate(user?.permissions, user?.role)
   const canManageUdara = canUpdateMerchant(user?.permissions, user?.role)
+  const canViewPricing = canReadPricing(user?.permissions)
 
   const [merchant, setMerchant] = useState(null)
   const [merchantLoading, setMerchantLoading] = useState(true)
@@ -270,7 +272,6 @@ export default function MerchantDetailsPage() {
   }
 
   const runUpgradeTier = async (targetTier) => {
-    const currentTier = Number(merchant?.default_kyc_tier ?? 1)
     const nextTier = Number(targetTier)
     if (!Number.isFinite(nextTier) || nextTier < 1 || nextTier > 3) {
       pushMsg('error', 'Select a valid tier (1 to 3).')
@@ -342,7 +343,6 @@ export default function MerchantDetailsPage() {
   const runUpgradeCustomer = async (customer, targetTier) => {
     const id = getCustomerId(customer)
     const label = customerDisplayName(customer)
-    const current = Number(customer?.tier ?? customer?.default_kyc_tier ?? 1)
     const next = Number(targetTier)
     if (!id) return
     if (!Number.isFinite(next) || next < 1 || next > 3) {
@@ -500,6 +500,15 @@ export default function MerchantDetailsPage() {
             </span>
           ) : null}
         </button>
+        {canViewPricing ? (
+          <Link
+            to={`/merchants/${encodeURIComponent(accountKey)}/pricing`}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-medium text-text-secondary hover:bg-card-hover sm:w-auto"
+          >
+            <BadgeDollarSign size={14} />
+            Pricing
+          </Link>
+        ) : null}
         {canMutate && (
           <div className="relative w-full sm:w-auto sm:self-auto">
             <button

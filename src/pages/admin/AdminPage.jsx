@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  BadgeDollarSign,
   KeyRound,
   Lock,
   Search,
@@ -16,6 +17,7 @@ import {
   PERMISSION_ALL,
   PERMISSION_FINANCIAL_READ,
   canManageRbac,
+  canReadPricing,
   isManagementRoleSlug,
   sanitizePermissionKeysForRole,
   validateRolePermissionKeysForSave,
@@ -30,6 +32,7 @@ import {
   revokeUserRole,
 } from '../../services/rbac'
 import AdminCreateUserForm from './AdminCreateUserForm'
+import DefaultPricingPanel from '../../features/pricing/DefaultPricingPanel'
 
 const BANNER_AUTO_DISMISS_MS = 5000
 
@@ -76,7 +79,7 @@ function SummaryCard({ label, value, hint, icon: Icon, iconWrapCls }) {
     <div className="rounded-card border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2">
         <div className={iconWrapCls}>
-          <Icon size={14} />
+          {createElement(Icon, { size: 14 })}
         </div>
         <span className="text-xs text-text-muted">{label}</span>
       </div>
@@ -114,6 +117,7 @@ function permissionChipLabel(key, catalogByKey) {
 const ADMIN_TABS = [
   { id: 'team', label: 'Team', icon: Users },
   { id: 'roles', label: 'Roles & access', icon: Shield },
+  { id: 'pricing', label: 'Default pricing', icon: BadgeDollarSign },
 ]
 
 function UserRoleModal({ user, mode, rolesList, roleSlug, onRoleSlugChange, pending, onClose, onSubmit }) {
@@ -209,6 +213,7 @@ export default function AdminPage() {
   const perms = user?.permissions
   const roles = user?.roles
   const manage = canManageRbac(perms)
+  const pricingRead = canReadPricing(perms)
 
   const [catalog, setCatalog] = useState([])
   const [rolesList, setRolesList] = useState([])
@@ -558,7 +563,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {rbacError && (
+      {rbacError && activeTab !== 'pricing' && (
         <div className="mb-4 rounded-card border border-error/40 bg-error-bg px-4 py-3 text-sm text-error">
           {rbacError}
           <button
@@ -571,7 +576,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {!manage && (
+      {!manage && activeTab !== 'pricing' && (
         <div className="mb-6 flex gap-3 rounded-card border border-warning/30 bg-warning-bg/30 p-4">
           <Lock className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
           <div>
@@ -584,15 +589,22 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div className="stat-grid mb-6 xl:grid-cols-3">
-        {statCards.map((card) => (
-          <SummaryCard key={card.label} {...card} />
-        ))}
-      </div>
+      {activeTab !== 'pricing' ? (
+        <div className="stat-grid mb-6 xl:grid-cols-3">
+          {statCards.map((card) => (
+            <SummaryCard key={card.label} {...card} />
+          ))}
+        </div>
+      ) : null}
 
       <div className="card-shell">
-        <div className="tab-scroll bg-page lg:grid lg:grid-cols-2 lg:overflow-visible lg:px-0">
-          {ADMIN_TABS.map((tab) => {
+        <div
+          className={cn(
+            'tab-scroll bg-page lg:grid lg:overflow-visible lg:px-0',
+            pricingRead ? 'lg:grid-cols-3' : 'lg:grid-cols-2'
+          )}
+        >
+          {ADMIN_TABS.filter((tab) => tab.id !== 'pricing' || pricingRead).map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.id
             return (
@@ -614,7 +626,9 @@ export default function AdminPage() {
           })}
         </div>
 
-        {activeTab === 'team' ? (
+        {activeTab === 'pricing' ? (
+          <DefaultPricingPanel />
+        ) : activeTab === 'team' ? (
           <>
             <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
