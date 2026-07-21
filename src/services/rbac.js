@@ -44,6 +44,22 @@ export async function listRbacUsers(params = {}) {
 }
 
 /**
+ * Provision a passwordless Console user for Crosslink authentication.
+ *
+ * @param {{
+ *   email: string,
+ *   biller_id?: string,
+ *   first_name: string,
+ *   last_name: string,
+ *   role_slug: string
+ * }} body
+ */
+export async function createRbacUser(body) {
+  const { data } = await api.post('/rbac/users', body)
+  return data
+}
+
+/**
  * @param {{ slug: string, label: string, permission_keys: string[] }} body
  */
 export async function createRbacRole(body) {

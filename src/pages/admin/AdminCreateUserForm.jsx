@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import { register as registerConsoleUser } from '../../services/auth'
+import { createRbacUser } from '../../services/rbac'
 
 const CONSOLE_ROLE_OPTIONS = [
   { value: 'operations', label: 'Operations' },
@@ -23,8 +23,7 @@ export default function AdminCreateUserForm({
   setPending,
 }) {
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [passwordConfirm, setPasswordConfirm] = useState('')
+  const [billerId, setBillerId] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [role, setRole] = useState('operations')
@@ -35,27 +34,22 @@ export default function AdminCreateUserForm({
     e.preventDefault()
     if (disabled) return
 
-    if (!email.trim() || !password.trim() || !firstName.trim() || !lastName.trim()) {
-      onError('Email, password, first name, and last name are required.')
-      return
-    }
-    if (password !== passwordConfirm) {
-      onError('Passwords do not match.')
+    if (!email.trim() || !firstName.trim() || !lastName.trim()) {
+      onError('Email, first name, and last name are required.')
       return
     }
 
     setPending('create-user')
     try {
-      await registerConsoleUser({
+      await createRbacUser({
         email: email.trim(),
-        password,
+        ...(billerId.trim() ? { biller_id: billerId.trim() } : {}),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        role,
+        role_slug: role,
       })
       setEmail('')
-      setPassword('')
-      setPasswordConfirm('')
+      setBillerId('')
       setFirstName('')
       setLastName('')
       setRole('operations')
@@ -144,29 +138,15 @@ export default function AdminCreateUserForm({
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor="admin-create-password" className="text-sm text-text-secondary">
-            Password
+          <label htmlFor="admin-create-biller-id" className="text-sm text-text-secondary">
+            Redbiller ID <span className="text-text-muted">(optional)</span>
           </label>
           <input
-            id="admin-create-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            disabled={disabled}
-            className={cn(inputCls, disabled && 'cursor-not-allowed opacity-60')}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="admin-create-password-confirm" className="text-sm text-text-secondary">
-            Confirm password
-          </label>
-          <input
-            id="admin-create-password-confirm"
-            type="password"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            autoComplete="new-password"
+            id="admin-create-biller-id"
+            type="text"
+            value={billerId}
+            onChange={(e) => setBillerId(e.target.value)}
+            autoComplete="off"
             disabled={disabled}
             className={cn(inputCls, disabled && 'cursor-not-allowed opacity-60')}
           />
