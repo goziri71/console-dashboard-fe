@@ -8,7 +8,7 @@ import authBranding from '../../assets/Authlogo/Container.svg'
 
 const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
 const ACCOUNT_LOGIN_URL =
-  'https://account.redbiller.com/login?rr=https%3A%2F%2Fwww.console.sterllo.com%2Flogin'
+  'https://account.redbiller.com/login/?rr=https://www.console.sterllo.com/'
 
 /** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
 let inflightCrosslink = null
