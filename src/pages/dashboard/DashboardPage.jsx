@@ -31,7 +31,7 @@ export default function DashboardPage() {
     async function fetchData() {
       try {
         const summaryRes = await getSummary()
-        setSummary(summaryRes.data)
+        setSummary(summaryRes)
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load dashboard data.')
       } finally {
