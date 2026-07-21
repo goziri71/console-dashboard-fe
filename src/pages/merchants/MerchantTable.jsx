@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { MoreVertical, Link2, ExternalLink, TrendingUp } from 'lucide-react'
 import { formatDate, cn } from '../../lib/utils'
@@ -49,6 +50,7 @@ const COLUMNS = [
 export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkUdara, onUpgradeMerchant }) {
   const navigate = useNavigate()
   const [openMenuKey, setOpenMenuKey] = useState(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
 
   useEffect(() => {
     if (!openMenuKey) return
@@ -59,7 +61,14 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
       setOpenMenuKey(null)
     }
     document.addEventListener('mousedown', onDocMouseDown)
-    return () => document.removeEventListener('mousedown', onDocMouseDown)
+    const closeMenu = () => setOpenMenuKey(null)
+    window.addEventListener('resize', closeMenu)
+    window.addEventListener('scroll', closeMenu, true)
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown)
+      window.removeEventListener('resize', closeMenu)
+      window.removeEventListener('scroll', closeMenu, true)
+    }
   }, [openMenuKey])
 
   const rowOffset = (page - 1) * limit
@@ -139,6 +148,20 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const menuWidth = 200
+                          const menuHeight = 132
+                          const roomBelow = window.innerHeight - rect.bottom
+                          setMenuPosition({
+                            top:
+                              roomBelow >= menuHeight
+                                ? rect.bottom + 4
+                                : Math.max(8, rect.top - menuHeight - 4),
+                            left: Math.min(
+                              window.innerWidth - menuWidth - 8,
+                              Math.max(8, rect.right - menuWidth)
+                            ),
+                          })
                           setOpenMenuKey((k) => (k === rowKey ? null : rowKey))
                         }}
                         className="p-1 rounded-md transition-colors text-text-muted hover:bg-card-hover hover:text-text-secondary active:scale-90"
@@ -148,10 +171,13 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                       >
                         <MoreVertical size={16} />
                       </button>
-                      {menuOpen ? (
+                      {menuOpen && typeof document !== 'undefined' ? createPortal(
                         <div
-                          className="absolute right-0 bottom-full z-[100] mb-1 min-w-[200px] overflow-hidden rounded-lg border border-border bg-card py-1 text-left shadow-lg sm:top-full sm:mb-0 sm:mt-1"
+                          className="fixed z-[100] min-w-[200px] overflow-hidden rounded-lg border border-border bg-card py-1 text-left shadow-lg"
                           role="menu"
+                          data-merchant-action-wrap
+                          data-menu-key={rowKey}
+                          style={{ top: menuPosition.top, left: menuPosition.left }}
                         >
                           <button
                             type="button"
@@ -199,7 +225,8 @@ export default function MerchantTable({ merchants, page = 1, limit = 20, onLinkU
                               Upgrade account
                             </button>
                           ) : null}
-                        </div>
+                        </div>,
+                        document.body
                       ) : null}
                     </div>
                   </td>
