@@ -145,8 +145,17 @@ function txStatusPill(kind, label) {
 
 function mapTxRow(row, index, page, activeTab) {
   const sn = (page - 1) * TX_PAGE_SIZE + index + 1
-  const currency = String(pickFirst(row, ['currency_code', 'currency', 'asset_code']) || 'NGN').toUpperCase()
-  const amountRaw = pickFirst(row, ['amount', 'value', 'gross_amount', 'net_amount']) || 0
+  const isSwap = activeTab === 'swaps'
+  const sourceCurrency = String(pickFirst(row, ['source_currency_code']) || 'NGN').toUpperCase()
+  const targetCurrency = String(pickFirst(row, ['target_currency_code']) || 'NGN').toUpperCase()
+  const sourceAmountRaw = pickFirst(row, ['source_amount']) || 0
+  const targetAmountRaw = pickFirst(row, ['target_amount']) || 0
+  const currency = isSwap
+    ? sourceCurrency
+    : String(pickFirst(row, ['currency_code', 'currency', 'asset_code']) || 'NGN').toUpperCase()
+  const amountRaw = isSwap
+    ? sourceAmountRaw
+    : pickFirst(row, ['amount', 'value', 'gross_amount', 'net_amount']) || 0
   const balanceRaw =
     pickFirst(row, ['closing_balance', 'balance_after']) ||
     pickFirst(row, ['opening_balance', 'balance_before']) ||
@@ -190,7 +199,11 @@ function mapTxRow(row, index, page, activeTab) {
   return {
     sn,
     service,
-    amount: amountRaw != null && amountRaw !== '' ? formatBalance(amountRaw, currency) : '—',
+    amount: isSwap
+      ? `${formatBalance(sourceAmountRaw, sourceCurrency)} → ${formatBalance(targetAmountRaw, targetCurrency)}`
+      : amountRaw != null && amountRaw !== ''
+        ? formatBalance(amountRaw, currency)
+        : '—',
     balanceDisplay,
     date: dateRaw ? formatDate(dateRaw) : '—',
     statusKind: txStatusKind(statusRaw),

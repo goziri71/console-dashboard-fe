@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDownCircle,
   ArrowLeftRight,
@@ -210,7 +210,7 @@ function FilterPill({ icon: Icon, label, value, options, onChange }) {
   return (
     <div className="relative min-w-0">
       <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
-        <Icon size={14} />
+        {createElement(Icon, { size: 14 })}
       </div>
       <select
         value={value}
@@ -296,7 +296,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [activeTab, page, query, selectedTab])
+  }, [page, query, selectedTab])
 
   useEffect(() => {
     fetchTransactions()
@@ -310,8 +310,17 @@ export default function TransactionsPage() {
   function mapRow(tx, index) {
     const sn = (page - 1) * TABLE_LIMIT + index + 1
     const parties = partiesForTab(activeTab, tx)
-    const currency = pickFirst(tx, ['currency_code', 'currency', 'asset_code']) || 'NGN'
-    const amountRaw = pickFirst(tx, ['amount', 'value', 'gross_amount', 'net_amount']) || 0
+    const isSwap = activeTab === 'swaps'
+    const sourceCurrency = pickFirst(tx, ['source_currency_code']) || 'NGN'
+    const targetCurrency = pickFirst(tx, ['target_currency_code']) || 'NGN'
+    const sourceAmountRaw = pickFirst(tx, ['source_amount']) || 0
+    const targetAmountRaw = pickFirst(tx, ['target_amount']) || 0
+    const currency = isSwap
+      ? sourceCurrency
+      : pickFirst(tx, ['currency_code', 'currency', 'asset_code']) || 'NGN'
+    const amountRaw = isSwap
+      ? sourceAmountRaw
+      : pickFirst(tx, ['amount', 'value', 'gross_amount', 'net_amount']) || 0
     const date = pickFirst(tx, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date']) || ''
     const statusValue =
       (activeTab === 'deposits'
@@ -331,9 +340,15 @@ export default function TransactionsPage() {
       primaryMeta: parties.primaryMeta,
       secondaryName: parties.secondaryName,
       secondaryMeta: parties.secondaryMeta,
-      amount: formatBalance(amountRaw, currency),
+      amount: isSwap
+        ? `${formatBalance(sourceAmountRaw, sourceCurrency)} → ${formatBalance(targetAmountRaw, targetCurrency)}`
+        : formatBalance(amountRaw, currency),
       amountRaw,
       currency,
+      sourceAmountRaw,
+      sourceCurrency,
+      targetAmountRaw,
+      targetCurrency,
       feeRaw,
       openingBalanceRaw,
       closingBalanceRaw,
@@ -343,7 +358,7 @@ export default function TransactionsPage() {
     }
   }
 
-  const displayRows = useMemo(() => rows.map(mapRow), [rows, page, activeTab])
+  const displayRows = rows.map(mapRow)
   const columnLabels = useMemo(() => tableColumnsForTab(activeTab), [activeTab])
 
   function handleExport() {
@@ -369,6 +384,24 @@ export default function TransactionsPage() {
 
   function buildDetailRows(tx, tab) {
     if (!tx) return []
+    if (tab === 'swaps') {
+      return [
+        ['Sender', tx.secondaryName],
+        ['Recipient', tx.primaryName],
+        ['Source Amount', formatBalance(tx.sourceAmountRaw, tx.sourceCurrency)],
+        ['Target Amount', formatBalance(tx.targetAmountRaw, tx.targetCurrency)],
+        ['Exchange Rate', pickFirst(tx.raw, ['exchange_rate'])],
+        ['Source Charge', formatBalance(pickFirst(tx.raw, ['source_charge']) || 0, tx.sourceCurrency)],
+        ['Target Charge', formatBalance(pickFirst(tx.raw, ['target_charge']) || 0, tx.targetCurrency)],
+        ['Source Reference', pickFirst(tx.raw, ['source_from_reference'])],
+        ['Target Reference', pickFirst(tx.raw, ['target_to_reference'])],
+        ['Reversal Reference', pickFirst(tx.raw, ['reversal_reference'])],
+        ['Message', pickFirst(tx.raw, ['message'])],
+        ['Session ID', pickFirst(tx.raw, ['session_id'])],
+        ['Status', statusFromBackend(tx.status)],
+      ]
+    }
+
     if (tab === 'payouts') {
       return [
         ['Recipient', tx.primaryName],
@@ -630,9 +663,18 @@ export default function TransactionsPage() {
                   </div>
 
                   {buildDetailRows(selectedTx, activeTab).map(([label, value], idx, arr) => {
-                    const isAmountField = ['Amount', 'Charge', 'VAT', 'Settlement', 'Opening Balance', 'Closing Balance'].includes(
-                      label
-                    )
+                    const isAmountField = [
+                      'Amount',
+                      'Source Amount',
+                      'Target Amount',
+                      'Source Charge',
+                      'Target Charge',
+                      'Charge',
+                      'VAT',
+                      'Settlement',
+                      'Opening Balance',
+                      'Closing Balance',
+                    ].includes(label)
                     return (
                       <div
                         key={label}
