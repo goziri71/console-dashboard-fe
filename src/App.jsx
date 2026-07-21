@@ -15,7 +15,6 @@ import DisputesPage from './pages/disputes/DisputesPage'
 import SettlementsPage from './pages/settlements/SettlementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import AdminPage from './pages/admin/AdminPage'
-import MfaStepUpProvider from './components/auth/MfaStepUpProvider'
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth()
@@ -99,9 +98,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <MfaStepUpProvider>
-          <AppRoutes />
-        </MfaStepUpProvider>
+        <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   )

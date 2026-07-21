@@ -9,32 +9,6 @@ export async function loginWithCrosslink(token, deviceLabel) {
   return data
 }
 
-export async function confirmMfaEnrollment(challengeToken, code, deviceLabel) {
-  const { data } = await api.post('/auth/mfa/enroll/confirm', {
-    challenge_token: challengeToken,
-    code,
-    device_label: deviceLabel,
-  })
-  return data
-}
-
-export async function verifyMfaChallenge(challengeToken, credential, deviceLabel) {
-  const payload = {
-    challenge_token: challengeToken,
-    device_label: deviceLabel,
-    ...(credential.type === 'recovery_code'
-      ? { recovery_code: credential.value }
-      : { code: credential.value }),
-  }
-  const { data } = await api.post('/auth/mfa/challenge/verify', payload)
-  return data
-}
-
-export async function stepUpMfa(code) {
-  const { data } = await api.post('/auth/mfa/step-up', { code })
-  return data
-}
-
 /** Admin-provisioned console user. */
 export async function register(payload) {
   const { data } = await api.post('/auth/register', payload)

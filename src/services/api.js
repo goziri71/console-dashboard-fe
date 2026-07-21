@@ -11,7 +11,6 @@ import {
   getAuthToken,
   setAuthNotice,
 } from '../lib/authStorage'
-import { requestMfaStepUp } from '../lib/mfaStepUp'
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -43,14 +42,6 @@ function expireAuthenticatedSession(config) {
   if (window.location.pathname !== '/login') {
     window.location.replace('/login')
   }
-}
-
-function requiresRecentMfa(error) {
-  const body = error.response?.data
-  return (
-    error.response?.status === 403 &&
-    (body?.data?.code === 'recent_mfa_required' || body?.code === 'recent_mfa_required')
-  )
 }
 
 function isBeamerIntegrationUrl(config) {
@@ -169,19 +160,8 @@ api.interceptors.response.use(
     response.data = body.data
     return response
   },
-  async (error) => {
+  (error) => {
     const config = error.config
-
-    if (
-      requiresRecentMfa(error) &&
-      requestHadAuthentication(config) &&
-      !config?._mfaRetry &&
-      !String(config?.url || '').includes('/auth/mfa/step-up')
-    ) {
-      await requestMfaStepUp()
-      config._mfaRetry = true
-      return api(config)
-    }
 
     if (error.response?.status === 401) {
       expireAuthenticatedSession(config)
