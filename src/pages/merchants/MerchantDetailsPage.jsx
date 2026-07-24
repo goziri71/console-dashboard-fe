@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
@@ -14,10 +14,23 @@ import {
   Link2,
   X,
 } from 'lucide-react'
-import { getMerchant, getMerchantCustomers, updateMerchant, patchMerchantTier } from '../../services/merchants'
+import {
+  getMerchant,
+  getMerchantCustomers,
+  getMerchantLedgers,
+  getMerchantSettlements,
+  updateMerchant,
+  patchMerchantTier,
+} from '../../services/merchants'
 import { patchCustomerTier, postCustomerFreeze } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
-import { canKycUpdate, canReadPricing, canUpdateMerchant } from '../../lib/permissions'
+import {
+  canKycUpdate,
+  canManagePricing,
+  canReadFinancial,
+  canReadPricing,
+  canUpdateMerchant,
+} from '../../lib/permissions'
 import { cn, exportToCsv, formatNumber } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -40,11 +53,26 @@ import {
 } from './merchantCustomerUi'
 import MerchantKycPanel from './MerchantKycPanel'
 import MerchantUdaraPanel from './MerchantUdaraPanel'
+import MerchantActivityPanel from './MerchantActivityPanel'
+import MerchantWalletsPanel from './MerchantWalletsPanel'
+import MerchantResourceListPanel from './MerchantResourceListPanel'
+import PricingManager from '../../features/pricing/PricingManager'
 import { kycAggregateLabel, kycStatusPillClass, normalizeKycAggregateStatus } from '../../lib/kycUi'
 import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
 
 const CAN_MUTATE = ['operations', 'compliance']
 const LIMIT = 20
+
+const MERCHANT_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'customers', label: 'Customers' },
+  { id: 'wallets', label: 'Wallets' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'settlements', label: 'Settlements' },
+  { id: 'ledgers', label: 'Ledgers' },
+  { id: 'kyc', label: 'KYC' },
+  { id: 'fees', label: 'Fees', requiresPricing: true },
+]
 
 function unwrapPayload(payload) {
   if (payload == null) return null
@@ -74,18 +102,42 @@ function ProfileDivider() {
 export default function MerchantDetailsPage() {
   const { accountKey } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const canMutate = CAN_MUTATE.includes(user?.role)
   const canApproveMerchantKyc = canKycUpdate(user?.permissions, user?.role)
   const canManageUdara = canUpdateMerchant(user?.permissions, user?.role)
   const canViewPricing = canReadPricing(user?.permissions)
+  const canEditPricing = canManagePricing(user?.permissions)
+  const financial = canReadFinancial(user?.permissions)
+
+  const requestedTab = searchParams.get('tab') || 'overview'
+  const activeTab =
+    requestedTab === 'fees' && !canViewPricing
+      ? 'overview'
+      : MERCHANT_TABS.some((t) => t.id === requestedTab)
+        ? requestedTab
+        : 'overview'
+
+  const setActiveTab = (tabId) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('tab', tabId)
+        return next
+      },
+      { replace: true }
+    )
+  }
+
+  const visibleTabs = MERCHANT_TABS.filter((t) => !t.requiresPricing || canViewPricing)
 
   const [merchant, setMerchant] = useState(null)
   const [merchantLoading, setMerchantLoading] = useState(true)
   const [merchantError, setMerchantError] = useState(null)
 
   const [customers, setCustomers] = useState([])
-  const [customersLoading, setCustomersLoading] = useState(true)
+  const [customersLoading, setCustomersLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
@@ -174,8 +226,9 @@ export default function MerchantDetailsPage() {
   }, [accountKey, page, search, sortBy, order, statusFilter])
 
   useEffect(() => {
+    if (activeTab !== 'customers') return
     fetchCustomers()
-  }, [fetchCustomers])
+  }, [activeTab, fetchCustomers])
 
   useEffect(() => {
     setPage(1)
@@ -219,9 +272,13 @@ export default function MerchantDetailsPage() {
     })
   }
 
-  const primaryFromList = customers[0]
-  const phone = merchant?.phone ?? merchant?.phone_number ?? primaryFromList?.phone_number
-  const email = merchant?.email ?? merchant?.email_address ?? primaryFromList?.email_address
+  const tradeName = merchant?.trade_name || merchant?.tradeName || ''
+  const userKey = merchant?.user_key || merchant?.userKey || ''
+  const walletCount =
+    merchant?.wallet_count ?? merchant?.wallets_count ?? merchant?.total_wallets ?? null
+  const ledgerCount = merchant?.ledger_count ?? merchant?.ledgers_count ?? null
+  const settlementCount =
+    merchant?.settlement_count ?? merchant?.settlements_count ?? null
 
   const accountStatusKey = merchant ? normalizeAccountStatusKey(merchant) : 'active'
   const typeStr = typeLabel(merchant)
@@ -427,12 +484,15 @@ export default function MerchantDetailsPage() {
 
   const scrollToMerchantKyc = () => {
     setMenuOpen(false)
-    document.getElementById('merchant-kyc')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setActiveTab('kyc')
   }
 
   const scrollToMerchantUdara = () => {
     setMenuOpen(false)
-    document.getElementById('merchant-udara')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setActiveTab('overview')
+    window.setTimeout(() => {
+      document.getElementById('merchant-udara')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
   }
 
   const openUdaraModal = () => {
@@ -462,8 +522,7 @@ export default function MerchantDetailsPage() {
             <div>
               <p className="text-sm font-medium text-text-primary">Merchant KYC pending approval</p>
               <p className="mt-0.5 text-xs text-text-secondary">
-                Scroll to the <strong>Merchant KYC approval</strong> section below the profile header to approve
-                documents.
+                Open the <strong>KYC</strong> tab to review and approve merchant documents.
                 {!canApproveMerchantKyc ? ' Your role needs kyc.update to approve.' : ''}
               </p>
             </div>
@@ -501,13 +560,14 @@ export default function MerchantDetailsPage() {
           ) : null}
         </button>
         {canViewPricing ? (
-          <Link
-            to={`/merchants/${encodeURIComponent(accountKey)}/pricing`}
+          <button
+            type="button"
+            onClick={() => setActiveTab('fees')}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-medium text-text-secondary hover:bg-card-hover sm:w-auto"
           >
             <BadgeDollarSign size={14} />
             Pricing
-          </Link>
+          </button>
         ) : null}
         {canMutate && (
           <div className="relative w-full sm:w-auto sm:self-auto">
@@ -582,22 +642,51 @@ export default function MerchantDetailsPage() {
               <h1 className="min-w-0 text-balance text-base font-bold leading-tight tracking-tight text-white sm:text-lg md:text-xl">
                 {merchant.name || '—'}
               </h1>
-              <p className="mt-1 break-all text-xs text-text-secondary sm:text-sm">
-                {email || '—'}
-              </p>
+              {tradeName ? (
+                <p className="mt-1 break-all text-xs text-text-secondary sm:text-sm">{tradeName}</p>
+              ) : null}
               <p className="mt-1.5 break-all font-mono text-[11px] leading-snug text-[#7d8087] sm:text-[13px]">
-                ID: {merchant.account_key || '—'}
+                Account: {merchant.account_key || '—'}
               </p>
+              {userKey ? (
+                <p className="mt-1 break-all font-mono text-[11px] leading-snug text-[#7d8087] sm:text-[13px]">
+                  User key: {userKey}
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-normal text-white md:flex-row md:flex-wrap md:items-center md:gap-x-1 md:text-sm">
-            <span className="shrink-0 tabular-nums">{phone || '—'}</span>
             {merchantCustomerTotal != null ? (
+              <span className="shrink-0 tabular-nums">
+                {formatNumber(merchantCustomerTotal)}{' '}
+                {merchantCustomerTotal === 1 ? 'Customer' : 'Customers'}
+              </span>
+            ) : (
+              <span className="shrink-0 text-text-muted">Customers —</span>
+            )}
+            {walletCount != null ? (
               <>
                 <ProfileDivider />
                 <span className="shrink-0 tabular-nums">
-                  {formatNumber(merchantCustomerTotal)} {merchantCustomerTotal === 1 ? 'Customer' : 'Customers'}
+                  {formatNumber(walletCount)} {Number(walletCount) === 1 ? 'Wallet' : 'Wallets'}
+                </span>
+              </>
+            ) : null}
+            {ledgerCount != null ? (
+              <>
+                <ProfileDivider />
+                <span className="shrink-0 tabular-nums">
+                  {formatNumber(ledgerCount)} {Number(ledgerCount) === 1 ? 'Ledger' : 'Ledgers'}
+                </span>
+              </>
+            ) : null}
+            {settlementCount != null ? (
+              <>
+                <ProfileDivider />
+                <span className="shrink-0 tabular-nums">
+                  {formatNumber(settlementCount)}{' '}
+                  {Number(settlementCount) === 1 ? 'Settlement' : 'Settlements'}
                 </span>
               </>
             ) : null}
@@ -643,66 +732,167 @@ export default function MerchantDetailsPage() {
         </div>
       </section>
 
-      <MerchantUdaraPanel
-        merchant={merchant}
-        onMerchantRefresh={refetchMerchant}
-        linkModalOpen={udaraModalOpen}
-        onLinkModalOpenChange={setUdaraModalOpen}
-      />
-
-      <MerchantKycPanel
-        accountKey={accountKey}
-        merchantProfile={merchant}
-        onKycMetaChange={handleMerchantKycMeta}
-      />
-
-      <div className="overflow-hidden rounded-card border border-border bg-card">
-        <div className="flex flex-col gap-4 border-b border-border px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:gap-6">
-          <h2 className="shrink-0 text-base font-medium text-text-primary">All Customers</h2>
-          <div className="min-w-0 flex-1">
-            <MerchantToolbar
-              search={search}
-              onSearchChange={setSearch}
-              sortBy={sortBy}
-              order={order}
-              onSortChange={(s, o) => {
-                setSortBy(s)
-                setOrder(o)
-              }}
-              statusFilter={statusFilter}
-              onStatusChange={setStatusFilter}
-              onExport={handleExportCustomers}
-              searchPlaceholder="Search customers..."
-              sortOptions={sortOptions}
-              filterOptions={filterOptions}
-            />
-          </div>
+      <div className="card-shell overflow-hidden">
+        <div className="tab-scroll border-b border-border bg-page px-2 py-2 lg:overflow-visible">
+          {visibleTabs.map((tab) => {
+            const active = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex h-10 shrink-0 items-center justify-center rounded-full px-4 text-sm transition-colors',
+                  active
+                    ? 'bg-accent text-page'
+                    : 'bg-card-hover text-text-secondary hover:text-text-primary lg:bg-transparent'
+                )}
+              >
+                {tab.label}
+                {tab.id === 'kyc' && merchantKycPending > 0 ? (
+                  <span className="ml-2 rounded-full bg-warning px-1.5 py-0.5 text-[10px] font-bold text-black">
+                    {merchantKycPending}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
         </div>
+      </div>
 
-        {customersLoading ? (
-          <div className="flex flex-col gap-3 p-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="skeleton h-10 w-full rounded-lg" />
+      {activeTab === 'overview' ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              {
+                label: 'Customers',
+                value: merchantCustomerTotal != null ? formatNumber(merchantCustomerTotal) : '—',
+              },
+              {
+                label: 'Wallets',
+                value: walletCount != null ? formatNumber(walletCount) : '—',
+              },
+              {
+                label: 'Ledgers',
+                value: ledgerCount != null ? formatNumber(ledgerCount) : '—',
+              },
+              {
+                label: 'Settlements',
+                value: settlementCount != null ? formatNumber(settlementCount) : '—',
+              },
+            ].map((card) => (
+              <div key={card.label} className="rounded-card border border-border bg-card p-4">
+                <p className="text-xs text-text-muted">{card.label}</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-text-primary">
+                  {card.value}
+                </p>
+              </div>
             ))}
           </div>
-        ) : (
-          <MerchantCustomersTable
-            customers={customers}
-            onViewKyc={handleViewCustomerKyc}
-            onFreezeAccount={handleFreezeCustomer}
-            onUpgradeAccount={handleUpgradeCustomer}
+          <MerchantUdaraPanel
+            merchant={merchant}
+            onMerchantRefresh={refetchMerchant}
+            linkModalOpen={udaraModalOpen}
+            onLinkModalOpenChange={setUdaraModalOpen}
           />
-        )}
+        </div>
+      ) : null}
 
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={LIMIT}
-          label="Customers"
-          onPageChange={setPage}
+      {activeTab === 'customers' ? (
+        <div className="overflow-hidden rounded-card border border-border bg-card">
+          <div className="flex flex-col gap-4 border-b border-border px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-center lg:gap-6">
+            <h2 className="shrink-0 text-base font-medium text-text-primary">All Customers</h2>
+            <div className="min-w-0 flex-1">
+              <MerchantToolbar
+                search={search}
+                onSearchChange={setSearch}
+                sortBy={sortBy}
+                order={order}
+                onSortChange={(s, o) => {
+                  setSortBy(s)
+                  setOrder(o)
+                }}
+                statusFilter={statusFilter}
+                onStatusChange={setStatusFilter}
+                onExport={handleExportCustomers}
+                searchPlaceholder="Search customers..."
+                sortOptions={sortOptions}
+                filterOptions={filterOptions}
+              />
+            </div>
+          </div>
+
+          {customersLoading ? (
+            <div className="flex flex-col gap-3 p-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="skeleton h-10 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <MerchantCustomersTable
+              customers={customers}
+              onViewKyc={handleViewCustomerKyc}
+              onFreezeAccount={handleFreezeCustomer}
+              onUpgradeAccount={handleUpgradeCustomer}
+            />
+          )}
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={LIMIT}
+            label="Customers"
+            onPageChange={setPage}
+          />
+        </div>
+      ) : null}
+
+      {activeTab === 'wallets' ? (
+        <MerchantWalletsPanel accountKey={accountKey} financial={financial} />
+      ) : null}
+
+      {activeTab === 'activity' ? (
+        <MerchantActivityPanel accountKey={accountKey} financial={financial} />
+      ) : null}
+
+      {activeTab === 'settlements' ? (
+        <MerchantResourceListPanel
+          title="Settlements"
+          description="Settlement records for this merchant account."
+          accountKey={accountKey}
+          fetcher={getMerchantSettlements}
+          financial={financial}
+          emptyLabel="No settlements found."
         />
-      </div>
+      ) : null}
+
+      {activeTab === 'ledgers' ? (
+        <MerchantResourceListPanel
+          title="Ledgers"
+          description="Ledger records for this merchant account."
+          accountKey={accountKey}
+          fetcher={getMerchantLedgers}
+          financial={financial}
+          emptyLabel="No ledgers found."
+        />
+      ) : null}
+
+      {activeTab === 'kyc' ? (
+        <MerchantKycPanel
+          accountKey={accountKey}
+          merchantProfile={merchant}
+          onKycMetaChange={handleMerchantKycMeta}
+        />
+      ) : null}
+
+      {activeTab === 'fees' && canViewPricing ? (
+        <PricingManager
+          accountKey={accountKey}
+          canView={canViewPricing}
+          canManage={canEditPricing}
+        />
+      ) : null}
 
       {confirmState.open
         ? createPortal(

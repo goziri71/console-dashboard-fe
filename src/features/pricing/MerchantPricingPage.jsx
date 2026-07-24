@@ -13,7 +13,7 @@ export default function MerchantPricingPage() {
     <div className="space-y-5">
       <div>
         <Link
-          to={`/merchants/${encodeURIComponent(accountKey)}`}
+          to={`/merchants/${encodeURIComponent(accountKey)}?tab=fees`}
           className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-accent"
         >
           <ArrowLeft size={15} />
