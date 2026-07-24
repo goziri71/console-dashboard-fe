@@ -19,6 +19,7 @@ import {
   getMerchantCustomers,
   getMerchantLedgers,
   getMerchantSettlements,
+  getMerchantWallets,
   updateMerchant,
   patchMerchantTier,
 } from '../../services/merchants'
@@ -67,7 +68,7 @@ const MERCHANT_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'customers', label: 'Customers' },
   { id: 'wallets', label: 'Wallets' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'transactions', label: 'Transactions' },
   { id: 'settlements', label: 'Settlements' },
   { id: 'ledgers', label: 'Ledgers' },
   { id: 'kyc', label: 'KYC' },
@@ -76,8 +77,25 @@ const MERCHANT_TABS = [
 
 function unwrapPayload(payload) {
   if (payload == null) return null
-  if (payload.data != null && typeof payload.data === 'object') return payload.data
+  if (payload.data != null && typeof payload.data === 'object' && !Array.isArray(payload.data)) {
+    return payload.data
+  }
   return payload
+}
+
+/** Total from a paginated merchant sub-resource response. */
+function pickResourceTotal(res) {
+  const inner = unwrapPayload(res) ?? res ?? {}
+  const pag = inner.pagination || {}
+  const total = Number(pag.total)
+  if (Number.isFinite(total) && total >= 0) return total
+  if (Array.isArray(inner.records)) return inner.records.length
+  if (Array.isArray(inner.wallets)) return inner.wallets.length
+  if (Array.isArray(inner.items)) return inner.items.length
+  if (Array.isArray(inner)) return inner.length
+  if (Array.isArray(res?.records)) return res.records.length
+  if (Array.isArray(res?.data)) return res.data.length
+  return null
 }
 
 /** Pills for the merchant profile banner (Figma node 8712-11162). */
@@ -112,11 +130,12 @@ export default function MerchantDetailsPage() {
   const financial = canReadFinancial(user?.permissions)
 
   const requestedTab = searchParams.get('tab') || 'overview'
+  const normalizedTab = requestedTab === 'activity' ? 'transactions' : requestedTab
   const activeTab =
-    requestedTab === 'fees' && !canViewPricing
+    normalizedTab === 'fees' && !canViewPricing
       ? 'overview'
-      : MERCHANT_TABS.some((t) => t.id === requestedTab)
-        ? requestedTab
+      : MERCHANT_TABS.some((t) => t.id === normalizedTab)
+        ? normalizedTab
         : 'overview'
 
   const setActiveTab = (tabId) => {
@@ -141,6 +160,11 @@ export default function MerchantDetailsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
+  const [resourceCounts, setResourceCounts] = useState({
+    wallets: null,
+    ledgers: null,
+    settlements: null,
+  })
 
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('')
@@ -170,6 +194,7 @@ export default function MerchantDetailsPage() {
     let cancelled = false
     setMerchantLoading(true)
     setMerchantError(null)
+    setResourceCounts({ wallets: null, ledgers: null, settlements: null })
     getMerchant(accountKey)
       .then((res) => {
         if (!cancelled) setMerchant(unwrapPayload(res))
@@ -180,6 +205,34 @@ export default function MerchantDetailsPage() {
       .finally(() => {
         if (!cancelled) setMerchantLoading(false)
       })
+    return () => {
+      cancelled = true
+    }
+  }, [accountKey])
+
+  useEffect(() => {
+    if (!accountKey) return
+    let cancelled = false
+    const params = { page: 1, limit: 1 }
+
+    Promise.allSettled([
+      getMerchantWallets(accountKey, params),
+      getMerchantLedgers(accountKey, params),
+      getMerchantSettlements(accountKey, params),
+    ]).then(([walletsRes, ledgersRes, settlementsRes]) => {
+      if (cancelled) return
+      setResourceCounts({
+        wallets:
+          walletsRes.status === 'fulfilled' ? pickResourceTotal(walletsRes.value) : null,
+        ledgers:
+          ledgersRes.status === 'fulfilled' ? pickResourceTotal(ledgersRes.value) : null,
+        settlements:
+          settlementsRes.status === 'fulfilled'
+            ? pickResourceTotal(settlementsRes.value)
+            : null,
+      })
+    })
+
     return () => {
       cancelled = true
     }
@@ -275,10 +328,18 @@ export default function MerchantDetailsPage() {
   const tradeName = merchant?.trade_name || merchant?.tradeName || ''
   const userKey = merchant?.user_key || merchant?.userKey || ''
   const walletCount =
-    merchant?.wallet_count ?? merchant?.wallets_count ?? merchant?.total_wallets ?? null
-  const ledgerCount = merchant?.ledger_count ?? merchant?.ledgers_count ?? null
+    resourceCounts.wallets ??
+    merchant?.wallet_count ??
+    merchant?.wallets_count ??
+    merchant?.total_wallets ??
+    null
+  const ledgerCount =
+    resourceCounts.ledgers ?? merchant?.ledger_count ?? merchant?.ledgers_count ?? null
   const settlementCount =
-    merchant?.settlement_count ?? merchant?.settlements_count ?? null
+    resourceCounts.settlements ??
+    merchant?.settlement_count ??
+    merchant?.settlements_count ??
+    null
 
   const accountStatusKey = merchant ? normalizeAccountStatusKey(merchant) : 'active'
   const typeStr = typeLabel(merchant)
@@ -852,7 +913,7 @@ export default function MerchantDetailsPage() {
         <MerchantWalletsPanel accountKey={accountKey} financial={financial} />
       ) : null}
 
-      {activeTab === 'activity' ? (
+      {activeTab === 'transactions' ? (
         <MerchantActivityPanel accountKey={accountKey} financial={financial} />
       ) : null}
 
