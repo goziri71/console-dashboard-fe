@@ -161,6 +161,7 @@ export default function MerchantDetailsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [resourceCounts, setResourceCounts] = useState({
+    customers: null,
     wallets: null,
     ledgers: null,
     settlements: null,
@@ -194,7 +195,7 @@ export default function MerchantDetailsPage() {
     let cancelled = false
     setMerchantLoading(true)
     setMerchantError(null)
-    setResourceCounts({ wallets: null, ledgers: null, settlements: null })
+    setResourceCounts({ customers: null, wallets: null, ledgers: null, settlements: null })
     getMerchant(accountKey)
       .then((res) => {
         if (!cancelled) setMerchant(unwrapPayload(res))
@@ -216,12 +217,15 @@ export default function MerchantDetailsPage() {
     const params = { page: 1, limit: 1 }
 
     Promise.allSettled([
+      getMerchantCustomers(accountKey, params),
       getMerchantWallets(accountKey, params),
       getMerchantLedgers(accountKey, params),
       getMerchantSettlements(accountKey, params),
-    ]).then(([walletsRes, ledgersRes, settlementsRes]) => {
+    ]).then(([customersRes, walletsRes, ledgersRes, settlementsRes]) => {
       if (cancelled) return
       setResourceCounts({
+        customers:
+          customersRes.status === 'fulfilled' ? pickResourceTotal(customersRes.value) : null,
         wallets:
           walletsRes.status === 'fulfilled' ? pickResourceTotal(walletsRes.value) : null,
         ledgers:
@@ -269,6 +273,10 @@ export default function MerchantDetailsPage() {
           ? Number(tp)
           : Math.max(1, Math.ceil(t / LIMIT))
       )
+      // Keep header/overview count in sync when viewing unfiltered customers.
+      if (!q && !statusFilter) {
+        setResourceCounts((prev) => ({ ...prev, customers: Number(t) }))
+      }
     } catch {
       setCustomers([])
       setTotal(0)
@@ -345,11 +353,14 @@ export default function MerchantDetailsPage() {
   const typeStr = typeLabel(merchant)
 
   const merchantCustomerTotal = useMemo(() => {
+    if (resourceCounts.customers != null) return resourceCounts.customers
     const fromMerchant = merchantCustomerCount(merchant)
+    if (fromMerchant != null && fromMerchant > 0) return fromMerchant
+    // Avoid showing a fake "0" from the uninitialized customers list total.
+    if (!search.trim() && !statusFilter && total > 0) return total
     if (fromMerchant != null) return fromMerchant
-    if (!search.trim() && !statusFilter) return total
     return null
-  }, [merchant, total, search, statusFilter])
+  }, [resourceCounts.customers, merchant, total, search, statusFilter])
 
   const handleExportCustomers = () => {
     if (!customers.length) return
