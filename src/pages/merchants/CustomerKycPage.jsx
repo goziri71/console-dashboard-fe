@@ -96,11 +96,10 @@ function pickKycRaw(row, keys) {
   return null
 }
 
-function maskValue(s) {
+/** Show full ID (BVN, etc.) for compliance review — do not mask. */
+function displayDocumentNumber(s) {
   if (s == null || s === '') return '—'
-  const str = String(s)
-  if (str.length <= 4) return '***'
-  return `*** ****** ${str.slice(-4)}`
+  return String(s)
 }
 
 /** Submitted timestamp uses unified formatDate (yyyy-mm-dd hh:mm:ss). */
@@ -549,7 +548,7 @@ export default function CustomerKycPage() {
                           </p>
                         ) : null}
                         <p className="mt-1 text-xs text-[#9ca3af]">
-                          Document Number: <span className="font-mono text-[#b4b9c4]">{maskValue(rawId)}</span>
+                          Document Number: <span className="font-mono text-[#b4b9c4]">{displayDocumentNumber(rawId)}</span>
                         </p>
                         <p className="mt-1 text-xs text-[#9ca3af]">
                           Submitted on {submitted != null ? formatKycSubmittedAt(submitted) : '—'}
