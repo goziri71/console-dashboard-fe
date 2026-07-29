@@ -817,7 +817,7 @@ export default function CustomerDetailsPage() {
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-border/60 text-xs text-text-muted">
-                    <th className="px-3 py-2.5 font-medium">Reference</th>
+                    <th className="px-3 py-2.5 font-medium">Document Number</th>
                     <th className="px-3 py-2.5 font-medium">Status</th>
                     <th className="px-3 py-2.5 font-medium">Created</th>
                     {canApproveKyc ? <th className="px-3 py-2.5 font-medium w-24" /> : null}
@@ -828,10 +828,18 @@ export default function CustomerDetailsPage() {
                     const reference = kycRowReference(row)
                     const pending = isKycRowPending(row)
                     const sk = kycRowStatusKey(row)
+                    const idNumber =
+                      pickKycRaw(row, [
+                        'identification_number',
+                        'document_number',
+                        'bvn',
+                        'tin',
+                        'registration_number',
+                      ]) || '—'
                     return (
                       <tr key={reference || row.id || row.kyc_id || ri} className="border-b border-border/40">
                         <td className="px-3 py-2.5 font-mono text-xs text-text-secondary">
-                          {reference || pickKycField(row, ['id', 'kyc_id', 'identifier'])}
+                          {idNumber}
                         </td>
                         <td className="px-3 py-2.5 text-text-primary capitalize">
                           {pickKycField(row, ['compliance_status', 'status', 'kyc_status', 'verification_status']) ||

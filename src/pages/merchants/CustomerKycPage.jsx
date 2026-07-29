@@ -527,10 +527,17 @@ export default function CustomerKycPage() {
                   const reference = kycRowReference(row)
                   const pending = isKycRowPending(row)
                   const rawId =
-                    pickKycRaw(row, ['document_number', 'identifier', 'bvn', 'tin', 'registration_number', 'value']) ?? ''
+                    pickKycRaw(row, [
+                      'identification_number',
+                      'document_number',
+                      'bvn',
+                      'tin',
+                      'registration_number',
+                    ]) ?? ''
                   const submitted = pickKycRaw(row, ['date_created', 'created_at', 'date_modified', 'submitted_at'])
                   const downloadUrl =
-                    pickKycRaw(row, ['document_url', 'file_url', 'download_url', 'url']) || (typeof rawId === 'string' && rawId.startsWith('http') ? rawId : null)
+                    pickKycRaw(row, ['document_url', 'file_url', 'download_url', 'url']) ||
+                    (typeof rawId === 'string' && rawId.startsWith('http') ? rawId : null)
                   return (
                     <li key={row.id ?? row.kyc_id ?? ri} className="flex items-start gap-4 px-5 py-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#3d442e] text-white/95">
@@ -542,13 +549,9 @@ export default function CustomerKycPage() {
                             ? humanizeDocTitle(row)
                             : kycIdentificationLabel(row)}
                         </p>
-                        {reference ? (
-                          <p className="mt-1 text-xs text-[#9ca3af]">
-                            Reference: <span className="font-mono text-[#b4b9c4]">{reference}</span>
-                          </p>
-                        ) : null}
                         <p className="mt-1 text-xs text-[#9ca3af]">
-                          Document Number: <span className="font-mono text-[#b4b9c4]">{displayDocumentNumber(rawId)}</span>
+                          Document Number:{' '}
+                          <span className="font-mono text-[#b4b9c4]">{displayDocumentNumber(rawId)}</span>
                         </p>
                         <p className="mt-1 text-xs text-[#9ca3af]">
                           Submitted on {submitted != null ? formatKycSubmittedAt(submitted) : '—'}
