@@ -14,7 +14,7 @@ import {
 import { getDeviceLabel } from '../lib/deviceLabel'
 
 const AuthContext = createContext(null)
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const initialAuth = getStoredAuth()
 
 export function AuthProvider({ children }) {
