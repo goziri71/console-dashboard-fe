@@ -272,7 +272,20 @@ export default function CustomerKycPage() {
       const res = await getCustomerKycs(statementIdentifier, { page: kycPage, limit: KYC_PAGE_SIZE })
       const nestedCustomer = pickCustomerFromKycListResponse(res)
       if (nestedCustomer) {
-        setCustomer((prev) => (prev ? { ...prev, ...nestedCustomer } : nestedCustomer))
+        setCustomer((prev) => {
+          if (!prev) return nestedCustomer
+          const businessName = nestedCustomer.business_name ?? nestedCustomer.businessName
+          const nextCompliant = nestedCustomer.is_business_compliant
+          const nextStatus = nestedCustomer.kyc_status
+          const nextType = nestedCustomer.type ?? nestedCustomer.customer_type
+          const unchanged =
+            (businessName == null || businessName === prev.business_name) &&
+            (nextCompliant == null || nextCompliant === prev.is_business_compliant) &&
+            (nextStatus == null || nextStatus === prev.kyc_status) &&
+            (nextType == null || nextType === prev.type)
+          if (unchanged) return prev
+          return { ...prev, ...nestedCustomer }
+        })
       }
       const rows = pickRecords(res)
       setKycRows(rows)
@@ -289,10 +302,12 @@ export default function CustomerKycPage() {
     }
   }, [statementIdentifier, kycPage])
 
+  const hasCustomer = Boolean(customer)
+
   useEffect(() => {
-    if (!statementIdentifier || !customer) return
+    if (!statementIdentifier || !hasCustomer) return
     loadKycs()
-  }, [statementIdentifier, customer, loadKycs])
+  }, [statementIdentifier, hasCustomer, loadKycs])
 
   useEffect(() => {
     setKycPage(1)
