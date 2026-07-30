@@ -682,8 +682,8 @@ export default function CustomerKycPage() {
                   Business KYC compliance
                 </p>
                 <p className="mt-1 text-sm text-white">
-                  Status is set with <code className="text-[#C5DC4B]">is_business_compliant</code>, not
-                  document rows.
+                  Approve or mark non-compliant for this business account. Document rows are not used for
+                  status.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {kycKey !== 'verified' ? (
@@ -801,8 +801,8 @@ export default function CustomerKycPage() {
         message={
           approveConfirm.mode === 'business'
             ? approveConfirm.compliant === 'N'
-              ? `Mark ${displayName} as non-compliant (is_business_compliant = N)?`
-              : `Approve business KYC for ${displayName}? This sets is_business_compliant = Y.`
+              ? `Mark ${displayName} as non-compliant?`
+              : `Approve business KYC for ${displayName}? This will set the business to compliant.`
             : `Approve KYC record ${approveConfirm.reference}? This marks the document as compliant.`
         }
         confirmLabel={

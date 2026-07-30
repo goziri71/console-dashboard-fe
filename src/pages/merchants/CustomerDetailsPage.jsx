@@ -842,7 +842,7 @@ export default function CustomerDetailsPage() {
             </h2>
             <p className="mt-0.5 text-xs text-text-muted">
               {treatAsBusiness
-                ? 'Compliance status for this business customer (is_business_compliant)'
+                ? 'Compliance status for this business customer'
                 : 'Verification history for this customer'}
             </p>
           </div>
@@ -1114,8 +1114,8 @@ export default function CustomerDetailsPage() {
         message={
           kycApproveConfirm.mode === 'business'
             ? kycApproveConfirm.compliant === 'N'
-              ? `Mark ${displayName} as non-compliant (is_business_compliant = N)?`
-              : `Approve business KYC for ${displayName}? This sets is_business_compliant = Y.`
+              ? `Mark ${displayName} as non-compliant?`
+              : `Approve business KYC for ${displayName}? This will set the business to compliant.`
             : `Approve KYC record ${kycApproveConfirm.reference}?`
         }
         confirmLabel={
