@@ -16,6 +16,7 @@ import {
 import { countryToFlagEmoji } from './merchantUi'
 import {
   customerDisplayName,
+  customerPersonName,
   customerTierLabel,
   customerKycKey,
   customerAccountStatusKey,
@@ -363,6 +364,7 @@ export default function CustomerKycPage() {
 
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
   const displayNameUpper = useMemo(() => (displayName === '—' ? '—' : displayName.toUpperCase()), [displayName])
+  const personName = useMemo(() => (customer ? customerPersonName(customer) : ''), [customer])
   const flag = countryToFlagEmoji(customer?.country_code ?? customer?.country)
   const isBusiness = customer ? isBusinessCustomer(customer) : false
   const localKycKey = customer ? customerKycKey(customer) : 'none'
@@ -373,6 +375,8 @@ export default function CustomerKycPage() {
   const typeDisplay = typeRaw === '—' ? '—' : String(typeRaw).toUpperCase()
   // Belt-and-suspenders: header already shows BUSINESS even if type field is oddly shaped.
   const treatAsBusiness = isBusiness || typeDisplay.includes('BUSINESS')
+  const showPersonUnderBusiness =
+    treatAsBusiness && personName && personName.toUpperCase() !== displayName.toUpperCase()
   const kycUpper = kycKeyToUpper(kycKey)
   const accountUpper =
     acctKey === 'active' ? 'ACTIVE' : acctKey === 'suspended' ? 'SUSPENDED' : acctKey === 'inactive' ? 'INACTIVE' : 'PENDING'
@@ -461,6 +465,11 @@ export default function CustomerKycPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold uppercase tracking-wide text-white sm:text-2xl">{displayNameUpper}</h1>
+              {showPersonUnderBusiness ? (
+                <p className="mt-1 truncate text-sm font-normal normal-case tracking-normal text-[#9ca3af]">
+                  {personName}
+                </p>
+              ) : null}
               <p className="mt-1.5 font-mono text-[13px] text-[#888888]">ID: {idLine}</p>
             </div>
           </div>
@@ -723,7 +732,12 @@ export default function CustomerKycPage() {
               {treatAsBusiness ? (
                 <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
                   <dt className="text-[#9ca3af]">Business name</dt>
-                  <dd className="text-right font-medium text-white">{displayName}</dd>
+                  <dd className="text-right font-medium text-white">
+                    <span className="block">{displayName}</span>
+                    {showPersonUnderBusiness ? (
+                      <span className="mt-0.5 block text-xs font-normal text-[#9ca3af]">{personName}</span>
+                    ) : null}
+                  </dd>
                 </div>
               ) : null}
               <div className="flex items-center justify-between gap-4 py-3 first:pt-0">

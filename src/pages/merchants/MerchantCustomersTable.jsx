@@ -5,11 +5,13 @@ import { formatDate, cn } from '../../lib/utils'
 import {
   countryToFlagEmoji,
   customerDisplayName,
+  customerPersonName,
   customerTypeLabel,
   customerTierLabel,
   customerKycKey,
   customerAccountStatusKey,
   getCustomerIdentifier,
+  isBusinessCustomer,
 } from './merchantCustomerUi'
 
 const kycBadge = {
@@ -119,7 +121,12 @@ export default function MerchantCustomersTable({
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 font-medium text-text-primary">{customerDisplayName(c)}</td>
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium text-text-primary">{customerDisplayName(c)}</p>
+                    {isBusinessCustomer(c) && customerPersonName(c) ? (
+                      <p className="mt-0.5 text-xs font-normal text-text-muted">{customerPersonName(c)}</p>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-2.5 text-text-secondary">{customerTypeLabel(c)}</td>
                   <td className="px-4 py-2.5 text-text-secondary">{customerTierLabel(c)}</td>
                   <td className="px-4 py-2.5">

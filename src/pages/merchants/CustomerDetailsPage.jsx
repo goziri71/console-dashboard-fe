@@ -50,6 +50,7 @@ import Pagination from '../../components/ui/Pagination'
 import { countryToFlagEmoji } from './merchantUi'
 import {
   customerDisplayName,
+  customerPersonName,
   customerTierLabel,
   customerKycKey,
   customerAccountStatusKey,
@@ -492,6 +493,7 @@ export default function CustomerDetailsPage() {
 
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
   const displayNameUpper = useMemo(() => (displayName === '—' ? '—' : displayName.toUpperCase()), [displayName])
+  const personName = useMemo(() => (customer ? customerPersonName(customer) : ''), [customer])
   const flag = countryToFlagEmoji(customer?.country_code ?? customer?.country)
   const selectedWallet = useMemo(
     () => wallets.find((w) => (w.wallet_key || w.wallet_id) === selectedWalletKey) || null,
@@ -510,6 +512,8 @@ export default function CustomerDetailsPage() {
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
   const typeDisplay = typeRaw === '—' ? '—' : String(typeRaw).toUpperCase()
   const treatAsBusiness = isBusiness || typeDisplay.includes('BUSINESS')
+  const showPersonUnderBusiness =
+    treatAsBusiness && personName && personName.toUpperCase() !== displayName.toUpperCase()
 
   const kycUpper = kycKeyToUpper(kycKey)
 
@@ -647,6 +651,11 @@ export default function CustomerDetailsPage() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold uppercase tracking-wide text-white sm:text-2xl">{displayNameUpper}</h1>
+              {showPersonUnderBusiness ? (
+                <p className="mt-1 truncate text-sm font-normal normal-case tracking-normal text-[#9ca3af]">
+                  {personName}
+                </p>
+              ) : null}
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <p className="font-mono text-[13px] text-[#888888]">ID: {idLine}</p>
               </div>
@@ -850,6 +859,9 @@ export default function CustomerDetailsPage() {
             <div>
               <p className="text-xs text-text-muted">Business name</p>
               <p className="mt-0.5 text-sm font-medium text-text-primary">{displayName}</p>
+              {showPersonUnderBusiness ? (
+                <p className="mt-0.5 text-xs text-text-muted">{personName}</p>
+              ) : null}
               <p className="mt-2 text-xs text-text-muted">
                 Status:{' '}
                 <span

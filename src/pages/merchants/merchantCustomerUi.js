@@ -22,12 +22,18 @@ export function customerBusinessName(c) {
   return String(bn).trim()
 }
 
+/** Personal / contact name (first + surname), even for BUSINESS customers. */
+export function customerPersonName(c) {
+  const n = [c?.first_name, c?.surname].filter(Boolean).join(' ').trim()
+  return n || ''
+}
+
 export function customerDisplayName(c) {
   if (isBusinessCustomer(c)) {
     const bn = customerBusinessName(c)
     if (bn) return bn
   }
-  const n = [c?.first_name, c?.surname].filter(Boolean).join(' ').trim()
+  const n = customerPersonName(c)
   if (n) return n
   const bn = customerBusinessName(c)
   return bn || '—'
