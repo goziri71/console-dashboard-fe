@@ -6,7 +6,7 @@ export const PERMISSION_RBAC_MANAGE = 'rbac.manage'
 export const PERMISSION_CUSTOMER_UPDATE = 'customer.update'
 /** Merchant profile / integrations — PATCH /merchants/:account_key, Beamer link & update */
 export const PERMISSION_MERCHANT_UPDATE = 'merchant.update'
-/** KYC document approval — PATCH /kycs/:reference, POST /merchants/:account_key/kyc/approve */
+/** KYC document approval — PATCH /kycs/:reference, POST /customers/:identifier/kyc/approve (BUSINESS), POST /merchants/:account_key/kyc/approve */
 export const PERMISSION_KYC_UPDATE = 'kyc.update'
 /** Pending transaction review — POST /transactions/review/.../approve|cancel */
 export const PERMISSION_DISPUTE_UPDATE = 'dispute.update'

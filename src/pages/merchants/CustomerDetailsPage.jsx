@@ -23,6 +23,7 @@ import {
   postCustomerFreeze,
   postCustomerUnfreeze,
   getCustomerKycs,
+  approveCustomerBusinessKyc,
 } from '../../services/customers'
 import { useAuth } from '../../context/AuthContext'
 import { canReadFinancial, canKycUpdate, canUpdateCustomerRecord } from '../../lib/permissions'
@@ -54,6 +55,8 @@ import {
   customerAccountStatusKey,
   customerTypeLabel,
   getCustomerIdentifier,
+  isBusinessCustomer,
+  pickCustomerFromKycListResponse,
 } from './merchantCustomerUi'
 import { pickMerchantAccountKeyFromCustomer } from '../../lib/walletNavigation'
 import CustomerWalletTransactionsPanel from './CustomerWalletTransactionsPanel'
@@ -202,7 +205,12 @@ export default function CustomerDetailsPage() {
   const [kycTotal, setKycTotal] = useState(0)
   const [kycLoading, setKycLoading] = useState(false)
   const [kycApproving, setKycApproving] = useState(false)
-  const [kycApproveConfirm, setKycApproveConfirm] = useState({ open: false, reference: '' })
+  const [kycApproveConfirm, setKycApproveConfirm] = useState({
+    open: false,
+    mode: 'document',
+    reference: '',
+    compliant: 'Y',
+  })
 
   useEffect(() => {
     setCustomer(null)
@@ -333,6 +341,10 @@ export default function CustomerDetailsPage() {
     setKycLoading(true)
     try {
       const res = await getCustomerKycs(statementIdentifier, { page: kycPage, limit: KYC_PAGE_SIZE })
+      const nestedCustomer = pickCustomerFromKycListResponse(res)
+      if (nestedCustomer) {
+        setCustomer((prev) => (prev ? { ...prev, ...nestedCustomer } : nestedCustomer))
+      }
       const rows = pickRecords(res)
       setKycRows(rows)
       const pag = pickPagination(res)
@@ -359,17 +371,28 @@ export default function CustomerDetailsPage() {
   }
 
   const runApproveCustomerKyc = async () => {
-    const reference = kycApproveConfirm.reference
-    if (!reference || !canApproveKyc) return
+    if (!canApproveKyc) return
+    if (kycApproveConfirm.mode === 'document' && !kycApproveConfirm.reference) return
     setKycApproving(true)
     try {
-      await patchKycCompliance(reference, { is_compliant: 'Y' })
-      pushMsg('success', 'KYC record approved successfully.')
-      setKycApproveConfirm({ open: false, reference: '' })
+      if (kycApproveConfirm.mode === 'business') {
+        const id = statementIdentifier || customerId
+        const compliant = kycApproveConfirm.compliant === 'N' ? 'N' : 'Y'
+        const res = await approveCustomerBusinessKyc(id, { is_business_compliant: compliant })
+        applyCustomerResponse(res)
+        pushMsg(
+          'success',
+          compliant === 'Y' ? 'Business KYC marked compliant.' : 'Business KYC marked non-compliant.'
+        )
+      } else {
+        await patchKycCompliance(kycApproveConfirm.reference, { is_compliant: 'Y' })
+        pushMsg('success', 'KYC record approved successfully.')
+      }
+      setKycApproveConfirm({ open: false, mode: 'document', reference: '', compliant: 'Y' })
       await fetchCore()
       await loadKycs()
     } catch (err) {
-      pushMsg('error', err.response?.data?.message || 'Failed to approve KYC record.')
+      pushMsg('error', err.response?.data?.message || 'Failed to update KYC.')
     } finally {
       setKycApproving(false)
     }
@@ -471,8 +494,9 @@ export default function CustomerDetailsPage() {
     () => wallets.find((w) => (w.wallet_key || w.wallet_id) === selectedWalletKey) || null,
     [wallets, selectedWalletKey]
   )
+  const isBusiness = customer ? isBusinessCustomer(customer) : false
   const localKycKey = customer ? customerKycKey(customer) : 'none'
-  const { kycKey } = useKycDisplayStatus(customer, localKycKey)
+  const { kycKey } = useKycDisplayStatus(isBusiness ? null : customer, localKycKey)
   const acctKey = customer ? customerAccountStatusKey(customer) : 'active'
   const tierLine = customer ? customerTierLabel(customer) : '—'
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
@@ -795,8 +819,14 @@ export default function CustomerDetailsPage() {
       <section className="overflow-hidden rounded-card border border-border/70 bg-card">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold text-text-primary">KYC records</h2>
-            <p className="mt-0.5 text-xs text-text-muted">Verification history for this customer</p>
+            <h2 className="text-sm font-semibold text-text-primary">
+              {isBusiness ? 'Business KYC' : 'KYC records'}
+            </h2>
+            <p className="mt-0.5 text-xs text-text-muted">
+              {isBusiness
+                ? 'Compliance status for this business customer (is_business_compliant)'
+                : 'Verification history for this customer'}
+            </p>
           </div>
           <Link
             to={`/merchants/${merchantAccountKey}/customers/${encodeURIComponent(customerId)}/kyc`}
@@ -805,6 +835,65 @@ export default function CustomerDetailsPage() {
             Open full KYC page
           </Link>
         </div>
+
+        {isBusiness ? (
+          <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-text-muted">Business name</p>
+              <p className="mt-0.5 text-sm font-medium text-text-primary">{displayName}</p>
+              <p className="mt-2 text-xs text-text-muted">
+                Status:{' '}
+                <span
+                  className={cn(
+                    'font-semibold uppercase',
+                    kycKey === 'verified' ? 'text-success' : 'text-warning'
+                  )}
+                >
+                  {kycKey === 'verified' ? 'Verified' : 'Pending'}
+                </span>
+              </p>
+            </div>
+            {canApproveKyc ? (
+              <div className="flex flex-wrap gap-2">
+                {kycKey !== 'verified' ? (
+                  <button
+                    type="button"
+                    disabled={kycApproving}
+                    onClick={() =>
+                      setKycApproveConfirm({
+                        open: true,
+                        mode: 'business',
+                        reference: '',
+                        compliant: 'Y',
+                      })
+                    }
+                    className="rounded-lg bg-[#C5DC4B] px-3 py-1.5 text-xs font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={kycApproving}
+                  onClick={() =>
+                    setKycApproveConfirm({
+                      open: true,
+                      mode: 'business',
+                      reference: '',
+                      compliant: 'N',
+                    })
+                  }
+                  className="rounded-lg border border-error/40 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
+                >
+                  Mark non-compliant
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">Requires kyc.update to change status.</p>
+            )}
+          </div>
+        ) : null}
+
         {kycLoading ? (
           <div className="flex flex-col gap-2 px-4 py-4">
             {[...Array(5)].map((_, i) => (
@@ -820,7 +909,9 @@ export default function CustomerDetailsPage() {
                     <th className="px-3 py-2.5 font-medium">Document Number</th>
                     <th className="px-3 py-2.5 font-medium">Status</th>
                     <th className="px-3 py-2.5 font-medium">Created</th>
-                    {canApproveKyc ? <th className="px-3 py-2.5 font-medium w-24" /> : null}
+                    {canApproveKyc && !isBusiness ? (
+                      <th className="px-3 py-2.5 font-medium w-24" />
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -851,13 +942,20 @@ export default function CustomerDetailsPage() {
                             return d != null ? formatDate(d) : '—'
                           })()}
                         </td>
-                        {canApproveKyc ? (
+                        {canApproveKyc && !isBusiness ? (
                           <td className="px-3 py-2.5">
                             {pending && reference ? (
                               <button
                                 type="button"
                                 disabled={kycApproving}
-                                onClick={() => setKycApproveConfirm({ open: true, reference })}
+                                onClick={() =>
+                                  setKycApproveConfirm({
+                                    open: true,
+                                    mode: 'document',
+                                    reference,
+                                    compliant: 'Y',
+                                  })
+                                }
                                 className="rounded-lg bg-[#C5DC4B] px-2.5 py-1 text-[11px] font-semibold text-black hover:brightness-105 disabled:opacity-50"
                               >
                                 Approve
@@ -984,9 +1082,35 @@ export default function CustomerDetailsPage() {
 
       <KycApproveConfirmDialog
         open={kycApproveConfirm.open}
-        message={`Approve KYC record ${kycApproveConfirm.reference}?`}
+        title={
+          kycApproveConfirm.mode === 'business'
+            ? kycApproveConfirm.compliant === 'N'
+              ? 'Mark business KYC non-compliant'
+              : 'Approve business KYC'
+            : 'Approve KYC'
+        }
+        message={
+          kycApproveConfirm.mode === 'business'
+            ? kycApproveConfirm.compliant === 'N'
+              ? `Mark ${displayName} as non-compliant (is_business_compliant = N)?`
+              : `Approve business KYC for ${displayName}? This sets is_business_compliant = Y.`
+            : `Approve KYC record ${kycApproveConfirm.reference}?`
+        }
+        confirmLabel={
+          kycApproveConfirm.mode === 'business' && kycApproveConfirm.compliant === 'N'
+            ? 'Mark non-compliant'
+            : 'Approve'
+        }
+        confirmClassName={
+          kycApproveConfirm.mode === 'business' && kycApproveConfirm.compliant === 'N'
+            ? 'bg-error text-white hover:brightness-105'
+            : 'bg-[#C5DC4B] text-black hover:brightness-105'
+        }
         loading={kycApproving}
-        onCancel={() => !kycApproving && setKycApproveConfirm({ open: false, reference: '' })}
+        onCancel={() =>
+          !kycApproving &&
+          setKycApproveConfirm({ open: false, mode: 'document', reference: '', compliant: 'Y' })
+        }
         onConfirm={runApproveCustomerKyc}
       />
     </div>

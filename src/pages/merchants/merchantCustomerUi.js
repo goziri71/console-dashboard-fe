@@ -1,10 +1,30 @@
 import { countryToFlagEmoji } from './merchantUi'
+import { flagNo, flagYes } from '../../lib/utils'
 
 export { countryToFlagEmoji }
 
+/** True when customer.type (or aliases) is BUSINESS. */
+export function isBusinessCustomer(c) {
+  const raw = c?.type ?? c?.customer_type ?? c?.account_type
+  if (raw == null || raw === '') return false
+  return String(raw).trim().toUpperCase() === 'BUSINESS'
+}
+
+export function customerBusinessName(c) {
+  const bn = c?.business_name ?? c?.businessName
+  if (bn == null || bn === '') return ''
+  return String(bn).trim()
+}
+
 export function customerDisplayName(c) {
+  if (isBusinessCustomer(c)) {
+    const bn = customerBusinessName(c)
+    if (bn) return bn
+  }
   const n = [c?.first_name, c?.surname].filter(Boolean).join(' ').trim()
-  return n || '—'
+  if (n) return n
+  const bn = customerBusinessName(c)
+  return bn || '—'
 }
 
 /** `type` from API as-is. */
@@ -20,14 +40,33 @@ export function customerTierLabel(c) {
   return Number.isFinite(n) ? `Tier ${n}` : '—'
 }
 
+/**
+ * Aggregate KYC key for display.
+ * BUSINESS: driven by is_business_compliant (verified | pending), not document rows.
+ */
 export function customerKycKey(c) {
+  if (isBusinessCustomer(c)) {
+    if (flagYes(c?.is_business_compliant)) return 'verified'
+    if (flagNo(c?.is_business_compliant)) return 'pending'
+    const raw = c?.kyc_status ?? c?.kyc_verification_status
+    if (raw != null && raw !== '') {
+      const s = String(raw).toLowerCase().replace(/\s+/g, '_')
+      if (s.includes('verif') || s === 'compliant') return 'verified'
+      if (s.includes('pend') || s.includes('non')) return 'pending'
+      if (['verified', 'pending', 'rejected', 'none'].includes(s)) return s === 'none' ? 'pending' : s
+    }
+    return 'pending'
+  }
+
   const raw = c?.kyc_status ?? c?.kyc_verification_status ?? c?.verification_status
   if (raw != null && raw !== '') {
     const s = String(raw).toLowerCase().replace(/\s+/g, '_')
-    if (s === 'unverified') return 'none'
+    if (s === 'unverified' || s === 'not_started') return 'none'
     if (['verified', 'pending', 'rejected', 'none'].includes(s)) return s
   }
   if (c?.kyc_status === true || c?.verified === true) return 'verified'
+  if (flagYes(c?.is_personal_compliant)) return 'verified'
+  if (flagNo(c?.is_personal_compliant)) return 'pending'
   return 'none'
 }
 
@@ -58,4 +97,14 @@ export function getCustomerIdentifier(customer) {
     customer.id ??
     ''
   )
+}
+
+/** Nested `customer` block from GET /customers/:id/kycs when present. */
+export function pickCustomerFromKycListResponse(res) {
+  if (res == null || typeof res !== 'object') return null
+  const inner =
+    res.data != null && typeof res.data === 'object' && !Array.isArray(res.data) ? res.data : res
+  if (inner.customer != null && typeof inner.customer === 'object') return inner.customer
+  if (inner.data?.customer != null && typeof inner.data.customer === 'object') return inner.data.customer
+  return null
 }

@@ -7,6 +7,7 @@ export default function KycApproveConfirmDialog({
   title = 'Approve KYC',
   message,
   confirmLabel = 'Approve',
+  confirmClassName = 'bg-[#C5DC4B] text-black hover:brightness-105',
   loading = false,
   onCancel,
   onConfirm,
@@ -52,7 +53,8 @@ export default function KycApproveConfirmDialog({
             disabled={loading}
             onClick={onConfirm}
             className={cn(
-              'inline-flex items-center gap-2 rounded-lg bg-[#C5DC4B] px-4 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-60'
+              'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60',
+              confirmClassName
             )}
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : null}

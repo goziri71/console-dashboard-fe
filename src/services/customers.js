@@ -78,3 +78,13 @@ export async function getCustomerKycs(identifier, params = {}) {
   const { data } = await api.get(`/customers/${id}/kycs`, { params })
   return data
 }
+
+/**
+ * BUSINESS customers only — approve / set business KYC compliance.
+ * Body: `{}` or `{ is_business_compliant: 'Y'|'N' }`. Personal customers use PATCH /kycs/:reference.
+ */
+export async function approveCustomerBusinessKyc(identifier, body = { is_business_compliant: 'Y' }) {
+  const id = encodeURIComponent(String(identifier))
+  const { data } = await api.post(`/customers/${id}/kyc/approve`, body)
+  return data
+}

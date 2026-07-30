@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, AlertCircle, CheckCircle, Download, FileText, Loader2, RefreshCw, XCircle, HelpCircle } from 'lucide-react'
-import { getCustomer, getCustomerKycs } from '../../services/customers'
+import { getCustomer, getCustomerKycs, approveCustomerBusinessKyc } from '../../services/customers'
 import { patchKycCompliance } from '../../services/kyc'
 import { useAuth } from '../../context/AuthContext'
 import { canKycUpdate } from '../../lib/permissions'
@@ -21,6 +21,8 @@ import {
   customerAccountStatusKey,
   customerTypeLabel,
   getCustomerIdentifier,
+  isBusinessCustomer,
+  pickCustomerFromKycListResponse,
 } from './merchantCustomerUi'
 import { kycKeyToUpper } from '../../lib/kycUi'
 import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
@@ -225,7 +227,12 @@ export default function CustomerKycPage() {
   const [kycLoading, setKycLoading] = useState(false)
   const [kycMsg, setKycMsg] = useState(null)
   const [approving, setApproving] = useState(false)
-  const [approveConfirm, setApproveConfirm] = useState({ open: false, reference: '' })
+  const [approveConfirm, setApproveConfirm] = useState({
+    open: false,
+    mode: 'document',
+    reference: '',
+    compliant: 'Y',
+  })
 
   const statementIdentifier = useMemo(() => {
     if (!customerId) return ''
@@ -263,6 +270,10 @@ export default function CustomerKycPage() {
     setKycLoading(true)
     try {
       const res = await getCustomerKycs(statementIdentifier, { page: kycPage, limit: KYC_PAGE_SIZE })
+      const nestedCustomer = pickCustomerFromKycListResponse(res)
+      if (nestedCustomer) {
+        setCustomer((prev) => (prev ? { ...prev, ...nestedCustomer } : nestedCustomer))
+      }
       const rows = pickRecords(res)
       setKycRows(rows)
       const pag = pickPagination(res)
@@ -294,20 +305,37 @@ export default function CustomerKycPage() {
   }, [kycMsg])
 
   const runApproveKyc = async () => {
-    const reference = approveConfirm.reference
-    if (!reference || !canApprove) return
+    if (!canApprove) return
+    if (approveConfirm.mode === 'document' && !approveConfirm.reference) return
     setApproving(true)
     setKycMsg(null)
     try {
-      await patchKycCompliance(reference, { is_compliant: 'Y' })
-      setKycMsg({ type: 'success', text: 'KYC record approved successfully.' })
-      setApproveConfirm({ open: false, reference: '' })
+      if (approveConfirm.mode === 'business') {
+        const id = statementIdentifier || customerId
+        const compliant = approveConfirm.compliant === 'N' ? 'N' : 'Y'
+        const res = await approveCustomerBusinessKyc(id, { is_business_compliant: compliant })
+        const body = unwrapPayload(res) ?? res
+        if (body && typeof body === 'object') {
+          setCustomer((prev) => (prev ? { ...prev, ...body } : body))
+        }
+        setKycMsg({
+          type: 'success',
+          text:
+            compliant === 'Y'
+              ? 'Business KYC marked compliant.'
+              : 'Business KYC marked non-compliant.',
+        })
+      } else {
+        await patchKycCompliance(approveConfirm.reference, { is_compliant: 'Y' })
+        setKycMsg({ type: 'success', text: 'KYC record approved successfully.' })
+      }
+      setApproveConfirm({ open: false, mode: 'document', reference: '', compliant: 'Y' })
       await fetchCore()
       await loadKycs()
     } catch (err) {
       setKycMsg({
         type: 'error',
-        text: err.response?.data?.message || 'Failed to approve KYC record.',
+        text: err.response?.data?.message || 'Failed to update KYC.',
       })
     } finally {
       setApproving(false)
@@ -333,8 +361,9 @@ export default function CustomerKycPage() {
   const displayName = useMemo(() => (customer ? customerDisplayName(customer) : '—'), [customer])
   const displayNameUpper = useMemo(() => (displayName === '—' ? '—' : displayName.toUpperCase()), [displayName])
   const flag = countryToFlagEmoji(customer?.country_code ?? customer?.country)
+  const isBusiness = customer ? isBusinessCustomer(customer) : false
   const localKycKey = customer ? customerKycKey(customer) : 'none'
-  const { kycKey } = useKycDisplayStatus(customer, localKycKey)
+  const { kycKey } = useKycDisplayStatus(isBusiness ? null : customer, localKycKey)
   const acctKey = customer ? customerAccountStatusKey(customer) : 'active'
   const tierLine = customer ? customerTierLabel(customer) : '—'
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
@@ -509,7 +538,9 @@ export default function CustomerKycPage() {
         <section className="flex flex-col overflow-hidden rounded-[30px] border border-[#2a2a2a] bg-[#111111]">
           <div className="border-b border-[#2a2a2a] px-5 py-4">
             <h2 className="text-[13px] font-semibold leading-snug tracking-[0.02em] text-[#C5DC4B]">
-              KYC Documents — Submitted Documents
+              {isBusiness
+                ? 'Supporting documents (status is set on business compliance)'
+                : 'KYC Documents — Submitted Documents'}
             </h2>
           </div>
           {kycLoading ? (
@@ -566,11 +597,18 @@ export default function CustomerKycPage() {
                         >
                           {sk === 'verified' ? 'Verified' : sk === 'pending' ? 'Pending' : sk === 'rejected' ? 'Rejected' : statusStr || '—'}
                         </span>
-                        {canApprove && pending && reference ? (
+                        {canApprove && !isBusiness && pending && reference ? (
                           <button
                             type="button"
                             disabled={approving}
-                            onClick={() => setApproveConfirm({ open: true, reference })}
+                            onClick={() =>
+                              setApproveConfirm({
+                                open: true,
+                                mode: 'document',
+                                reference,
+                                compliant: 'Y',
+                              })
+                            }
                             className="rounded-full bg-[#C5DC4B] px-3 py-1.5 text-[11px] font-semibold text-black hover:brightness-105 disabled:opacity-50"
                           >
                             Approve
@@ -624,7 +662,55 @@ export default function CustomerKycPage() {
           <div className="flex flex-1 flex-col gap-5 p-6">
             <KycSummaryStatusBanner kycKey={kycKey} />
 
+            {isBusiness && canApprove ? (
+              <div className="flex flex-wrap gap-2">
+                {kycKey !== 'verified' ? (
+                  <button
+                    type="button"
+                    disabled={approving}
+                    onClick={() =>
+                      setApproveConfirm({
+                        open: true,
+                        mode: 'business',
+                        reference: '',
+                        compliant: 'Y',
+                      })
+                    }
+                    className="rounded-full bg-[#C5DC4B] px-4 py-2 text-xs font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                  >
+                    Approve business KYC
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={approving}
+                  onClick={() =>
+                    setApproveConfirm({
+                      open: true,
+                      mode: 'business',
+                      reference: '',
+                      compliant: 'N',
+                    })
+                  }
+                  className="rounded-full border border-[#b91c1c]/60 bg-[#1a1010] px-4 py-2 text-xs font-semibold text-[#fca5a5] hover:bg-[#2a1515] disabled:opacity-50"
+                >
+                  Mark non-compliant
+                </button>
+              </div>
+            ) : null}
+            {isBusiness && !canApprove ? (
+              <p className="text-xs text-[#9ca3af]">
+                Business KYC approve requires <strong>kyc.update</strong>.
+              </p>
+            ) : null}
+
             <dl className="mt-auto divide-y divide-[#2a2a2a] text-sm">
+              {isBusiness ? (
+                <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
+                  <dt className="text-[#9ca3af]">Business name</dt>
+                  <dd className="text-right font-medium text-white">{displayName}</dd>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
                 <dt className="text-[#F8FAEA] text-[17.838px] font-normal">KYC Status</dt>
                 <dd>
@@ -676,9 +762,35 @@ export default function CustomerKycPage() {
 
       <KycApproveConfirmDialog
         open={approveConfirm.open}
-        message={`Approve KYC record ${approveConfirm.reference}? This marks the document as compliant.`}
+        title={
+          approveConfirm.mode === 'business'
+            ? approveConfirm.compliant === 'N'
+              ? 'Mark business KYC non-compliant'
+              : 'Approve business KYC'
+            : 'Approve KYC'
+        }
+        message={
+          approveConfirm.mode === 'business'
+            ? approveConfirm.compliant === 'N'
+              ? `Mark ${displayName} as non-compliant (is_business_compliant = N)?`
+              : `Approve business KYC for ${displayName}? This sets is_business_compliant = Y.`
+            : `Approve KYC record ${approveConfirm.reference}? This marks the document as compliant.`
+        }
+        confirmLabel={
+          approveConfirm.mode === 'business' && approveConfirm.compliant === 'N'
+            ? 'Mark non-compliant'
+            : 'Approve'
+        }
+        confirmClassName={
+          approveConfirm.mode === 'business' && approveConfirm.compliant === 'N'
+            ? 'bg-error text-white hover:brightness-105'
+            : 'bg-[#C5DC4B] text-black hover:brightness-105'
+        }
         loading={approving}
-        onCancel={() => !approving && setApproveConfirm({ open: false, reference: '' })}
+        onCancel={() =>
+          !approving &&
+          setApproveConfirm({ open: false, mode: 'document', reference: '', compliant: 'Y' })
+        }
         onConfirm={runApproveKyc}
       />
     </div>
