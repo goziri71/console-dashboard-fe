@@ -57,6 +57,7 @@ import {
   getCustomerIdentifier,
   isBusinessCustomer,
   pickCustomerFromKycListResponse,
+  mergeCustomerFromKycPayload,
 } from './merchantCustomerUi'
 import { pickMerchantAccountKeyFromCustomer } from '../../lib/walletNavigation'
 import CustomerWalletTransactionsPanel from './CustomerWalletTransactionsPanel'
@@ -338,20 +339,7 @@ export default function CustomerDetailsPage() {
       const res = await getCustomerKycs(statementIdentifier, { page: kycPage, limit: KYC_PAGE_SIZE })
       const nestedCustomer = pickCustomerFromKycListResponse(res)
       if (nestedCustomer) {
-        setCustomer((prev) => {
-          if (!prev) return nestedCustomer
-          const businessName = nestedCustomer.business_name ?? nestedCustomer.businessName
-          const nextCompliant = nestedCustomer.is_business_compliant
-          const nextStatus = nestedCustomer.kyc_status
-          const nextType = nestedCustomer.type ?? nestedCustomer.customer_type
-          const unchanged =
-            (businessName == null || businessName === prev.business_name) &&
-            (nextCompliant == null || nextCompliant === prev.is_business_compliant) &&
-            (nextStatus == null || nextStatus === prev.kyc_status) &&
-            (nextType == null || nextType === prev.type)
-          if (unchanged) return prev
-          return { ...prev, ...nestedCustomer }
-        })
+        setCustomer((prev) => mergeCustomerFromKycPayload(prev, nestedCustomer))
       }
       const rows = pickRecords(res)
       setKycRows(rows)
@@ -511,11 +499,17 @@ export default function CustomerDetailsPage() {
   )
   const isBusiness = customer ? isBusinessCustomer(customer) : false
   const localKycKey = customer ? customerKycKey(customer) : 'none'
-  const { kycKey } = useKycDisplayStatus(isBusiness ? null : customer, localKycKey)
+  const { kycKey } = useKycDisplayStatus(
+    isBusiness || (customer && String(customerTypeLabel(customer)).toUpperCase().includes('BUSINESS'))
+      ? null
+      : customer,
+    localKycKey
+  )
   const acctKey = customer ? customerAccountStatusKey(customer) : 'active'
   const tierLine = customer ? customerTierLabel(customer) : '—'
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
   const typeDisplay = typeRaw === '—' ? '—' : String(typeRaw).toUpperCase()
+  const treatAsBusiness = isBusiness || typeDisplay.includes('BUSINESS')
 
   const kycUpper = kycKeyToUpper(kycKey)
 
@@ -835,10 +829,10 @@ export default function CustomerDetailsPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-text-primary">
-              {isBusiness ? 'Business KYC' : 'KYC records'}
+              {treatAsBusiness ? 'Business KYC' : 'KYC records'}
             </h2>
             <p className="mt-0.5 text-xs text-text-muted">
-              {isBusiness
+              {treatAsBusiness
                 ? 'Compliance status for this business customer (is_business_compliant)'
                 : 'Verification history for this customer'}
             </p>
@@ -851,7 +845,7 @@ export default function CustomerDetailsPage() {
           </Link>
         </div>
 
-        {isBusiness ? (
+        {treatAsBusiness ? (
           <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs text-text-muted">Business name</p>
@@ -868,12 +862,12 @@ export default function CustomerDetailsPage() {
                 </span>
               </p>
             </div>
-            {canApproveKyc ? (
+            <div className="flex flex-col items-start gap-2">
               <div className="flex flex-wrap gap-2">
                 {kycKey !== 'verified' ? (
                   <button
                     type="button"
-                    disabled={kycApproving}
+                    disabled={kycApproving || !canApproveKyc}
                     onClick={() =>
                       setKycApproveConfirm({
                         open: true,
@@ -882,14 +876,14 @@ export default function CustomerDetailsPage() {
                         compliant: 'Y',
                       })
                     }
-                    className="rounded-lg bg-[#C5DC4B] px-3 py-1.5 text-xs font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                    className="rounded-lg bg-[#C5DC4B] px-3 py-1.5 text-xs font-semibold text-black hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Approve
                   </button>
                 ) : null}
                 <button
                   type="button"
-                  disabled={kycApproving}
+                  disabled={kycApproving || !canApproveKyc}
                   onClick={() =>
                     setKycApproveConfirm({
                       open: true,
@@ -898,14 +892,15 @@ export default function CustomerDetailsPage() {
                       compliant: 'N',
                     })
                   }
-                  className="rounded-lg border border-error/40 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/10 disabled:opacity-50"
+                  className="rounded-lg border border-error/40 px-3 py-1.5 text-xs font-semibold text-error hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Mark non-compliant
                 </button>
               </div>
-            ) : (
-              <p className="text-xs text-text-muted">Requires kyc.update to change status.</p>
-            )}
+              {!canApproveKyc ? (
+                <p className="text-xs text-warning">Needs kyc.update (or operations/compliance).</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -924,7 +919,7 @@ export default function CustomerDetailsPage() {
                     <th className="px-3 py-2.5 font-medium">Document Number</th>
                     <th className="px-3 py-2.5 font-medium">Status</th>
                     <th className="px-3 py-2.5 font-medium">Created</th>
-                    {canApproveKyc && !isBusiness ? (
+                    {canApproveKyc && !treatAsBusiness ? (
                       <th className="px-3 py-2.5 font-medium w-24" />
                     ) : null}
                   </tr>
@@ -957,7 +952,7 @@ export default function CustomerDetailsPage() {
                             return d != null ? formatDate(d) : '—'
                           })()}
                         </td>
-                        {canApproveKyc && !isBusiness ? (
+                        {canApproveKyc && !treatAsBusiness ? (
                           <td className="px-3 py-2.5">
                             {pending && reference ? (
                               <button

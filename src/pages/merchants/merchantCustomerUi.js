@@ -5,9 +5,15 @@ export { countryToFlagEmoji }
 
 /** True when customer.type (or aliases) is BUSINESS. */
 export function isBusinessCustomer(c) {
-  const raw = c?.type ?? c?.customer_type ?? c?.account_type
+  if (c == null || typeof c !== 'object') return false
+  if (flagYes(c.is_business) || flagYes(c.isBusiness)) return true
+  const raw = c.type ?? c.customer_type ?? c.account_type ?? c.entity_type ?? c.customer_kind
   if (raw == null || raw === '') return false
-  return String(raw).trim().toUpperCase() === 'BUSINESS'
+  const normalized = String(raw)
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_')
+  return normalized === 'BUSINESS' || normalized.includes('BUSINESS')
 }
 
 export function customerBusinessName(c) {
@@ -107,4 +113,41 @@ export function pickCustomerFromKycListResponse(res) {
   if (inner.customer != null && typeof inner.customer === 'object') return inner.customer
   if (inner.data?.customer != null && typeof inner.data.customer === 'object') return inner.data.customer
   return null
+}
+
+/**
+ * Merge KYC nested customer fields without wiping profile type / identity.
+ * Only applies known compliance/display keys when they have real values.
+ */
+export function mergeCustomerFromKycPayload(prev, nested) {
+  if (!nested || typeof nested !== 'object') return prev
+  if (!prev) return nested
+
+  const patch = {}
+  const businessName = nested.business_name ?? nested.businessName
+  if (businessName != null && String(businessName).trim() !== '') {
+    patch.business_name = String(businessName).trim()
+  }
+  if (nested.is_business_compliant != null && nested.is_business_compliant !== '') {
+    patch.is_business_compliant = nested.is_business_compliant
+  }
+  if (nested.kyc_status != null && nested.kyc_status !== '') {
+    patch.kyc_status = nested.kyc_status
+  }
+  const nextType = nested.type ?? nested.customer_type ?? nested.account_type
+  if (nextType != null && String(nextType).trim() !== '') {
+    patch.type = nextType
+  }
+
+  if (Object.keys(patch).length === 0) return prev
+
+  const unchanged =
+    (patch.business_name == null || patch.business_name === prev.business_name) &&
+    (patch.is_business_compliant == null ||
+      patch.is_business_compliant === prev.is_business_compliant) &&
+    (patch.kyc_status == null || patch.kyc_status === prev.kyc_status) &&
+    (patch.type == null || patch.type === prev.type)
+
+  if (unchanged) return prev
+  return { ...prev, ...patch }
 }

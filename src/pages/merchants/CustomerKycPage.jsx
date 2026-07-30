@@ -23,6 +23,7 @@ import {
   getCustomerIdentifier,
   isBusinessCustomer,
   pickCustomerFromKycListResponse,
+  mergeCustomerFromKycPayload,
 } from './merchantCustomerUi'
 import { kycKeyToUpper } from '../../lib/kycUi'
 import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
@@ -272,20 +273,7 @@ export default function CustomerKycPage() {
       const res = await getCustomerKycs(statementIdentifier, { page: kycPage, limit: KYC_PAGE_SIZE })
       const nestedCustomer = pickCustomerFromKycListResponse(res)
       if (nestedCustomer) {
-        setCustomer((prev) => {
-          if (!prev) return nestedCustomer
-          const businessName = nestedCustomer.business_name ?? nestedCustomer.businessName
-          const nextCompliant = nestedCustomer.is_business_compliant
-          const nextStatus = nestedCustomer.kyc_status
-          const nextType = nestedCustomer.type ?? nestedCustomer.customer_type
-          const unchanged =
-            (businessName == null || businessName === prev.business_name) &&
-            (nextCompliant == null || nextCompliant === prev.is_business_compliant) &&
-            (nextStatus == null || nextStatus === prev.kyc_status) &&
-            (nextType == null || nextType === prev.type)
-          if (unchanged) return prev
-          return { ...prev, ...nestedCustomer }
-        })
+        setCustomer((prev) => mergeCustomerFromKycPayload(prev, nestedCustomer))
       }
       const rows = pickRecords(res)
       setKycRows(rows)
@@ -383,6 +371,8 @@ export default function CustomerKycPage() {
   const tierLine = customer ? customerTierLabel(customer) : '—'
   const typeRaw = customer ? customerTypeLabel(customer) : '—'
   const typeDisplay = typeRaw === '—' ? '—' : String(typeRaw).toUpperCase()
+  // Belt-and-suspenders: header already shows BUSINESS even if type field is oddly shaped.
+  const treatAsBusiness = isBusiness || typeDisplay.includes('BUSINESS')
   const kycUpper = kycKeyToUpper(kycKey)
   const accountUpper =
     acctKey === 'active' ? 'ACTIVE' : acctKey === 'suspended' ? 'SUSPENDED' : acctKey === 'inactive' ? 'INACTIVE' : 'PENDING'
@@ -553,7 +543,7 @@ export default function CustomerKycPage() {
         <section className="flex flex-col overflow-hidden rounded-[30px] border border-[#2a2a2a] bg-[#111111]">
           <div className="border-b border-[#2a2a2a] px-5 py-4">
             <h2 className="text-[13px] font-semibold leading-snug tracking-[0.02em] text-[#C5DC4B]">
-              {isBusiness
+              {treatAsBusiness
                 ? 'Supporting documents (status is set on business compliance)'
                 : 'KYC Documents — Submitted Documents'}
             </h2>
@@ -612,7 +602,7 @@ export default function CustomerKycPage() {
                         >
                           {sk === 'verified' ? 'Verified' : sk === 'pending' ? 'Pending' : sk === 'rejected' ? 'Rejected' : statusStr || '—'}
                         </span>
-                        {canApprove && !isBusiness && pending && reference ? (
+                        {canApprove && !treatAsBusiness && pending && reference ? (
                           <button
                             type="button"
                             disabled={approving}
@@ -677,50 +667,60 @@ export default function CustomerKycPage() {
           <div className="flex flex-1 flex-col gap-5 p-6">
             <KycSummaryStatusBanner kycKey={kycKey} />
 
-            {isBusiness && canApprove ? (
-              <div className="flex flex-wrap gap-2">
-                {kycKey !== 'verified' ? (
+            {treatAsBusiness ? (
+              <div className="rounded-xl border border-[#3f4552] bg-[#161616] p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-[#9ca3af]">
+                  Business KYC compliance
+                </p>
+                <p className="mt-1 text-sm text-white">
+                  Status is set with <code className="text-[#C5DC4B]">is_business_compliant</code>, not
+                  document rows.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {kycKey !== 'verified' ? (
+                    <button
+                      type="button"
+                      disabled={approving || !canApprove}
+                      onClick={() =>
+                        setApproveConfirm({
+                          open: true,
+                          mode: 'business',
+                          reference: '',
+                          compliant: 'Y',
+                        })
+                      }
+                      className="rounded-full bg-[#C5DC4B] px-4 py-2 text-xs font-semibold text-black hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Approve business KYC
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    disabled={approving}
+                    disabled={approving || !canApprove}
                     onClick={() =>
                       setApproveConfirm({
                         open: true,
                         mode: 'business',
                         reference: '',
-                        compliant: 'Y',
+                        compliant: 'N',
                       })
                     }
-                    className="rounded-full bg-[#C5DC4B] px-4 py-2 text-xs font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                    className="rounded-full border border-[#b91c1c]/60 bg-[#1a1010] px-4 py-2 text-xs font-semibold text-[#fca5a5] hover:bg-[#2a1515] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Approve business KYC
+                    Mark non-compliant
                   </button>
+                </div>
+                {!canApprove ? (
+                  <p className="mt-2 text-xs text-[#fbbf24]">
+                    Your role needs <strong>kyc.update</strong> (or operations/compliance) to change
+                    business KYC.
+                  </p>
                 ) : null}
-                <button
-                  type="button"
-                  disabled={approving}
-                  onClick={() =>
-                    setApproveConfirm({
-                      open: true,
-                      mode: 'business',
-                      reference: '',
-                      compliant: 'N',
-                    })
-                  }
-                  className="rounded-full border border-[#b91c1c]/60 bg-[#1a1010] px-4 py-2 text-xs font-semibold text-[#fca5a5] hover:bg-[#2a1515] disabled:opacity-50"
-                >
-                  Mark non-compliant
-                </button>
               </div>
-            ) : null}
-            {isBusiness && !canApprove ? (
-              <p className="text-xs text-[#9ca3af]">
-                Business KYC approve requires <strong>kyc.update</strong>.
-              </p>
             ) : null}
 
             <dl className="mt-auto divide-y divide-[#2a2a2a] text-sm">
-              {isBusiness ? (
+              {treatAsBusiness ? (
                 <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
                   <dt className="text-[#9ca3af]">Business name</dt>
                   <dd className="text-right font-medium text-white">{displayName}</dd>
