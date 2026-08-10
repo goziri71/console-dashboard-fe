@@ -8,7 +8,7 @@ export const PERMISSION_CUSTOMER_UPDATE = 'customer.update'
 export const PERMISSION_MERCHANT_UPDATE = 'merchant.update'
 /** KYC document approval — PATCH /kycs/:reference, POST /customers/:identifier/kyc/approve (BUSINESS), POST /merchants/:account_key/kyc/approve */
 export const PERMISSION_KYC_UPDATE = 'kyc.update'
-/** Pending transaction review — POST /transactions/review/.../approve|cancel */
+/** @deprecated Prefer merchant.update for NGN payout TSQ resolve. Kept for any remaining dispute UI. */
 export const PERMISSION_DISPUTE_UPDATE = 'dispute.update'
 export const PERMISSION_PRICING_READ = 'pricing.read'
 export const PERMISSION_PRICING_MANAGE = 'pricing.manage'

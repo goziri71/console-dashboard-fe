@@ -45,6 +45,24 @@ export async function beamerAccountUpdate(accountKey, body, requestId) {
   return postBeamerIntegration(accountKey, 'account-update', body, requestId)
 }
 
+/**
+ * Resolve / query pending NGN payout status (TSQ).
+ * Body: `{ headers: { Request-Id }, data: { reference } }` — reference is live_reference.
+ */
+export async function beamerNgnTsq(accountKey, body = {}, requestId) {
+  const reference =
+    body?.data?.reference ?? body?.reference ?? (typeof body === 'string' ? body : '')
+  return postBeamerIntegration(
+    accountKey,
+    'ngn-tsq',
+    {
+      headers: body?.headers,
+      data: { reference: String(reference || '').trim() },
+    },
+    requestId
+  )
+}
+
 // ── Single merchant ───────────────────────────────────────────────────────────
 
 export async function getMerchant(accountKey) {

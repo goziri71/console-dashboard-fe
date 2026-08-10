@@ -14,15 +14,15 @@ import {
 import Pagination from '../../components/ui/Pagination'
 import OverlayPortal from '../../components/ui/OverlayPortal'
 import { useAuth } from '../../context/AuthContext'
-import { canDisputeUpdate, canReadFinancial } from '../../lib/permissions'
+import { canUpdateMerchant, canReadFinancial } from '../../lib/permissions'
 import {
-  canReviewRowActions,
+  canResolveNgnTsq,
   detailFieldsForRow,
+  pickAccountKey,
   pickReference,
   pickRecord,
   pickRowStatus,
   reviewStatusBadge,
-  reviewUrlSegment,
   normalizeReviewStatus,
   REVIEW_TYPE_TABS,
   transactionTypeLabel,
@@ -30,21 +30,19 @@ import {
   unwrapPendingReviewSummary,
 } from '../../lib/transactionReview'
 import { cn, formatBalance, formatDate, formatNumber } from '../../lib/utils'
-import {
-  approvePendingReviewTransaction,
-  cancelPendingReviewTransaction,
-  getPendingReviewSummary,
-  getPendingReviewTransactions,
-} from '../../services/transactions'
+import { parseBeamerResponse, isIsvsDirectSuccess, getBeamerErrorMessage } from '../../lib/beamerUi'
+import { getPendingReviewSummary, getPendingReviewTransactions } from '../../services/transactions'
+import { beamerNgnTsq } from '../../services/merchants'
 
 const LIMIT = 20
 
-function SummaryCard({ label, value, icon: Icon, iconCls }) {
+function SummaryCard({ label, value, icon, iconCls }) {
+  const Icon = icon
   return (
     <div className="rounded-card border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2">
         <div className={cn('flex h-8 w-8 items-center justify-center rounded-full', iconCls)}>
-          <Icon size={15} />
+          {Icon ? <Icon size={15} /> : null}
         </div>
         <span className="text-xs text-text-muted">{label}</span>
       </div>
@@ -121,12 +119,12 @@ function formatDrawerAmount(row, canShowAmounts) {
   return formatBalance(n, 'NGN')
 }
 
-function DetailDrawer({ row, canAct, canShowAmounts, acting, onClose, onApprove, onCancel }) {
+function DetailDrawer({ row, canAct, canShowAmounts, acting, onClose, onResolve }) {
   if (!row) return null
   const status = pickRowStatus(row)
   const statusKind = reviewStatusKind(status)
   const fields = detailFieldsForRow(row)
-  const showActions = canAct && canReviewRowActions(row)
+  const showActions = canAct && canResolveNgnTsq(row)
   const amountDisplay = formatDrawerAmount(row, canShowAmounts)
   const dateValue = fields.find(([label]) => label === 'Date created')?.[1] ?? '—'
   const detailRows = fields.filter(([label]) => !['Amount', 'Date created'].includes(label))
@@ -201,7 +199,7 @@ function DetailDrawer({ row, canAct, canShowAmounts, acting, onClose, onApprove,
                     )}
                   >
                     {value ?? '—'}
-                    {label === 'Reference' && value && value !== '—' ? (
+                    {(label === 'Reference' || label === 'Live reference') && value && value !== '—' ? (
                       <button
                         type="button"
                         onClick={() => copyText(value)}
@@ -222,20 +220,11 @@ function DetailDrawer({ row, canAct, canShowAmounts, acting, onClose, onApprove,
               <button
                 type="button"
                 disabled={acting}
-                onClick={onApprove}
+                onClick={onResolve}
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-semibold text-page hover:brightness-105 disabled:opacity-50"
               >
                 {acting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                Approve
-              </button>
-              <button
-                type="button"
-                disabled={acting}
-                onClick={onCancel}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-error/40 bg-error-bg py-2.5 text-sm font-semibold text-error hover:bg-error/10 disabled:opacity-50"
-              >
-                <XCircle size={14} />
-                Cancel
+                Resolve payout
               </button>
             </div>
           ) : null}
@@ -251,7 +240,7 @@ export default function DisputesPage() {
   const scopeAccountKey = searchParams.get('account_key')?.trim() || ''
   const scopeIdentifier = searchParams.get('identifier')?.trim() || ''
 
-  const canAct = canDisputeUpdate(user?.permissions, user?.role)
+  const canAct = canUpdateMerchant(user?.permissions, user?.role)
   const canShowAmounts = canReadFinancial(user?.permissions)
 
   const [summary, setSummary] = useState({ total_pending: 0, by_type: {} })
@@ -278,7 +267,7 @@ export default function DisputesPage() {
   const [selected, setSelected] = useState(null)
   const [actingRef, setActingRef] = useState(null)
   const [toast, setToast] = useState(null)
-  const [confirmCancel, setConfirmCancel] = useState(null)
+  const [confirmResolve, setConfirmResolve] = useState(null)
 
   const abortRef = useRef(null)
 
@@ -373,37 +362,50 @@ export default function DisputesPage() {
     return formatBalance(n, 'NGN')
   }
 
-  async function runReviewAction(row, action) {
+  async function runResolveTsq(row) {
     const reference = pickReference(row)
-    const segment = reviewUrlSegment(row?.transaction_type)
-    if (!reference || !segment) {
-      setToast({ type: 'error', text: 'Missing reference or transaction type for this row.' })
+    const accountKey = pickAccountKey(row)
+    if (!reference || !accountKey) {
+      setToast({
+        type: 'error',
+        text: 'Missing merchant account key or payout live reference for TSQ.',
+      })
+      return
+    }
+    if (!canResolveNgnTsq(row)) {
+      setToast({ type: 'error', text: 'TSQ resolve is only available for pending NGN payouts.' })
       return
     }
 
     setActingRef(reference)
     try {
-      if (action === 'approve') {
-        await approvePendingReviewTransaction(segment, reference)
-        setToast({ type: 'success', text: 'Transaction approved successfully.' })
+      const res = await beamerNgnTsq(accountKey, { data: { reference } })
+      const parsed = parseBeamerResponse(res)
+      if (isIsvsDirectSuccess(parsed) || parsed.isvsState === true) {
+        setToast({
+          type: 'success',
+          text: parsed.isvsMessage || 'Payout status queried successfully.',
+        })
+        setSelected(null)
+        setConfirmResolve(null)
+        await Promise.all([fetchList(), fetchSummary()])
       } else {
-        await cancelPendingReviewTransaction(segment, reference)
-        setToast({ type: 'success', text: 'Transaction cancelled (marked failed).' })
+        const reason =
+          parsed.isvs?.data?.reason ||
+          parsed.isvsMessage ||
+          'Could not resolve payout status.'
+        setToast({ type: 'error', text: String(reason) })
       }
-      setSelected(null)
-      setConfirmCancel(null)
-      await Promise.all([fetchList(), fetchSummary()])
     } catch (err) {
       const status = err?.response?.status
-      const msg = err?.response?.data?.message || err?.message || 'Request failed.'
-      if (status === 409) {
-        setToast({ type: 'error', text: 'Already processed — refreshing queue.' })
-        await Promise.all([fetchList(), fetchSummary()])
-        setSelected(null)
-      } else if (status === 403) {
-        setToast({ type: 'error', text: 'You do not have permission to review transactions.' })
+      const msg = getBeamerErrorMessage(err, err?.response?.data?.message || 'TSQ request failed.')
+      if (status === 403) {
+        setToast({
+          type: 'error',
+          text: 'You do not have permission to resolve payouts (merchant.update required).',
+        })
       } else if (status === 404) {
-        setToast({ type: 'error', text: 'Transaction not found.' })
+        setToast({ type: 'error', text: 'Merchant or payout reference not found.' })
       } else {
         setToast({ type: 'error', text: msg })
       }
@@ -423,7 +425,8 @@ export default function DisputesPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Pending review</h1>
         <p className="mt-1 max-w-3xl text-sm text-text-secondary">
-          Transactions awaiting ops approval. Search the queue, review details, then approve or cancel pending items.
+          Pending transactions queue. For NGN payouts, use Resolve to query status via Beamer TSQ
+          (requires merchant.update).
           {scopeAccountKey ? ` Scoped to merchant ${scopeAccountKey}.` : ''}
           {scopeIdentifier ? ` Scoped to customer ${scopeIdentifier}.` : ''}
         </p>
@@ -543,7 +546,7 @@ export default function DisputesPage() {
                     const ref = pickReference(row)
                     const status = pickRowStatus(row)
                     const badge = reviewStatusBadge(status)
-                    const showActions = canAct && canReviewRowActions(row)
+                    const showActions = canAct && canResolveNgnTsq(row)
                     const busy = actingRef === ref
 
                     return (
@@ -571,18 +574,10 @@ export default function DisputesPage() {
                                 <button
                                   type="button"
                                   disabled={busy}
-                                  onClick={() => runReviewAction(row, 'approve')}
+                                  onClick={() => setConfirmResolve(row)}
                                   className="rounded-full bg-accent px-3 py-1 text-[11px] font-semibold text-page hover:brightness-105 disabled:opacity-50"
                                 >
-                                  {busy ? '…' : 'Approve'}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => setConfirmCancel(row)}
-                                  className="rounded-full border border-error/30 bg-error-bg px-3 py-1 text-[11px] font-semibold text-error hover:bg-error/20 disabled:opacity-50"
-                                >
-                                  Cancel
+                                  {busy ? '…' : 'Resolve'}
                                 </button>
                               </div>
                             ) : null}
@@ -618,19 +613,18 @@ export default function DisputesPage() {
         canShowAmounts={canShowAmounts}
         acting={actingRef === pickReference(selected)}
         onClose={() => setSelected(null)}
-        onApprove={() => selected && runReviewAction(selected, 'approve')}
-        onCancel={() => selected && setConfirmCancel(selected)}
+        onResolve={() => selected && setConfirmResolve(selected)}
       />
 
       <ConfirmDialog
-        open={!!confirmCancel}
-        title="Cancel pending transaction?"
-        message="This will mark the transaction as failed. This action cannot be undone from the review queue."
-        confirmLabel="Cancel transaction"
-        danger
+        open={!!confirmResolve}
+        title="Resolve pending NGN payout?"
+        message={`Query payout status via Beamer TSQ for reference ${pickReference(confirmResolve) || '—'}?`}
+        confirmLabel="Resolve payout"
+        danger={false}
         loading={!!actingRef}
-        onClose={() => setConfirmCancel(null)}
-        onConfirm={() => confirmCancel && runReviewAction(confirmCancel, 'cancel')}
+        onClose={() => setConfirmResolve(null)}
+        onConfirm={() => confirmResolve && runResolveTsq(confirmResolve)}
       />
     </>
   )

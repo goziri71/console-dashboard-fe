@@ -112,12 +112,43 @@ export function pickRecord(row) {
 export function pickReference(row) {
   const rec = pickRecord(row)
   return (
+    row?.live_reference ??
+    rec.live_reference ??
     row?.reference ??
     rec.deposit_reference ??
     rec.reference ??
     rec.transaction_reference ??
     ''
   )
+}
+
+/** Merchant account_key for Beamer NGN TSQ. */
+export function pickAccountKey(row) {
+  const rec = pickRecord(row)
+  return (
+    row?.account_key ??
+    rec.account_key ??
+    row?.merchant_account_key ??
+    rec.merchant_account_key ??
+    row?.source_account_key ??
+    rec.source_account_key ??
+    ''
+  )
+}
+
+export function isNgnPayoutReviewRow(row) {
+  const type = String(row?.transaction_type ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+  return type.includes('ngn') && type.includes('payout')
+}
+
+/** Pending NGN payout that can be resolved via Beamer TSQ. */
+export function canResolveNgnTsq(row) {
+  if (!isPendingReviewRow(row)) return false
+  if (!isNgnPayoutReviewRow(row)) return false
+  return Boolean(pickReference(row) && pickAccountKey(row))
 }
 
 export function pickRowStatus(row) {
@@ -180,6 +211,8 @@ export function detailFieldsForRow(row) {
       ['VAT', fmtAmount(rec.vat)],
       ['Narration', rec.narration ?? '—'],
       ['Payout status', rec.payout_status ?? '—'],
+      ['Live reference', rec.live_reference ?? row?.live_reference ?? '—'],
+      ['Account key', row?.account_key ?? rec.account_key ?? '—'],
       ['Opening balance', fmtAmount(rec.opening_balance)],
       ['Closing balance', fmtAmount(rec.closing_balance)],
     ]
