@@ -142,6 +142,8 @@ function mapTxRow(row, index, page, activeTab, financial) {
       'live_reference',
       'deposit_reference',
     ]) || '—'
+  const vendorReference = pickFirst(row, ['vendor_reference']) || ''
+  const isPayoutTab = activeTab === 'ngn-payouts' || activeTab === 'crypto-payouts'
   const dateRaw = pickFirst(row, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date'])
   const statusRaw = pickFirst(row, [
     'status',
@@ -163,6 +165,8 @@ function mapTxRow(row, index, page, activeTab, financial) {
   return {
     sn,
     service,
+    vendorReference: isPayoutTab ? vendorReference || '—' : '',
+    showVendorReference: isPayoutTab,
     amount,
     date: dateRaw ? formatDate(dateRaw) : '—',
     statusKind: txStatusKind(statusRaw),
@@ -293,7 +297,11 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search activity..."
+            placeholder={
+              activeTab === 'ngn-payouts' || activeTab === 'crypto-payouts'
+                ? 'Search vendor reference…'
+                : 'Search activity…'
+            }
             className="h-10 w-full rounded-xl border border-border bg-page pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50"
           />
         </div>
@@ -349,6 +357,9 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
                 <tr>
                   <th className="px-3 py-3 font-medium">S/N</th>
                   <th className="px-3 py-3 font-medium">Reference / service</th>
+                  {activeTab === 'ngn-payouts' || activeTab === 'crypto-payouts' ? (
+                    <th className="px-3 py-3 font-medium">Vendor reference</th>
+                  ) : null}
                   <th className="px-3 py-3 font-medium">Amount</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="px-3 py-3 font-medium">Date</th>
@@ -364,6 +375,14 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
                           {row.service}
                         </span>
                       </td>
+                      {row.showVendorReference ? (
+                        <td
+                          className="max-w-[180px] truncate px-3 py-2.5 font-mono text-xs text-text-secondary"
+                          title={row.vendorReference || undefined}
+                        >
+                          {row.vendorReference}
+                        </td>
+                      ) : null}
                       <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-text-secondary">
                         {row.amount}
                       </td>
@@ -377,7 +396,12 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-3 py-12 text-center text-sm text-text-muted">
+                    <td
+                      colSpan={
+                        activeTab === 'ngn-payouts' || activeTab === 'crypto-payouts' ? 6 : 5
+                      }
+                      className="px-3 py-12 text-center text-sm text-text-muted"
+                    >
                       No activity found for this merchant.
                     </td>
                   </tr>

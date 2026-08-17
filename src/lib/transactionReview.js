@@ -212,6 +212,7 @@ export function detailFieldsForRow(row) {
       ['Narration', rec.narration ?? '—'],
       ['Payout status', rec.payout_status ?? '—'],
       ['Live reference', rec.live_reference ?? row?.live_reference ?? '—'],
+      ['Vendor reference', rec.vendor_reference ?? row?.vendor_reference ?? '—'],
       ['Account key', row?.account_key ?? rec.account_key ?? '—'],
       ['Opening balance', fmtAmount(rec.opening_balance)],
       ['Closing balance', fmtAmount(rec.closing_balance)],

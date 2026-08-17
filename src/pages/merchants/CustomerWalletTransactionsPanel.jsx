@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDownCircle, ArrowUpCircle, BookOpenText, Filter, Send, Shuffle } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, BookOpenText, Filter, Search, Send, Shuffle } from 'lucide-react'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import {
@@ -174,6 +174,15 @@ function mapTxRow(row, index, page, activeTab) {
       : pickFirst(row, ['service', 'narration', 'description', 'memo', 'reference']) ||
         pickFirst(row, ['live_reference', 'deposit_reference']) ||
         '—'
+  const vendorReference = pickFirst(row, ['vendor_reference']) || ''
+  const typeHint = String(
+    pickFirst(row, ['transaction_type', 'type', 'service']) || service || ''
+  ).toLowerCase()
+  const isPayoutRow =
+    activeTab === 'withdrawals' ||
+    activeTab === 'payout' ||
+    typeHint.includes('payout') ||
+    typeHint.includes('withdrawal')
   const dateRaw = pickFirst(row, ['date_created', 'created_at', 'timestamp', 'date_modified', 'date'])
   const statusRaw =
     activeTab === 'deposits'
@@ -199,6 +208,8 @@ function mapTxRow(row, index, page, activeTab) {
   return {
     sn,
     service,
+    vendorReference: isPayoutRow ? vendorReference || '—' : '',
+    showVendorReference: isPayoutRow || activeTab === 'statement',
     amount: isSwap
       ? `${formatBalance(sourceAmountRaw, sourceCurrency)} → ${formatBalance(targetAmountRaw, targetCurrency)}`
       : amountRaw != null && amountRaw !== ''
@@ -229,6 +240,8 @@ export default function CustomerWalletTransactionsPanel({
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [currencyFilter, setCurrencyFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   const abortRef = useRef(null)
 
@@ -242,6 +255,14 @@ export default function CustomerWalletTransactionsPanel({
     [rows, page, activeTab]
   )
 
+  const showVendorReferenceColumn =
+    activeTab === 'withdrawals' || activeTab === 'payout' || activeTab === 'statement'
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => window.clearTimeout(t)
+  }, [search])
+
   useEffect(() => {
     setPage(1)
     setActiveTab('deposits')
@@ -249,7 +270,7 @@ export default function CustomerWalletTransactionsPanel({
 
   useEffect(() => {
     setPage(1)
-  }, [activeTab, statusFilter, currencyFilter])
+  }, [activeTab, statusFilter, currencyFilter, debouncedSearch])
 
   const fetchTransactions = useCallback(async () => {
     if (!financial || !customerIdentifier || !walletKey) {
@@ -270,6 +291,7 @@ export default function CustomerWalletTransactionsPanel({
     if (merchantAccountKey) params.account_key = merchantAccountKey
     if (statusFilter) params.status = statusFilter
     if (currencyFilter) params.currency_code = currencyFilter
+    if (debouncedSearch) params.search = debouncedSearch
 
     abortRef.current?.abort?.()
     const controller = new AbortController()
@@ -304,6 +326,7 @@ export default function CustomerWalletTransactionsPanel({
     page,
     statusFilter,
     currencyFilter,
+    debouncedSearch,
     selectedTab,
     activeTab,
   ])
@@ -350,7 +373,20 @@ export default function CustomerWalletTransactionsPanel({
         })}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-b border-border/40 px-3 py-2">
+      <div className="flex flex-col gap-2 border-b border-border/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={
+              showVendorReferenceColumn
+                ? 'Search vendor reference…'
+                : 'Search reference…'
+            }
+            className="h-10 w-full rounded-xl border border-border bg-[#11141b] pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50"
+          />
+        </div>
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
@@ -398,6 +434,9 @@ export default function CustomerWalletTransactionsPanel({
                 <tr className="text-xs font-medium text-text-muted">
                   <th className="whitespace-nowrap px-2 py-3 sm:px-3">S/N</th>
                   <th className="min-w-[140px] px-2 py-3 sm:min-w-[180px] sm:px-3">Service</th>
+                  {showVendorReferenceColumn ? (
+                    <th className="whitespace-nowrap px-2 py-3 sm:px-3">Vendor reference</th>
+                  ) : null}
                   <th className="whitespace-nowrap px-2 py-3 sm:px-3">Amount</th>
                   <th className="whitespace-nowrap px-2 py-3 sm:px-3">Balance</th>
                   <th className="whitespace-nowrap px-2 py-3 sm:px-3">Status</th>
@@ -414,6 +453,14 @@ export default function CustomerWalletTransactionsPanel({
                           {row.service}
                         </span>
                       </td>
+                      {showVendorReferenceColumn ? (
+                        <td
+                          className="max-w-[140px] truncate px-2 py-2.5 font-mono text-[11px] text-text-secondary sm:px-3"
+                          title={row.vendorReference || undefined}
+                        >
+                          {row.showVendorReference ? row.vendorReference || '—' : '—'}
+                        </td>
+                      ) : null}
                       <td className="whitespace-nowrap px-2 py-2.5 tabular-nums text-text-secondary sm:px-3">
                         {row.amount}
                       </td>
@@ -430,7 +477,10 @@ export default function CustomerWalletTransactionsPanel({
                   ))
                 ) : (
                   <tr className="border-t border-border/50">
-                    <td colSpan={6} className="px-3 py-10 text-center text-sm text-text-muted">
+                    <td
+                      colSpan={showVendorReferenceColumn ? 7 : 6}
+                      className="px-3 py-10 text-center text-sm text-text-muted"
+                    >
                       No transactions found.
                     </td>
                   </tr>

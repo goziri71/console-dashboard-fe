@@ -332,6 +332,14 @@ export default function TransactionsPage() {
     const feeRaw = pickFirst(tx, ['fee', 'transaction_fee', 'charges', 'charge']) || 0
     const openingBalanceRaw = pickFirst(tx, ['opening_balance', 'balance_before']) || 0
     const closingBalanceRaw = pickFirst(tx, ['closing_balance', 'balance_after']) || 0
+    const vendorReference = pickFirst(tx, ['vendor_reference']) || ''
+    const transactionType = String(
+      pickFirst(tx, ['transaction_type', 'type', 'service']) || ''
+    ).toLowerCase()
+    const isPayoutType =
+      activeTab === 'payouts' ||
+      transactionType.includes('payout') ||
+      transactionType.includes('withdrawal')
 
     return {
       sn,
@@ -352,6 +360,8 @@ export default function TransactionsPage() {
       feeRaw,
       openingBalanceRaw,
       closingBalanceRaw,
+      vendorReference: isPayoutType ? vendorReference || '—' : vendorReference || '',
+      showVendorReference: isPayoutType || activeTab === 'payouts' || activeTab === 'statement',
       date,
       status: statusValue,
       raw: tx,
@@ -360,6 +370,7 @@ export default function TransactionsPage() {
 
   const displayRows = rows.map(mapRow)
   const columnLabels = useMemo(() => tableColumnsForTab(activeTab), [activeTab])
+  const showVendorReferenceColumn = activeTab === 'payouts' || activeTab === 'statement'
 
   function handleExport() {
     if (!displayRows.length) return
@@ -369,6 +380,7 @@ export default function TransactionsPage() {
         Transaction_ID: row.id,
         [columnLabels.primary]: row.primaryName,
         [columnLabels.secondary]: row.secondaryName,
+        Vendor_Reference: row.vendorReference || '',
         Amount: row.amount,
         Date: row.date ? formatDate(row.date) : '--',
         Status: row.status,
@@ -460,6 +472,7 @@ export default function TransactionsPage() {
       ['Merchant Bank Name', pickFirstPath(tx.raw, ['sender_bank_name'])],
       ['Reference ID', tx.id],
       ['Deposit Reference', pickFirstPath(tx.raw, ['deposit_reference'])],
+      ['Vendor Reference', pickFirst(tx.raw, ['vendor_reference']) || '—'],
       ['Amount', formatBalance(tx.amountRaw, tx.currency)],
       ['Charge', formatBalance(pickFirst(tx.raw, ['charge', 'charges', 'transaction_fee', 'fee']) || 0, tx.currency)],
       ['VAT', formatBalance(pickFirst(tx.raw, ['vat']) || 0, tx.currency)],
@@ -515,7 +528,11 @@ export default function TransactionsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search wallets..."
+              placeholder={
+                activeTab === 'payouts' || activeTab === 'statement'
+                  ? 'Search vendor reference, reference…'
+                  : 'Search reference, wallet…'
+              }
               className="h-10 w-full rounded-xl border border-border bg-page pl-9 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent/50"
             />
           </div>
@@ -563,6 +580,9 @@ export default function TransactionsPage() {
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">S/N</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">{columnLabels.primary}</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">{columnLabels.secondary}</th>
+                  {showVendorReferenceColumn ? (
+                    <th className="px-4 py-3 text-sm font-medium text-text-muted">Vendor reference</th>
+                  ) : null}
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">Amount</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">Date</th>
                   <th className="px-4 py-3 text-sm font-medium text-text-muted">Status</th>
@@ -582,6 +602,14 @@ export default function TransactionsPage() {
                         <p className="text-text-primary">{row.secondaryName}</p>
                         <p className="text-[11px] text-text-muted">{row.secondaryMeta}</p>
                       </td>
+                      {showVendorReferenceColumn ? (
+                        <td
+                          className="max-w-[180px] truncate px-4 py-2 font-mono text-xs text-text-secondary"
+                          title={row.vendorReference || undefined}
+                        >
+                          {row.showVendorReference ? row.vendorReference || '—' : '—'}
+                        </td>
+                      ) : null}
                       <td className="whitespace-nowrap px-4 py-2 tabular-nums text-text-secondary">{row.amount}</td>
                       <td className="whitespace-nowrap px-4 py-2 text-text-secondary">{row.date ? formatDate(row.date) : '--'}</td>
                       <td className="whitespace-nowrap px-4 py-2">
@@ -601,7 +629,10 @@ export default function TransactionsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-text-muted">
+                    <td
+                      colSpan={showVendorReferenceColumn ? 8 : 7}
+                      className="px-4 py-8 text-center text-sm text-text-muted"
+                    >
                       No transactions found. Try a broader search or different filter.
                     </td>
                   </tr>
