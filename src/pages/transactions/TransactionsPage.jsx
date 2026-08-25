@@ -11,6 +11,8 @@ import {
   Copy,
   Download,
   Filter,
+  Loader2,
+  RefreshCw,
   Search,
   Shuffle,
   XCircle,
@@ -18,6 +20,8 @@ import {
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
 import OverlayPortal from '../../components/ui/OverlayPortal'
+import { useAuth } from '../../context/AuthContext'
+import { canUpdateMerchant } from '../../lib/permissions'
 import { cn, exportToCsv, formatBalance, formatDate } from '../../lib/utils'
 import {
   getNgnDeposits,
@@ -25,6 +29,7 @@ import {
   getStatementTransactions,
   getSwapTransactions,
   getTransferTransactions,
+  replayDepositWebhook,
 } from '../../services/transactions'
 
 const TABLE_LIMIT = 10
@@ -206,6 +211,41 @@ function statusBadgeCls(status) {
   return 'bg-card-hover text-text-muted'
 }
 
+function isDepositLikeRow(tx, tab) {
+  if (tab === 'deposits') return true
+  if (tab !== 'statement' || !tx) return false
+  const type = String(
+    pickFirst(tx.raw, ['transaction_type', 'type', 'service']) || ''
+  ).toLowerCase()
+  return type.includes('deposit') && !type.includes('payout')
+}
+
+function buildDepositWebhookReplayBody(tx, sessionID) {
+  const raw = tx?.raw || {}
+  const reference =
+    pickFirst(raw, ['deposit_reference', 'reference', 'live_reference']) ||
+    (tx?.id && !String(tx.id).startsWith('TX-') ? tx.id : '') ||
+    ''
+  const currency_code = String(
+    pickFirst(raw, ['currency_code', 'currency', 'asset_code']) || tx?.currency || 'NGN'
+  ).toUpperCase()
+  const account_key = pickFirstPath(raw, [
+    'account_key',
+    'target_account_key',
+    'sender_account_key',
+    'merchant_account_key',
+  ])
+  const user_key = pickFirst(raw, ['user_key', 'merchant_user_key'])
+  const body = {
+    reference: String(reference).trim(),
+    currency_code,
+    session_id: String(sessionID || '').trim(),
+  }
+  if (account_key) body.account_key = String(account_key)
+  if (user_key) body.user_key = String(user_key)
+  return body
+}
+
 function FilterPill({ icon: Icon, label, value, options, onChange }) {
   return (
     <div className="relative min-w-0">
@@ -230,7 +270,65 @@ function FilterPill({ icon: Icon, label, value, options, onChange }) {
   )
 }
 
+function ConfirmDialog({ open, title, message, confirmLabel, loading, onClose, onConfirm }) {
+  if (!open) return null
+  return (
+    <OverlayPortal open={open}>
+      <div className="modal-overlay" onClick={onClose} role="presentation">
+        <div className="modal-panel max-h-none p-5" onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-base font-semibold text-text-primary">{title}</h3>
+          <p className="mt-2 text-sm text-text-secondary">{message}</p>
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onClose}
+              className="rounded-full border border-border px-4 py-2 text-sm text-text-secondary hover:bg-card-hover"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={onConfirm}
+              className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-page hover:brightness-105 disabled:opacity-50"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : null}
+              {confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </OverlayPortal>
+  )
+}
+
+function sterlloReplayMessage(payload, fallback) {
+  if (payload == null) return fallback
+  if (typeof payload === 'string' && payload.trim()) return payload.trim()
+  if (typeof payload !== 'object') return fallback
+  const msg =
+    payload.message ||
+    payload.Message ||
+    payload.msg ||
+    payload.data?.message ||
+    payload.data?.Message
+  return msg ? String(msg) : fallback
+}
+
+function isSterlloReplaySuccess(payload) {
+  if (payload == null || typeof payload !== 'object') return true
+  if (payload.status === false || payload.Status === false || payload.state === false) return false
+  if (payload.success === false) return false
+  if (payload.status === true || payload.Status === true || payload.state === true) return true
+  if (payload.success === true) return true
+  return true
+}
+
 export default function TransactionsPage() {
+  const { user, sessionID } = useAuth()
+  const canReplayWebhook = canUpdateMerchant(user?.permissions, user?.role)
+
   const [activeTab, setActiveTab] = useState('deposits')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -244,6 +342,9 @@ export default function TransactionsPage() {
   const [currencyCode, setCurrencyCode] = useState('')
   const [query, setQuery] = useState({ search: '', status: '', currency_code: '' })
   const [selectedTx, setSelectedTx] = useState(null)
+  const [replayConfirmOpen, setReplayConfirmOpen] = useState(false)
+  const [replaying, setReplaying] = useState(false)
+  const [toast, setToast] = useState(null)
 
   const abortRef = useRef(null)
 
@@ -306,6 +407,12 @@ export default function TransactionsPage() {
   useEffect(() => {
     setPage(1)
   }, [activeTab, query.search, query.status, query.currency_code])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const t = window.setTimeout(() => setToast(null), 5000)
+    return () => window.clearTimeout(t)
+  }, [toast])
 
   function mapRow(tx, index) {
     const sn = (page - 1) * TABLE_LIMIT + index + 1
@@ -392,6 +499,59 @@ export default function TransactionsPage() {
   function copyText(value) {
     if (!value) return
     navigator.clipboard?.writeText(String(value)).catch(() => {})
+  }
+
+  function closeTxDrawer() {
+    setSelectedTx(null)
+    setReplayConfirmOpen(false)
+  }
+
+  async function runReplayDepositWebhook() {
+    if (!selectedTx || replaying) return
+    const body = buildDepositWebhookReplayBody(selectedTx, sessionID)
+    if (!body.reference) {
+      setToast({ type: 'error', text: 'Missing deposit reference for webhook replay.' })
+      return
+    }
+    if (!body.session_id) {
+      setToast({ type: 'error', text: 'Missing session. Please sign in again and retry.' })
+      return
+    }
+
+    setReplaying(true)
+    try {
+      const res = await replayDepositWebhook(body)
+      if (isSterlloReplaySuccess(res)) {
+        setToast({
+          type: 'success',
+          text: sterlloReplayMessage(res, 'Deposit webhook resent.'),
+        })
+        setReplayConfirmOpen(false)
+      } else {
+        setToast({
+          type: 'error',
+          text: sterlloReplayMessage(res, 'Webhook replay failed.'),
+        })
+      }
+    } catch (err) {
+      const status = err?.response?.status
+      const msg = sterlloReplayMessage(
+        err?.response?.data,
+        err?.message || 'Webhook replay failed.'
+      )
+      if (status === 403) {
+        setToast({
+          type: 'error',
+          text: 'You do not have permission to resend webhooks (merchant.update required).',
+        })
+      } else if (status === 404) {
+        setToast({ type: 'error', text: 'Deposit not found for webhook replay.' })
+      } else {
+        setToast({ type: 'error', text: msg })
+      }
+    } finally {
+      setReplaying(false)
+    }
   }
 
   function buildDetailRows(tx, tab) {
@@ -487,6 +647,12 @@ export default function TransactionsPage() {
   }
 
   const modalState = selectedTx ? statusKind(selectedTx.status) : 'neutral'
+  const showReplayWebhook =
+    canReplayWebhook && selectedTx && isDepositLikeRow(selectedTx, activeTab)
+  const replayReference =
+    selectedTx &&
+    (pickFirst(selectedTx.raw, ['deposit_reference', 'reference', 'live_reference']) ||
+      selectedTx.id)
 
   return (
     <div>
@@ -496,6 +662,19 @@ export default function TransactionsPage() {
           Monitor and review all transactions across deposits, payouts, transfers, swaps, and statements.
         </p>
       </div>
+
+      {toast ? (
+        <div
+          className={cn(
+            'mb-4 rounded-lg border px-4 py-3 text-sm',
+            toast.type === 'success'
+              ? 'border-success/30 bg-success-bg text-success'
+              : 'border-error/30 bg-error-bg text-error'
+          )}
+        >
+          {toast.text}
+        </div>
+      ) : null}
 
       <div className="card-shell">
         <div className="tab-scroll bg-page lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0">
@@ -653,11 +832,12 @@ export default function TransactionsPage() {
 
       {selectedTx && (
         <OverlayPortal open>
-          <div className="drawer-overlay" onClick={() => setSelectedTx(null)} role="presentation">
+          <div className="drawer-overlay" onClick={closeTxDrawer} role="presentation">
             <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
               <div className="relative shrink-0 border-b border-border px-6 pb-5 pt-6">
                 <button
-                  onClick={() => setSelectedTx(null)}
+                  type="button"
+                  onClick={closeTxDrawer}
                   className="absolute right-5 top-5 rounded-md p-1 text-text-muted transition-colors hover:bg-card-hover hover:text-text-secondary"
                 >
                   <X size={18} />
@@ -737,10 +917,38 @@ export default function TransactionsPage() {
                   })}
                 </div>
               </div>
+
+              {showReplayWebhook ? (
+                <div className="flex shrink-0 gap-2 border-t border-border px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <button
+                    type="button"
+                    disabled={replaying}
+                    onClick={() => setReplayConfirmOpen(true)}
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-accent py-2.5 text-sm font-semibold text-page hover:brightness-105 disabled:opacity-50"
+                  >
+                    {replaying ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={14} />
+                    )}
+                    Resend webhook
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </OverlayPortal>
       )}
+
+      <ConfirmDialog
+        open={replayConfirmOpen}
+        title="Resend deposit webhook?"
+        message={`Replay the merchant deposit webhook for reference ${replayReference || '—'}? This notifies the merchant again via Sterllo Verify Deposit.`}
+        confirmLabel="Resend webhook"
+        loading={replaying}
+        onClose={() => !replaying && setReplayConfirmOpen(false)}
+        onConfirm={runReplayDepositWebhook}
+      />
     </div>
   )
 }

@@ -55,6 +55,12 @@ function isKycEnableStatusPassthroughUrl(config) {
   return url.includes('/kyc/sub-account-enable-status')
 }
 
+/** Sterllo Verify Deposit proxy — body/status passed through unchanged. */
+function isDepositWebhookReplayUrl(config) {
+  const url = String(config?.url || '')
+  return url.includes('/transactions/deposits/webhook-replay')
+}
+
 function requiresRecentMfa(error) {
   const body = error.response?.data
   return (
@@ -78,6 +84,11 @@ api.interceptors.response.use(
     const body = response.data
 
     if (isKycEnableStatusPassthroughUrl(response.config)) {
+      response.data = body
+      return response
+    }
+
+    if (isDepositWebhookReplayUrl(response.config)) {
       response.data = body
       return response
     }

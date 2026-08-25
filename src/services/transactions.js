@@ -45,6 +45,16 @@ export async function getCryptoPayouts(params = {}, signal) {
   return data
 }
 
+/**
+ * Replay merchant deposit webhook (Sterllo Verify Deposit with notify: true).
+ * Requires merchant.update.
+ * @param {{ reference: string, currency_code: string, session_id: string, user_key?: string, account_key?: string, Credentials?: string }} body
+ */
+export async function replayDepositWebhook(body) {
+  const { data } = await api.post('/transactions/deposits/webhook-replay', body)
+  return data
+}
+
 /** Pending transaction review queue (list + summary). Resolve uses Beamer NGN TSQ. */
 export async function getPendingReviewTransactions(params = {}, signal) {
   const { data } = await api.get('/transactions/pending-review', { params, signal })
