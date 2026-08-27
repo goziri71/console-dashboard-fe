@@ -42,7 +42,13 @@ export default function MfaStepUpProvider({ children }) {
       setRequest(null)
       setCode('')
     } catch (err) {
-      setError(err.response?.data?.message || 'The code could not be verified.')
+      const body = err.response?.data
+      setError(
+        body?.message ||
+          body?.data?.message ||
+          err.message ||
+          'The code could not be verified.'
+      )
     } finally {
       setSubmitting(false)
     }
@@ -56,7 +62,7 @@ export default function MfaStepUpProvider({ children }) {
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="pricing-mfa-title"
+            aria-labelledby="mfa-step-up-title"
             className="modal-panel max-w-md p-6"
           >
             <div className="flex items-start justify-between gap-4">
@@ -65,11 +71,12 @@ export default function MfaStepUpProvider({ children }) {
                   <ShieldCheck className="text-accent" size={22} />
                 </div>
                 <div>
-                  <h2 id="pricing-mfa-title" className="text-xl font-semibold text-text-primary">
-                    Verify pricing change
+                  <h2 id="mfa-step-up-title" className="text-xl font-semibold text-text-primary">
+                    Confirm with authenticator
                   </h2>
                   <p className="mt-1 text-sm text-text-secondary">
-                    Enter a fresh authenticator code. Your pricing changes will be preserved.
+                    This action needs a fresh six-digit code from your authenticator app. Your
+                    unsaved changes will be kept.
                   </p>
                 </div>
               </div>

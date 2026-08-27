@@ -21,3 +21,7 @@ export function requestMfaStepUp() {
     })
   return pendingStepUp
 }
+
+export function isMfaStepUpCancellation(error) {
+  return error?.message === 'MFA verification was cancelled.'
+}

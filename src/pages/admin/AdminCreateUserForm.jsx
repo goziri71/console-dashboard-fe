@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { UserPlus } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { isMfaStepUpCancellation } from '../../lib/mfaStepUp'
 import { createRbacUser } from '../../services/rbac'
 
 const CONSOLE_ROLE_OPTIONS = [
@@ -55,7 +56,9 @@ export default function AdminCreateUserForm({
       setRole('operations')
       onSuccess(`Console account created for ${email.trim()}. The user can sign in from the login page.`)
     } catch (err) {
-      onError(err.response?.data?.message || err.message || 'Failed to create account.')
+      if (!isMfaStepUpCancellation(err)) {
+        onError(err.response?.data?.message || err.message || 'Failed to create account.')
+      }
     } finally {
       setPending(null)
     }

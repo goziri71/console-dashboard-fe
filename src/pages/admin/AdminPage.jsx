@@ -33,6 +33,7 @@ import {
 } from '../../services/rbac'
 import AdminCreateUserForm from './AdminCreateUserForm'
 import DefaultPricingPanel from '../../features/pricing/DefaultPricingPanel'
+import { isMfaStepUpCancellation } from '../../lib/mfaStepUp'
 
 const BANNER_AUTO_DISMISS_MS = 5000
 
@@ -430,6 +431,7 @@ export default function AdminPage() {
       setModalRoleSlug('')
       await Promise.all([loadRbac(), loadTeamUsers()])
     } catch (err) {
+      if (isMfaStepUpCancellation(err)) return
       setBanner({
         type: 'error',
         text: err.response?.data?.message || err.message || 'Could not update user roles.',
@@ -468,6 +470,7 @@ export default function AdminPage() {
       setDraftKeys([])
       await loadRbac()
     } catch (err) {
+      if (isMfaStepUpCancellation(err)) return
       setBanner({
         type: 'error',
         text: err.response?.data?.message || err.message || 'Failed to update role permissions.',
@@ -509,6 +512,7 @@ export default function AdminPage() {
       setCreateKeys(new Set())
       await loadRbac()
     } catch (err) {
+      if (isMfaStepUpCancellation(err)) return
       setBanner({
         type: 'error',
         text: err.response?.data?.message || err.message || 'Failed to create role.',

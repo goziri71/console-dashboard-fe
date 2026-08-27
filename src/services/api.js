@@ -61,7 +61,7 @@ function isDepositWebhookReplayUrl(config) {
   return url.includes('/transactions/deposits/webhook-replay')
 }
 
-function requiresRecentMfa(error) {
+export function requiresRecentMfa(error) {
   const body = error.response?.data
   return (
     error.response?.status === 403 &&
@@ -69,14 +69,12 @@ function requiresRecentMfa(error) {
   )
 }
 
-function isPricingWrite(config) {
+function isMutatingRequest(config) {
   const method = String(config?.method || 'get').toLowerCase()
+  if (method === 'get' || method === 'head' || method === 'options') return false
   const url = String(config?.url || '')
-  return (
-    method !== 'get' &&
-    (url.includes('/fees/defaults/') ||
-      (url.includes('/merchants/') && url.includes('/fees/')))
-  )
+  if (url.includes('/auth/mfa/step-up')) return false
+  return true
 }
 
 api.interceptors.response.use(
@@ -206,12 +204,12 @@ api.interceptors.response.use(
 
 api.interceptors.response.use(undefined, async (error) => {
   const config = error.config
-  if (
-    requiresRecentMfa(error) &&
-    isPricingWrite(config) &&
-    !config?._mfaRetry
-  ) {
-    await requestMfaStepUp()
+  if (requiresRecentMfa(error) && isMutatingRequest(config) && !config?._mfaRetry) {
+    try {
+      await requestMfaStepUp()
+    } catch (stepUpError) {
+      return Promise.reject(stepUpError)
+    }
     config._mfaRetry = true
     return api(config)
   }
