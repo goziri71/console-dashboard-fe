@@ -74,7 +74,6 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
       const body = isUpdate
         ? buildBeamerUpdateBody({
             udara360: udara,
-            clientId,
             clientKey,
             requestId,
           })
@@ -142,7 +141,7 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
             </h3>
             <p className="text-xs text-text-muted">
               {isUpdate
-                ? 'Refresh Beamer client credentials. Account number is loaded from Udara360 on the server and is not sent.'
+                ? 'Enter a fresh client key. Account number and client id are taken from Udara360 on the server.'
                 : 'Enter Udara (Beamer) account number and client credentials from the Udara dashboard.'}
             </p>
           </div>
@@ -185,39 +184,32 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
                 </div>
               ) : null}
 
-              {isUpdate ? (
-                <div className="rounded-lg border border-border/60 bg-page/50 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wide text-text-muted">Account number (on file)</p>
-                  <p className="mt-1 font-mono text-sm text-text-secondary">
-                    {udara?.account_number || '—'}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="mb-1 block text-xs text-text-muted">Account number</label>
-                  <input
-                    type="text"
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
-                    placeholder="From Udara dashboard"
-                    autoComplete="off"
-                  />
-                </div>
-              )}
-              <div>
-                <label className="mb-1 block text-xs text-text-muted">
-                  Client ID{isUpdate ? ' (optional if on file)' : ''}
-                </label>
-                <input
-                  type="text"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
-                  placeholder="From Udara dashboard"
-                  autoComplete="off"
-                />
-              </div>
+              {!isUpdate ? (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs text-text-muted">Account number</label>
+                    <input
+                      type="text"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
+                      placeholder="From Udara dashboard"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-text-muted">Client ID</label>
+                    <input
+                      type="text"
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
+                      placeholder="From Udara dashboard"
+                      autoComplete="off"
+                    />
+                  </div>
+                </>
+              ) : null}
               <div>
                 <label className="mb-1 block text-xs text-text-muted">Client key</label>
                 <input
