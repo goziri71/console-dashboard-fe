@@ -73,19 +73,24 @@ export function buildBeamerLinkBody({ merchant, accountNumber, clientId, clientK
   }
 }
 
-/** ISVS update shape — data.id from udara360.identifier. */
-export function buildBeamerUpdateBody({ merchant, udara360, accountNumber, clientId, clientKey, requestId }) {
+/**
+ * ISVS update shape — do not send account_number (backend loads from udara360).
+ * Headers: Request-Id only. data.id / client.id may omit when udara360 has defaults.
+ */
+export function buildBeamerUpdateBody({ udara360, clientId, clientKey, requestId }) {
   const u = udara360 && typeof udara360 === 'object' ? udara360 : {}
-  return {
-    headers: buildBeamerRequestHeaders({ merchant, requestId }),
-    data: {
-      id: String(u.identifier ?? u.id ?? ''),
-      account_number: accountNumber.trim() || u.account_number || '',
-      client: {
-        id: clientId.trim() || u.client_id || '',
-        key: clientKey.trim(),
-      },
+  const id = String(u.identifier ?? u.id ?? '').trim()
+  const resolvedClientId = String(clientId || '').trim() || String(u.client_id || '').trim()
+  const data = {
+    client: {
+      key: String(clientKey || '').trim(),
     },
+  }
+  if (id) data.id = id
+  if (resolvedClientId) data.client.id = resolvedClientId
+  return {
+    headers: { 'Request-Id': requestId || crypto.randomUUID() },
+    data,
   }
 }
 

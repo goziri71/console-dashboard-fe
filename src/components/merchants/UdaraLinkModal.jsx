@@ -14,6 +14,7 @@ import {
 /**
  * Link or update Udara (Beamer) credentials for a merchant.
  * Uses account-link when udara360 is null; account-update when linked.
+ * Update omits account_number (backend loads it from udara360).
  */
 export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
   const linked = isUdaraLinked(merchant)
@@ -45,7 +46,19 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
     const accountKey = merchant.account_key
     if (!accountKey) return
 
-    if (!accountNumber.trim() || !clientId.trim() || !clientKey.trim()) {
+    if (isUpdate) {
+      if (!clientKey.trim()) {
+        setMsg({ type: 'error', text: 'Client key is required to update Udara credentials.' })
+        return
+      }
+      if (!udara?.account_number) {
+        setMsg({
+          type: 'error',
+          text: 'This merchant has no Udara account number on file. Switch to link or contact support.',
+        })
+        return
+      }
+    } else if (!accountNumber.trim() || !clientId.trim() || !clientKey.trim()) {
       setMsg({
         type: 'error',
         text: 'Account number, client id, and client key are required.',
@@ -60,9 +73,7 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
     try {
       const body = isUpdate
         ? buildBeamerUpdateBody({
-            merchant,
             udara360: udara,
-            accountNumber,
             clientId,
             clientKey,
             requestId,
@@ -131,7 +142,7 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
             </h3>
             <p className="text-xs text-text-muted">
               {isUpdate
-                ? 'Refresh Beamer integration credentials. Client secret is required and is never stored in merchant API responses.'
+                ? 'Refresh Beamer client credentials. Account number is loaded from Udara360 on the server and is not sent.'
                 : 'Enter Udara (Beamer) account number and client credentials from the Udara dashboard.'}
             </p>
           </div>
@@ -174,19 +185,30 @@ export default function UdaraLinkModal({ open, merchant, onClose, onSuccess }) {
                 </div>
               ) : null}
 
+              {isUpdate ? (
+                <div className="rounded-lg border border-border/60 bg-page/50 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-text-muted">Account number (on file)</p>
+                  <p className="mt-1 font-mono text-sm text-text-secondary">
+                    {udara?.account_number || '—'}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-xs text-text-muted">Account number</label>
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
+                    placeholder="From Udara dashboard"
+                    autoComplete="off"
+                  />
+                </div>
+              )}
               <div>
-                <label className="mb-1 block text-xs text-text-muted">Account number</label>
-                <input
-                  type="text"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent/50"
-                  placeholder="From Udara dashboard"
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-text-muted">Client ID</label>
+                <label className="mb-1 block text-xs text-text-muted">
+                  Client ID{isUpdate ? ' (optional if on file)' : ''}
+                </label>
                 <input
                   type="text"
                   value={clientId}
