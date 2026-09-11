@@ -101,29 +101,46 @@ export function unwrapCommandCenterEvents(payload) {
   const records = root.records ?? root.events ?? (Array.isArray(root) ? root : [])
   const pagination = root.pagination ?? root.meta ?? {}
   return {
-    records: Array.isArray(records) ? records : [],
-    pagination,
+    records: Array.isArray(records) ? records.filter((row) => row && typeof row === 'object') : [],
+    pagination: pagination && typeof pagination === 'object' ? pagination : {},
   }
 }
 
 export function unwrapCommandCenterPulse(payload) {
   const root = unwrapRoot(payload)
-  const byType = root.by_type && typeof root.by_type === 'object' ? root.by_type : {}
+  const byType = root.by_type && typeof root.by_type === 'object' && !Array.isArray(root.by_type) ? root.by_type : {}
   const typeTotal = Object.values(byType).reduce((sum, n) => sum + Number(n || 0), 0)
   return {
-    total: Number(root.total ?? root.total_events ?? typeTotal ?? 0),
-    success: Number(root.success ?? root.successful ?? root.by_outcome?.success ?? 0),
-    failure: Number(root.failure ?? root.failed ?? root.by_outcome?.failure ?? 0),
-    live_subscribers: Number(root.live_subscribers ?? root.subscribers ?? 0),
-    window_minutes: Number(root.window_minutes ?? 60),
+    total: Number(root.total ?? root.total_events ?? typeTotal ?? 0) || 0,
+    success: Number(root.success ?? root.successful ?? root.by_outcome?.success ?? 0) || 0,
+    failure: Number(root.failure ?? root.failed ?? root.by_outcome?.failure ?? 0) || 0,
+    live_subscribers: Number(root.live_subscribers ?? root.subscribers ?? 0) || 0,
+    window_minutes: Number(root.window_minutes ?? 60) || 60,
     by_type: byType,
   }
 }
 
 export function unwrapCommandCenterPresence(payload) {
   const root = unwrapRoot(payload)
-  const sessions = root.sessions ?? root.records ?? root.presence ?? []
-  return Array.isArray(sessions) ? sessions : []
+  const sessions =
+    root.sessions ?? root.records ?? root.presence ?? (Array.isArray(root) ? root : [])
+  return Array.isArray(sessions) ? sessions.filter((row) => row && typeof row === 'object') : []
+}
+
+/** Safe display string — prevents "Objects are not valid as a React child" blank screens. */
+export function asText(value, fallback = '—') {
+  if (value == null || value === '') return fallback
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return fallback
+    }
+  }
+  return fallback
 }
 
 export function actorName(actor) {

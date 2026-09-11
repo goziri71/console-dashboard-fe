@@ -15,6 +15,7 @@ import SettlementsPage from './pages/settlements/SettlementsPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import AdminPage from './pages/admin/AdminPage'
 import CommandCenterPage from './pages/ops/CommandCenterPage'
+import CommandCenterErrorBoundary from './pages/ops/CommandCenterErrorBoundary'
 import MerchantPricingPage from './features/pricing/MerchantPricingPage'
 import MfaStepUpProvider from './components/auth/MfaStepUpProvider'
 import ActivityTrackerProvider from './components/ops/ActivityTrackerProvider'
@@ -80,8 +81,14 @@ function AppRoutes() {
         >
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/command-center" element={<CommandCenterPage />} />
-          <Route path="/command-center/" element={<CommandCenterPage />} />
+          <Route
+            path="/command-center"
+            element={
+              <CommandCenterErrorBoundary>
+                <CommandCenterPage />
+              </CommandCenterErrorBoundary>
+            }
+          />
           <Route path="/merchants" element={<MerchantsPage />} />
           <Route path="/merchants/:accountKey/pricing" element={<MerchantPricingPage />} />
           <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />

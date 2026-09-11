@@ -21,6 +21,7 @@ import {
   EVENT_TYPE_CHIPS,
   OUTCOME_CHIPS,
   actorName,
+  asText,
   eventKey,
   eventMatchesFilters,
   eventSourceKind,
@@ -31,7 +32,7 @@ import {
   unwrapCommandCenterPresence,
   unwrapCommandCenterPulse,
 } from '../../lib/commandCenter'
-import { canReadConsole } from '../../lib/permissions'
+import { canReadConsole, hasFullAccess, isManagementRoleSlug } from '../../lib/permissions'
 import { cn, formatDate, formatNumber, timeAgo } from '../../lib/utils'
 import {
   getCommandCenterEvents,
@@ -43,10 +44,21 @@ const PAGE_LIMIT = 50
 const PRESENCE_POLL_MS = 20000
 const PULSE_POLL_MS = 45000
 
+function canViewCommandCenter(user) {
+  if (canReadConsole(user?.permissions) || hasFullAccess(user?.permissions)) return true
+  const role = user?.role
+  if (isManagementRoleSlug(typeof role === 'string' ? role : role?.slug)) return true
+  if (Array.isArray(user?.roles)) {
+    return user.roles.some((r) => isManagementRoleSlug(typeof r === 'string' ? r : r?.slug))
+  }
+  return false
+}
+
 function connectionCopy(status) {
   if (status === 'live') return { label: 'Live', cls: 'text-accent' }
   if (status === 'connecting') return { label: 'Connecting', cls: 'text-warning' }
   if (status === 'reconnecting') return { label: 'Reconnecting', cls: 'text-warning' }
+  if (status === 'offline') return { label: 'Offline', cls: 'text-error' }
   return { label: 'Offline', cls: 'text-text-muted' }
 }
 
@@ -92,19 +104,19 @@ function EventDrawer({ event, onClose }) {
   const badge = outcomeBadge(event.outcome)
   const actor = actorName(event.actor)
   const rows = [
-    ['Summary', event.summary],
+    ['Summary', asText(event.summary)],
     ['Action', eventTypeLabel(event.event_type)],
-    ['Outcome', event.outcome],
+    ['Outcome', asText(event.outcome)],
     ['Operator', actor],
-    ['Email', event.actor?.email],
-    ['Role', event.actor?.role],
-    ['Path', event.metadata?.path || event.target_key],
-    ['Label', event.metadata?.label],
-    ['Reference', event.reference],
-    ['Account key', event.account_key],
-    ['Target type', event.target_type],
-    ['Session', event.session_id],
-    ['IP', event.ip_address],
+    ['Email', asText(event.actor?.email)],
+    ['Role', asText(event.actor?.role)],
+    ['Path', asText(event.metadata?.path || event.target_key)],
+    ['Label', asText(event.metadata?.label)],
+    ['Reference', asText(event.reference)],
+    ['Account key', asText(event.account_key)],
+    ['Target type', asText(event.target_type)],
+    ['Session', asText(event.session_id)],
+    ['IP', asText(event.ip_address)],
     ['When', event.date_created ? formatDate(event.date_created) : '—'],
   ]
 
@@ -183,7 +195,7 @@ function EventDrawer({ event, onClose }) {
 
 export default function CommandCenterPage() {
   const { user, token } = useAuth()
-  const canView = canReadConsole(user?.permissions)
+  const canView = canViewCommandCenter(user)
 
   const [rows, setRows] = useState([])
   const [page, setPage] = useState(1)
@@ -263,11 +275,14 @@ export default function CommandCenterPage() {
       const payload = await getCommandCenterEvents(params, controller.signal)
       const { records, pagination } = unwrapCommandCenterEvents(payload)
       setRows(records)
-      const nextTotal = Number(pagination.total ?? records.length)
-      const nextPages = Number(pagination.total_pages ?? Math.max(1, Math.ceil(nextTotal / PAGE_LIMIT)))
+      const nextTotal = Number(pagination.total ?? records.length) || 0
+      const nextPages =
+        Number(pagination.total_pages) > 0
+          ? Number(pagination.total_pages)
+          : Math.max(1, Math.ceil(nextTotal / PAGE_LIMIT) || 1)
       setTotal(nextTotal)
       setTotalPages(nextPages)
-      seenIdsRef.current = new Set(records.map(eventKey))
+      seenIdsRef.current = new Set(records.map((row) => eventKey(row)).filter(Boolean))
       setMissedLive(0)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
@@ -476,20 +491,22 @@ export default function CommandCenterPage() {
         ) : (
           <div className="flex gap-3 overflow-x-auto px-4 py-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {presence.map((session, idx) => {
-              const name = session.name || session.email || session.user_key || 'Operator'
+              if (!session || typeof session !== 'object') return null
+              const name = asText(session.name || session.email || session.user_key, 'Operator')
               return (
                 <div
-                  key={session.user_id || session.session_id || `${session.email}-${idx}`}
+                  key={asText(session.user_id || session.session_id || session.email, `presence-${idx}`)}
                   className="flex min-w-[196px] items-center gap-3 rounded-xl border border-border/70 bg-page px-3 py-2.5"
                 >
                   <div className="relative">
-                    <Avatar name={name} seed={session.email} />
+                    <Avatar name={name} seed={asText(session.email, name)} />
                     <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-success" />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm text-text-primary">{name}</p>
                     <p className="truncate text-[11px] text-text-muted">
-                      {session.role || 'console'} · {session.last_seen ? timeAgo(session.last_seen) : 'now'}
+                      {asText(session.role, 'console')} ·{' '}
+                      {session.last_seen ? timeAgo(session.last_seen) : 'now'}
                     </p>
                   </div>
                 </div>
@@ -677,12 +694,14 @@ export default function CommandCenterPage() {
           </div>
         ) : (
           <ul className="divide-y divide-border/50">
-            {rows.map((event) => {
-              const key = eventKey(event)
+            {rows.map((event, idx) => {
+              if (!event || typeof event !== 'object') return null
+              const key = eventKey(event) || `row-${idx}`
               const badge = outcomeBadge(event.outcome)
               const actor = actorName(event.actor)
               const live = liveIds.has(key)
               const source = eventSourceKind(event.event_type)
+              const headline = asText(event.summary, eventTypeLabel(event.event_type))
               return (
                 <li key={key}>
                   <button
@@ -694,7 +713,7 @@ export default function CommandCenterPage() {
                     )}
                   >
                     <div className="relative mt-0.5">
-                      <Avatar name={actor} seed={event.actor?.email} size="sm" />
+                      <Avatar name={actor} seed={asText(event.actor?.email, actor)} size="sm" />
                       {live ? (
                         <span className="absolute -left-1 top-2 h-8 w-0.5 rounded-full bg-accent" />
                       ) : null}
@@ -711,9 +730,7 @@ export default function CommandCenterPage() {
                         >
                           {source}
                         </span>
-                        <p className="text-sm font-medium text-text-primary">
-                          {event.summary || eventTypeLabel(event.event_type)}
-                        </p>
+                        <p className="text-sm font-medium text-text-primary">{headline}</p>
                         {live ? (
                           <span className="rounded-full bg-accent-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
                             New
@@ -722,15 +739,15 @@ export default function CommandCenterPage() {
                       </div>
                       <p className="mt-0.5 truncate text-xs text-text-muted">
                         {actor}
-                        {event.actor?.role ? ` · ${event.actor.role}` : ''}
-                        {event.reference ? ` · ${event.reference}` : ''}
-                        {event.account_key ? ` · ${event.account_key}` : ''}
-                        {event.target_key && !event.account_key ? ` · ${event.target_key}` : ''}
+                        {event.actor?.role ? ` · ${asText(event.actor.role)}` : ''}
+                        {event.reference ? ` · ${asText(event.reference)}` : ''}
+                        {event.account_key ? ` · ${asText(event.account_key)}` : ''}
+                        {event.target_key && !event.account_key ? ` · ${asText(event.target_key)}` : ''}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
                       <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', badge.cls)}>
-                        {badge.label}
+                        {asText(badge.label)}
                       </span>
                       <span className="text-[11px] text-text-muted">
                         {event.date_created ? timeAgo(event.date_created) : '—'}

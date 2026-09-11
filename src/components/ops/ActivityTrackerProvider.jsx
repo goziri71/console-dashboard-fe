@@ -37,22 +37,26 @@ export default function ActivityTrackerProvider({ children }) {
     if (!token) return undefined
 
     function onClick(e) {
-      if (e.defaultPrevented) return
-      if (e.button != null && e.button !== 0) return
-      const resolved = resolveClickAudit(e.target)
-      if (!resolved) return
+      try {
+        if (e.defaultPrevented) return
+        if (e.button != null && e.button !== 0) return
+        const resolved = resolveClickAudit(e.target)
+        if (!resolved) return
 
-      const key = `${resolved.event_type}|${resolved.label}|${resolved.element}`
-      const now = Date.now()
-      if (lastClickRef.current.key === key && now - lastClickRef.current.at < CLICK_DEDUPE_MS) {
-        return
+        const key = `${resolved.event_type}|${resolved.label}|${resolved.element}`
+        const now = Date.now()
+        if (lastClickRef.current.key === key && now - lastClickRef.current.at < CLICK_DEDUPE_MS) {
+          return
+        }
+        lastClickRef.current = { key, at: now }
+
+        trackActivity({
+          ...resolved,
+          path: `${window.location.pathname}${window.location.search || ''}`,
+        })
+      } catch (err) {
+        console.warn('[activity] click capture failed', err)
       }
-      lastClickRef.current = { key, at: now }
-
-      trackActivity({
-        ...resolved,
-        path: `${window.location.pathname}${window.location.search || ''}`,
-      })
     }
 
     document.addEventListener('click', onClick, true)

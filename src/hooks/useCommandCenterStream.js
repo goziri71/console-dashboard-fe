@@ -8,16 +8,23 @@ import { API_BASE_URL } from '../services/api'
 export function useCommandCenterStream({ enabled, token, onAudit }) {
   const [liveStatus, setLiveStatus] = useState('connecting')
   const onAuditRef = useRef(onAudit)
+  const eventSourceSupported = typeof EventSource !== 'undefined'
 
   useEffect(() => {
     onAuditRef.current = onAudit
   }, [onAudit])
 
   useEffect(() => {
-    if (!enabled || !token) return undefined
+    if (!enabled || !token || !eventSourceSupported) return undefined
 
-    const url = `${API_BASE_URL}/ops/command-center/stream?access_token=${encodeURIComponent(token)}`
-    const es = new EventSource(url)
+    let es
+    try {
+      const url = `${API_BASE_URL}/ops/command-center/stream?access_token=${encodeURIComponent(token)}`
+      es = new EventSource(url)
+    } catch (err) {
+      console.error('[command-center] EventSource failed', err)
+      return undefined
+    }
 
     function handleAudit(ev) {
       setLiveStatus('live')
@@ -36,11 +43,16 @@ export function useCommandCenterStream({ enabled, token, onAudit }) {
     es.onerror = () => setLiveStatus('reconnecting')
 
     return () => {
-      es.removeEventListener('audit', handleAudit)
-      es.close()
+      try {
+        es.removeEventListener('audit', handleAudit)
+        es.close()
+      } catch {
+        // ignore
+      }
     }
-  }, [enabled, token])
+  }, [enabled, token, eventSourceSupported])
 
   if (!enabled || !token) return 'idle'
+  if (!eventSourceSupported) return 'offline'
   return liveStatus
 }

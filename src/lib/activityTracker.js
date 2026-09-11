@@ -96,19 +96,23 @@ export function setActivityTrackingEnabled(next) {
 }
 
 export function trackActivity(partial) {
-  if (!enabled) return
-  const event = normalizeEvent(partial)
-  if (!event) return
-  queue.push(event)
-  if (queue.length >= MAX_BATCH) {
-    if (flushTimer != null) {
-      window.clearTimeout(flushTimer)
-      flushTimer = null
+  try {
+    if (!enabled) return
+    const event = normalizeEvent(partial)
+    if (!event) return
+    queue.push(event)
+    if (queue.length >= MAX_BATCH) {
+      if (flushTimer != null) {
+        window.clearTimeout(flushTimer)
+        flushTimer = null
+      }
+      flushQueue()
+      return
     }
-    flushQueue()
-    return
+    scheduleFlush()
+  } catch (err) {
+    console.warn('[activity] track failed', err)
   }
-  scheduleFlush()
 }
 
 export function trackPageView(path = currentPath()) {
