@@ -1,5 +1,18 @@
+export const EVENT_PREFIX_CHIPS = [
+  { value: '', label: 'All sources' },
+  { value: 'ui.', label: 'UI activity' },
+  { value: 'api.', label: 'API requests' },
+]
+
 export const EVENT_TYPE_CHIPS = [
   { value: '', label: 'All actions' },
+  { value: 'ui.click', label: 'UI click' },
+  { value: 'ui.page_view', label: 'Page view' },
+  { value: 'ui.navigation', label: 'Navigation' },
+  { value: 'ui.filter', label: 'Filter' },
+  { value: 'ui.search', label: 'Search' },
+  { value: 'ui.tab_change', label: 'Tab change' },
+  { value: 'api.request', label: 'API request' },
   { value: 'beamer.ngn_tsq', label: 'NGN resolve' },
   { value: 'deposit.webhook_replay', label: 'Webhook replay' },
   { value: 'beamer.account_link', label: 'Udara link' },
@@ -20,6 +33,19 @@ export const OUTCOME_CHIPS = [
 ]
 
 const TYPE_LABELS = {
+  'ui.page_view': 'Page view',
+  'ui.navigation': 'Navigation',
+  'ui.click': 'UI click',
+  'ui.filter': 'Filter applied',
+  'ui.search': 'Search',
+  'ui.tab_change': 'Tab change',
+  'ui.modal_open': 'Modal opened',
+  'ui.modal_close': 'Modal closed',
+  'ui.form_submit': 'Form submitted',
+  'ui.copy': 'Copied',
+  'ui.export': 'Export',
+  'ui.selection': 'Selection',
+  'api.request': 'API request',
   'transaction.approve': 'Transaction approved',
   'transaction.cancel': 'Transaction cancelled',
   'deposit.webhook_replay': 'Deposit webhook replay',
@@ -36,6 +62,13 @@ export function eventTypeLabel(type) {
   const raw = String(type ?? '').trim()
   if (!raw) return 'Action'
   return TYPE_LABELS[raw] ?? raw.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+export function eventSourceKind(type) {
+  const raw = String(type ?? '')
+  if (raw.startsWith('ui.')) return 'ui'
+  if (raw.startsWith('api.')) return 'api'
+  return 'ops'
 }
 
 export function outcomeKind(outcome) {
@@ -109,6 +142,9 @@ export function initials(nameOrEmail) {
 
 export function eventMatchesFilters(event, filters) {
   if (!event) return false
+  if (filters.event_prefix && !String(event.event_type || '').startsWith(filters.event_prefix)) {
+    return false
+  }
   if (filters.event_type && event.event_type !== filters.event_type) return false
   if (filters.outcome && outcomeKind(event.outcome) !== outcomeKind(filters.outcome)) return false
   if (filters.actor_user_id && String(event.actor?.user_id ?? '') !== String(filters.actor_user_id)) {
@@ -123,6 +159,8 @@ export function eventMatchesFilters(event, filters) {
       event.summary,
       event.actor?.email,
       event.actor?.name,
+      event.metadata?.path,
+      event.metadata?.label,
     ]
       .join(' ')
       .toLowerCase()
@@ -133,5 +171,7 @@ export function eventMatchesFilters(event, filters) {
 
 export function eventKey(event) {
   if (event?.id != null) return String(event.id)
-  return [event?.event_type, event?.reference, event?.date_created, event?.session_id].join(':')
+  return [event?.event_type, event?.reference, event?.date_created, event?.session_id, event?.summary].join(
+    ':'
+  )
 }

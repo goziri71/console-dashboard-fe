@@ -48,6 +48,11 @@ export default function Sidebar({ mobileOpen = false, onNavigate }) {
             key={item.path}
             to={item.path}
             end={item.path === '/dashboard'}
+            data-audit
+            data-audit-type="ui.navigation"
+            data-audit-label={item.label}
+            data-audit-element={`nav-${item.path.replace(/\//g, '-') || 'home'}`}
+            data-audit-nav=""
             onClick={() => onNavigate?.()}
             className={({ isActive }) =>
               `motion-surface flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium ${

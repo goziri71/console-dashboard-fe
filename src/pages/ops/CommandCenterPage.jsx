@@ -17,11 +17,13 @@ import Pagination from '../../components/ui/Pagination'
 import { useAuth } from '../../context/AuthContext'
 import { useCommandCenterStream } from '../../hooks/useCommandCenterStream'
 import {
+  EVENT_PREFIX_CHIPS,
   EVENT_TYPE_CHIPS,
   OUTCOME_CHIPS,
   actorName,
   eventKey,
   eventMatchesFilters,
+  eventSourceKind,
   eventTypeLabel,
   initials,
   outcomeBadge,
@@ -96,8 +98,10 @@ function EventDrawer({ event, onClose }) {
     ['Operator', actor],
     ['Email', event.actor?.email],
     ['Role', event.actor?.role],
+    ['Path', event.metadata?.path || event.target_key],
+    ['Label', event.metadata?.label],
     ['Reference', event.reference],
-    ['Account key', event.account_key || event.target_key],
+    ['Account key', event.account_key],
     ['Target type', event.target_type],
     ['Session', event.session_id],
     ['IP', event.ip_address],
@@ -190,6 +194,7 @@ export default function CommandCenterPage() {
   const [forbidden, setForbidden] = useState(false)
 
   const [search, setSearch] = useState('')
+  const [eventPrefix, setEventPrefix] = useState('')
   const [eventType, setEventType] = useState('')
   const [outcome, setOutcome] = useState('')
   const [actorUserId, setActorUserId] = useState('')
@@ -227,16 +232,17 @@ export default function CommandCenterPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [eventType, outcome, actorUserId, query.reference, fromDate, toDate])
+  }, [eventPrefix, eventType, outcome, actorUserId, query.reference, fromDate, toDate])
 
   const filters = useMemo(
     () => ({
+      event_prefix: eventPrefix,
       event_type: eventType,
       outcome,
       actor_user_id: actorUserId,
       reference: query.reference,
     }),
-    [eventType, outcome, actorUserId, query.reference]
+    [eventPrefix, eventType, outcome, actorUserId, query.reference]
   )
 
   const fetchEvents = useCallback(async () => {
@@ -247,6 +253,7 @@ export default function CommandCenterPage() {
     setError(null)
     try {
       const params = { page, limit: PAGE_LIMIT }
+      if (filters.event_prefix) params.event_prefix = filters.event_prefix
       if (filters.event_type) params.event_type = filters.event_type
       if (filters.outcome) params.outcome = filters.outcome
       if (filters.actor_user_id) params.actor_user_id = filters.actor_user_id
@@ -405,7 +412,8 @@ export default function CommandCenterPage() {
           </div>
           <h1 className="text-2xl font-semibold text-text-primary">Command Center</h1>
           <p className="mt-1 max-w-2xl text-sm text-text-secondary">
-            Live wall of console actions — resolve, webhook replay, Udara, and RBAC — as the team works.
+            Live wall of everything the team does — UI clicks and navigation, API traffic, and major ops
+            actions like resolve, webhook replay, Udara, and RBAC.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -567,6 +575,26 @@ export default function CommandCenterPage() {
           </div>
         </div>
 
+        <div className="flex gap-2 overflow-x-auto border-b border-border px-4 py-2">
+          {EVENT_PREFIX_CHIPS.map((chip) => (
+            <button
+              key={chip.value || 'all-sources'}
+              type="button"
+              onClick={() => {
+                setEventPrefix(chip.value)
+                setEventType('')
+              }}
+              className={cn(
+                'shrink-0 rounded-full px-3 py-1 text-[11px] font-medium',
+                eventPrefix === chip.value
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-text-muted hover:text-text-secondary'
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
         <div className="tab-scroll">
           {EVENT_TYPE_CHIPS.map((chip) => (
             <button
@@ -625,9 +653,9 @@ export default function CommandCenterPage() {
           <div className="py-16 text-center text-sm text-error">{error}</div>
         ) : rows.length === 0 ? (
           <div className="px-4 py-16 text-center">
-            <p className="text-sm text-text-muted">No ops actions in this view yet.</p>
+            <p className="text-sm text-text-muted">No activity in this view yet.</p>
             <p className="mt-1 text-xs text-text-muted">
-              Resolve a payout, replay a deposit webhook, or change RBAC — it will land here live.
+              Navigate, click, search, or run ops actions — UI and API events will land here live.
             </p>
           </div>
         ) : (
@@ -637,6 +665,7 @@ export default function CommandCenterPage() {
               const badge = outcomeBadge(event.outcome)
               const actor = actorName(event.actor)
               const live = liveIds.has(key)
+              const source = eventSourceKind(event.event_type)
               return (
                 <li key={key}>
                   <button
@@ -655,6 +684,16 @@ export default function CommandCenterPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={cn(
+                            'rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            source === 'ui' && 'bg-info-bg text-info',
+                            source === 'api' && 'bg-warning-bg text-warning',
+                            source === 'ops' && 'bg-accent-bg text-accent'
+                          )}
+                        >
+                          {source}
+                        </span>
                         <p className="text-sm font-medium text-text-primary">
                           {event.summary || eventTypeLabel(event.event_type)}
                         </p>
@@ -669,6 +708,7 @@ export default function CommandCenterPage() {
                         {event.actor?.role ? ` · ${event.actor.role}` : ''}
                         {event.reference ? ` · ${event.reference}` : ''}
                         {event.account_key ? ` · ${event.account_key}` : ''}
+                        {event.target_key && !event.account_key ? ` · ${event.target_key}` : ''}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">

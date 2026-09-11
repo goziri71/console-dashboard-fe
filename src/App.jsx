@@ -18,6 +18,7 @@ import AdminPage from './pages/admin/AdminPage'
 import CommandCenterPage from './pages/ops/CommandCenterPage'
 import MerchantPricingPage from './features/pricing/MerchantPricingPage'
 import MfaStepUpProvider from './components/auth/MfaStepUpProvider'
+import ActivityTrackerProvider from './components/ops/ActivityTrackerProvider'
 
 function ProtectedRoute({ children }) {
   const { token, loading } = useAuth()
@@ -104,7 +105,9 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <MfaStepUpProvider>
-          <AppRoutes />
+          <ActivityTrackerProvider>
+            <AppRoutes />
+          </ActivityTrackerProvider>
         </MfaStepUpProvider>
       </AuthProvider>
     </BrowserRouter>
