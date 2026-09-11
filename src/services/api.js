@@ -13,7 +13,7 @@ import {
 } from '../lib/authStorage'
 import { requestMfaStepUp } from '../lib/mfaStepUp'
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD
     ? 'https://api.console.sterllo.com/1.202602.0'

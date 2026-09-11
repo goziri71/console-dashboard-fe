@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import {
   LayoutDashboard,
+  Radio,
   Users,
   Wallet,
   ArrowLeftRight,
@@ -15,6 +16,7 @@ import logo from '../../assets/Authlogo/Sterllologo.svg'
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+  { label: 'Command Center', icon: Radio, path: '/command-center' },
   { label: 'Merchants', icon: Users, path: '/merchants' },
   { label: 'Wallet', icon: Wallet, path: '/wallets' },
   { label: 'Transactions', icon: ArrowLeftRight, path: '/transactions' },

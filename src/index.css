@@ -119,6 +119,25 @@ body {
   animation: shake 0.5s ease-in-out;
 }
 
+@keyframes livePulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(200, 230, 74, 0.45); }
+  70% { box-shadow: 0 0 0 8px rgba(200, 230, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(200, 230, 74, 0); }
+}
+
+.live-dot {
+  animation: livePulseRing 1.8s ease-out infinite;
+}
+
+@keyframes feedFlash {
+  0% { background-color: rgba(200, 230, 74, 0.14); }
+  100% { background-color: transparent; }
+}
+
+.feed-row-live {
+  animation: feedFlash 1.8s ease-out;
+}
+
 /* Mature motion baseline */
 button,
 a,

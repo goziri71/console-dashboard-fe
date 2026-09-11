@@ -12,6 +12,7 @@ export const PERMISSION_KYC_UPDATE = 'kyc.update'
 export const PERMISSION_DISPUTE_UPDATE = 'dispute.update'
 export const PERMISSION_PRICING_READ = 'pricing.read'
 export const PERMISSION_PRICING_MANAGE = 'pricing.manage'
+export const PERMISSION_CONSOLE_READ = 'console.read'
 
 /** Seeded management role: server rejects PATCH …/roles/:id/permissions for this slug only. */
 export const ROLE_SLUG_MANAGEMENT = 'management'
@@ -28,6 +29,11 @@ export function hasFullAccess(permissions) {
 export function canReadFinancial(permissions) {
   if (!permissions?.length) return false
   return hasFullAccess(permissions) || permissions.includes(PERMISSION_FINANCIAL_READ)
+}
+
+export function canReadConsole(permissions) {
+  if (!permissions?.length) return false
+  return hasFullAccess(permissions) || permissions.includes(PERMISSION_CONSOLE_READ)
 }
 
 export function canManageRbac(permissions) {
