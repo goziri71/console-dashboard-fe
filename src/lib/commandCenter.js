@@ -106,17 +106,42 @@ export function unwrapCommandCenterEvents(payload) {
   }
 }
 
+/** Pulse by_type values may be a number or `{ success, failure, total }`. */
+export function pulseTypeCount(value) {
+  if (value == null) return 0
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : 0
+  }
+  if (typeof value === 'object') {
+    const total = Number(value.total)
+    if (Number.isFinite(total)) return total
+    const success = Number(value.success) || 0
+    const failure = Number(value.failure) || 0
+    return success + failure
+  }
+  return 0
+}
+
 export function unwrapCommandCenterPulse(payload) {
   const root = unwrapRoot(payload)
-  const byType = root.by_type && typeof root.by_type === 'object' && !Array.isArray(root.by_type) ? root.by_type : {}
-  const typeTotal = Object.values(byType).reduce((sum, n) => sum + Number(n || 0), 0)
+  const rawByType =
+    root.by_type && typeof root.by_type === 'object' && !Array.isArray(root.by_type) ? root.by_type : {}
+  const by_type = {}
+  for (const [key, value] of Object.entries(rawByType)) {
+    by_type[key] = pulseTypeCount(value)
+  }
+  const typeTotal = Object.values(by_type).reduce((sum, n) => sum + n, 0)
+
+  const outcome = root.by_outcome && typeof root.by_outcome === 'object' ? root.by_outcome : {}
   return {
-    total: Number(root.total ?? root.total_events ?? typeTotal ?? 0) || 0,
-    success: Number(root.success ?? root.successful ?? root.by_outcome?.success ?? 0) || 0,
-    failure: Number(root.failure ?? root.failed ?? root.by_outcome?.failure ?? 0) || 0,
-    live_subscribers: Number(root.live_subscribers ?? root.subscribers ?? 0) || 0,
+    total: pulseTypeCount(root.total ?? root.total_events ?? typeTotal),
+    success: pulseTypeCount(root.success ?? root.successful ?? outcome.success),
+    failure: pulseTypeCount(root.failure ?? root.failed ?? outcome.failure),
+    live_subscribers: pulseTypeCount(root.live_subscribers ?? root.subscribers),
     window_minutes: Number(root.window_minutes ?? 60) || 60,
-    by_type: byType,
+    by_type,
   }
 }
 

@@ -378,11 +378,12 @@ export default function CommandCenterPage() {
   const typeEntries = useMemo(
     () =>
       Object.entries(pulse.by_type || {})
-        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .map(([type, count]) => [type, Number(count) || 0])
+        .sort((a, b) => b[1] - a[1])
         .slice(0, 6),
     [pulse.by_type]
   )
-  const typeMax = typeEntries.reduce((max, [, n]) => Math.max(max, Number(n) || 0), 1)
+  const typeMax = typeEntries.reduce((max, [, n]) => Math.max(max, n), 1)
 
   const actorOptions = useMemo(() => {
     const map = new Map()
