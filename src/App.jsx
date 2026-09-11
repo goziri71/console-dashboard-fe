@@ -1,5 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AppLayout from './components/layout/AppLayout'
 import LoginPage from './pages/auth/LoginPage'
@@ -45,19 +44,22 @@ function RedirectToLogin() {
   return <Navigate to={{ pathname: '/login', search: location.search }} replace />
 }
 
-/** Hosts often 301 `/login` → `/login/`; keep `?token=` and normalize the path. */
+/** Hosts often add a trailing slash (`/command-center/`). Strip it before Routes match. */
 function TrailingSlashFix({ children }) {
   const location = useLocation()
-  const navigate = useNavigate()
 
-  useEffect(() => {
-    if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
-      navigate(
-        { pathname: location.pathname.replace(/\/+$/, ''), search: location.search, hash: location.hash },
-        { replace: true }
-      )
-    }
-  }, [location.pathname, location.search, location.hash, navigate])
+  if (location.pathname.length > 1 && location.pathname.endsWith('/')) {
+    return (
+      <Navigate
+        to={{
+          pathname: location.pathname.replace(/\/+$/, ''),
+          search: location.search,
+          hash: location.hash,
+        }}
+        replace
+      />
+    )
+  }
 
   return children
 }
@@ -79,6 +81,7 @@ function AppRoutes() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/command-center" element={<CommandCenterPage />} />
+          <Route path="/command-center/" element={<CommandCenterPage />} />
           <Route path="/merchants" element={<MerchantsPage />} />
           <Route path="/merchants/:accountKey/pricing" element={<MerchantPricingPage />} />
           <Route path="/merchants/:accountKey" element={<MerchantDetailsPage />} />

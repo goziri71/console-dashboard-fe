@@ -303,9 +303,9 @@ export default function CommandCenterPage() {
   useEffect(() => {
     if (!canView) {
       setLoading(false)
-      setForbidden(true)
       return undefined
     }
+    setForbidden(false)
     fetchEvents()
     return () => abortRef.current?.abort?.()
   }, [canView, fetchEvents])
@@ -379,7 +379,24 @@ export default function CommandCenterPage() {
     return [...map.entries()]
   }, [rows])
 
-  if (!canView || forbidden) {
+  if (!canView) {
+    return (
+      <div className="animate-fade-in-up">
+        <h1 className="text-2xl font-semibold text-text-primary">Command Center</h1>
+        <div className="mt-6 flex gap-3 rounded-card border border-warning/30 bg-warning-bg/30 p-4">
+          <Lock className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+          <div>
+            <p className="text-sm font-medium text-text-primary">Restricted</p>
+            <p className="mt-1 text-sm text-text-secondary">
+              console.read is required to watch the live ops wall.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (forbidden) {
     return (
       <div className="animate-fade-in-up">
         <h1 className="text-2xl font-semibold text-text-primary">Command Center</h1>
