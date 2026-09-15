@@ -1,4 +1,5 @@
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowDownCircle,
   ArrowLeftRight,
@@ -312,8 +313,18 @@ function sterlloReplayMessage(payload, fallback) {
     payload.Message ||
     payload.msg ||
     payload.data?.message ||
-    payload.data?.Message
-  return msg ? String(msg) : fallback
+    payload.data?.Message ||
+    payload.data?.reason ||
+    payload.reason
+  if (msg == null || msg === '') return fallback
+  if (typeof msg === 'object') {
+    try {
+      return JSON.stringify(msg)
+    } catch {
+      return fallback
+    }
+  }
+  return String(msg)
 }
 
 function isSterlloReplaySuccess(payload) {
@@ -322,6 +333,11 @@ function isSterlloReplaySuccess(payload) {
   if (payload.success === false) return false
   if (payload.status === true || payload.Status === true || payload.state === true) return true
   if (payload.success === true) return true
+  const code = Number(payload.code ?? payload.Code)
+  if (Number.isFinite(code) && code !== 0) {
+    if (code === 2000 || (code >= 200 && code < 300)) return true
+    if (code >= 400) return false
+  }
   return true
 }
 
@@ -532,6 +548,7 @@ export default function TransactionsPage() {
           type: 'error',
           text: sterlloReplayMessage(res, 'Webhook replay failed.'),
         })
+        setReplayConfirmOpen(false)
       }
     } catch (err) {
       const status = err?.response?.status
@@ -549,6 +566,7 @@ export default function TransactionsPage() {
       } else {
         setToast({ type: 'error', text: msg })
       }
+      setReplayConfirmOpen(false)
     } finally {
       setReplaying(false)
     }
@@ -663,18 +681,32 @@ export default function TransactionsPage() {
         </p>
       </div>
 
-      {toast ? (
-        <div
-          className={cn(
-            'mb-4 rounded-lg border px-4 py-3 text-sm',
-            toast.type === 'success'
-              ? 'border-success/30 bg-success-bg text-success'
-              : 'border-error/30 bg-error-bg text-error'
-          )}
-        >
-          {toast.text}
-        </div>
-      ) : null}
+      {toast && typeof document !== 'undefined'
+        ? createPortal(
+            <div className="pointer-events-none fixed inset-x-0 top-[76px] z-[120] flex justify-center px-3 pt-3 sm:px-6 lg:pl-[248px]">
+              <div
+                className={cn(
+                  'pointer-events-auto animate-fade-in-up flex w-full max-w-xl items-start gap-3 rounded-card border px-4 py-3 text-sm shadow-lg shadow-black/20',
+                  toast.type === 'success'
+                    ? 'border-success/40 bg-success-bg text-success'
+                    : 'border-error/40 bg-error-bg text-error'
+                )}
+                role="status"
+              >
+                <p className="min-w-0 flex-1 leading-snug">{String(toast.text || '')}</p>
+                <button
+                  type="button"
+                  onClick={() => setToast(null)}
+                  className="shrink-0 rounded-md p-1 text-current opacity-70 hover:opacity-100"
+                  aria-label="Dismiss notification"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
 
       <div className="card-shell">
         <div className="tab-scroll bg-page lg:grid lg:grid-cols-5 lg:overflow-visible lg:px-0">
