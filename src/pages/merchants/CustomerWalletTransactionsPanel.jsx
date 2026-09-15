@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDownCircle, ArrowUpCircle, BookOpenText, Filter, Search, Send, Shuffle } from 'lucide-react'
+import { normalizeListPagination, unwrapListPayload } from '../../lib/listPagination'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import {
@@ -42,32 +43,6 @@ function pickRecords(res) {
   return []
 }
 
-function pickPagination(res) {
-  const inner = unwrapPayload(res) ?? res ?? {}
-  const nested = inner.pagination ?? inner.meta?.pagination ?? inner.meta ?? {}
-  const merged = {
-    total: inner.total ?? nested.total ?? nested.count,
-    total_pages: inner.total_pages ?? inner.totalPages ?? nested.total_pages ?? nested.last_page,
-    last_page: inner.last_page ?? nested.last_page,
-  }
-  if ((merged.total_pages == null || merged.total_pages === '') && merged.last_page != null) {
-    const lp = Number(merged.last_page)
-    if (Number.isFinite(lp) && lp > 0) merged.total_pages = lp
-  }
-  return merged
-}
-
-function inferTotalPages(res, limit, currentPage) {
-  const pag = pickPagination(res)
-  const tp = Number(pag.total_pages)
-  const total = Number(pag.total)
-  if (Number.isFinite(tp) && tp > 0) return tp
-  if (Number.isFinite(total) && total > 0) return Math.max(1, Math.ceil(total / limit))
-  const rows = pickRecords(res)
-  if (rows.length < limit) return Math.max(1, currentPage)
-  return Math.max(currentPage + 1, 2)
-}
-
 function pickFirst(obj, keys) {
   for (const k of keys) {
     const v = obj?.[k]
@@ -100,10 +75,23 @@ async function fetchCustomerPayouts(params, signal) {
   )
   const start = (page - 1) * limit
   const pageRows = merged.slice(start, start + limit)
-  const totalPages = Math.max(inferTotalPages(ngnRes, limit, page), inferTotalPages(cryptoRes, limit, page))
+  const ngnPag = unwrapListPayload(ngnRes, { page, limit }).pagination
+  const cryptoPag = unwrapListPayload(cryptoRes, { page, limit }).pagination
+  const pagination = normalizeListPagination(
+    {},
+    {
+      page,
+      limit,
+      recordCount: pageRows.length,
+    }
+  )
   return {
     records: pageRows,
-    pagination: { total_pages: totalPages, total: merged.length },
+    pagination: {
+      ...pagination,
+      hasNext: pagination.hasNext || ngnPag.hasNext || cryptoPag.hasNext,
+      hasPrev: pagination.hasPrev || ngnPag.hasPrev || cryptoPag.hasPrev,
+    },
   }
 }
 
@@ -235,8 +223,8 @@ export default function CustomerWalletTransactionsPanel({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [currencyFilter, setCurrencyFilter] = useState('')
@@ -275,8 +263,8 @@ export default function CustomerWalletTransactionsPanel({
   const fetchTransactions = useCallback(async () => {
     if (!financial || !customerIdentifier || !walletKey) {
       setRows([])
-      setTotalPages(1)
-      setTotal(0)
+      setHasNext(false)
+      setHasPrev(false)
       setLoading(false)
       setError(null)
       return
@@ -304,17 +292,16 @@ export default function CustomerWalletTransactionsPanel({
         activeTab === 'payout'
           ? await fetchCustomerPayouts(params, controller.signal)
           : await selectedTab.fetcher(params, controller.signal)
-      const records = pickRecords(res)
-      const pag = pickPagination(res)
+      const { records, pagination } = unwrapListPayload(res, { page, limit: TX_PAGE_SIZE })
       setRows(records)
-      setTotalPages(inferTotalPages(res, TX_PAGE_SIZE, page))
-      setTotal(Number(pag.total) || records.length)
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       setError(err.response?.data?.message || 'Failed to load transactions.')
       setRows([])
-      setTotalPages(1)
-      setTotal(0)
+      setHasNext(false)
+      setHasPrev(false)
     } finally {
       setLoading(false)
     }
@@ -491,8 +478,9 @@ export default function CustomerWalletTransactionsPanel({
 
           <Pagination
             page={page}
-            totalPages={totalPages}
-            total={total}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
+            pageCount={rows.length}
             limit={TX_PAGE_SIZE}
             label="transactions"
             onPageChange={setPage}

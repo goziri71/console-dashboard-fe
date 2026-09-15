@@ -6,6 +6,7 @@ import {
   isSuccessEnvelope,
   isSuccessfulApiCode,
 } from '../lib/apiEnvelope'
+import { attachEnvelopePagination } from '../lib/listPagination'
 import {
   clearStoredAuth,
   getAuthToken,
@@ -115,7 +116,7 @@ api.interceptors.response.use(
         )
         return Promise.reject(err)
       }
-      response.data = body.data
+      response.data = attachEnvelopePagination(body)
       return response
     }
 
@@ -185,7 +186,7 @@ api.interceptors.response.use(
       return Promise.reject(err)
     }
 
-    response.data = body.data
+    response.data = attachEnvelopePagination(body)
     return response
   },
   (error) => {

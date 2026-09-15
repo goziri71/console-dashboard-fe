@@ -33,6 +33,7 @@ import {
   unwrapCommandCenterPulse,
 } from '../../lib/commandCenter'
 import { canReadConsole, hasFullAccess, isManagementRoleSlug } from '../../lib/permissions'
+import { normalizeListPagination } from '../../lib/listPagination'
 import { cn, formatDate, formatNumber, timeAgo } from '../../lib/utils'
 import {
   getCommandCenterEvents,
@@ -199,8 +200,8 @@ export default function CommandCenterPage() {
 
   const [rows, setRows] = useState([])
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [forbidden, setForbidden] = useState(false)
@@ -273,15 +274,15 @@ export default function CommandCenterPage() {
       if (fromDate) params.from_date = fromDate
       if (toDate) params.to_date = toDate
       const payload = await getCommandCenterEvents(params, controller.signal)
-      const { records, pagination } = unwrapCommandCenterEvents(payload)
+      const { records, pagination: paginationRaw } = unwrapCommandCenterEvents(payload)
+      const pagination = normalizeListPagination(paginationRaw, {
+        page,
+        limit: PAGE_LIMIT,
+        recordCount: records.length,
+      })
       setRows(records)
-      const nextTotal = Number(pagination.total ?? records.length) || 0
-      const nextPages =
-        Number(pagination.total_pages) > 0
-          ? Number(pagination.total_pages)
-          : Math.max(1, Math.ceil(nextTotal / PAGE_LIMIT) || 1)
-      setTotal(nextTotal)
-      setTotalPages(nextPages)
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
       seenIdsRef.current = new Set(records.map((row) => eventKey(row)).filter(Boolean))
       setMissedLive(0)
     } catch (err) {
@@ -351,7 +352,6 @@ export default function CommandCenterPage() {
       }
 
       setRows((prev) => [event, ...prev].slice(0, PAGE_LIMIT))
-      setTotal((n) => n + 1)
       setLiveIds((prev) => {
         const next = new Set(prev)
         next.add(key)
@@ -763,8 +763,9 @@ export default function CommandCenterPage() {
 
         <Pagination
           page={page}
-          totalPages={totalPages}
-          total={total}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          pageCount={rows.length}
           limit={PAGE_LIMIT}
           label="actions"
           onPageChange={setPage}

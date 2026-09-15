@@ -12,6 +12,7 @@ import {
 import OverlayPortal from '../../components/ui/OverlayPortal'
 import { useAuth } from '../../context/AuthContext'
 import Pagination from '../../components/ui/Pagination'
+import { normalizeListPagination } from '../../lib/listPagination'
 import { cn, formatDate } from '../../lib/utils'
 import {
   PERMISSION_ALL,
@@ -309,24 +310,18 @@ export default function AdminPage() {
         ...(teamRoleFilter ? { role_slug: teamRoleFilter } : {}),
       })
       setTeamUsers(records.map(normalizeTeamUser))
-      const limFromApi =
-        Number.isFinite(Number(pagination.limit)) && Number(pagination.limit) > 0
-          ? Number(pagination.limit)
-          : lim
-      const total = Number.isFinite(Number(pagination.total))
-        ? Number(pagination.total)
-        : records.length
-      let totalPages = Number(pagination.total_pages)
-      if (!Number.isFinite(totalPages) || totalPages < 1) {
-        totalPages = total === 0 ? 0 : Math.max(1, Math.ceil(total / limFromApi))
-      }
+      const normalized = normalizeListPagination(pagination, {
+        page: teamPage,
+        limit: lim,
+        recordCount: records.length,
+      })
       setTeamPagination({
-        total,
-        page: Number.isFinite(Number(pagination.page)) ? Number(pagination.page) : teamPage,
-        limit: limFromApi,
-        total_pages: totalPages,
-        has_next: pagination.has_next,
-        has_prev: pagination.has_prev,
+        page: normalized.page,
+        limit: normalized.limit,
+        hasNext: normalized.hasNext,
+        hasPrev: normalized.hasPrev,
+        total: normalized.total,
+        totalPages: normalized.totalPages,
       })
     } catch (err) {
       const msg =
@@ -815,11 +810,12 @@ export default function AdminPage() {
               </table>
             </div>
 
-            {manage && teamPagination && teamPagination.total_pages > 0 && (
+            {manage && teamPagination && (teamPagination.hasNext || teamPagination.hasPrev || teamPagination.page > 1) && (
               <Pagination
                 page={teamPagination.page}
-                totalPages={teamPagination.total_pages}
-                total={teamPagination.total}
+                hasNext={teamPagination.hasNext}
+                hasPrev={teamPagination.hasPrev}
+                pageCount={teamUsers.length}
                 label="users"
                 limit={teamPagination.limit}
                 onPageChange={setTeamPage}

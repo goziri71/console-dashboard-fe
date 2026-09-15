@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Building2, Clock, ShieldAlert, Loader2, TrendingUp, X } from 'lucide-react'
 import { getMerchantStats, getMerchants, patchMerchantTier } from '../../services/merchants'
 import UdaraLinkModal from '../../components/merchants/UdaraLinkModal'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { formatNumber, exportToCsv } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -110,8 +111,8 @@ export default function MerchantsPage() {
   const [error, setError] = useState(null)
 
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
 
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('')
@@ -146,11 +147,10 @@ export default function MerchantsPage() {
       else if (statusFilter === 'kyc_pending') params.kyc_status = 'pending'
 
       const res = await getMerchants(params)
-      const records = res.records || res.data || []
-      const pag = res.pagination || {}
+      const { records, pagination } = unwrapListPayload(res, { page, limit: LIMIT })
       setMerchants(records)
-      setTotal(pag.total || records.length)
-      setTotalPages(pag.total_pages || Math.ceil((pag.total || records.length) / LIMIT))
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load merchants.')
     } finally {
@@ -313,7 +313,15 @@ export default function MerchantsPage() {
           />
         )}
 
-        <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} label="Merchants" onPageChange={setPage} />
+        <Pagination
+          page={page}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          pageCount={merchants.length}
+          limit={LIMIT}
+          label="Merchants"
+          onPageChange={setPage}
+        />
       </div>
 
       <UdaraLinkModal

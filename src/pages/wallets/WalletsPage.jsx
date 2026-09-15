@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Activity, Search, Wallet, WalletCards } from 'lucide-react'
 import MetricCard from '../../components/ui/MetricCard'
 import Pagination from '../../components/ui/Pagination'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { cn, formatCurrency, formatDate, formatNumber } from '../../lib/utils'
 import {
   parseWalletsPageResponse,
@@ -26,8 +27,8 @@ export default function WalletsPage() {
     active_wallets: 0,
     pending_transactions: 0,
   })
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -72,15 +73,16 @@ export default function WalletsPage() {
         active_wallets: 0,
         pending_transactions: 0,
       })
-      setRows(payload.records)
-      setTotal(payload.pagination?.total || 0)
-      setTotalPages(payload.pagination?.total_pages || 1)
+      const { records, pagination } = unwrapListPayload(payload, { page, limit: TABLE_LIMIT })
+      setRows(records)
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       setError(err.response?.data?.message || 'Failed to load wallets.')
       setRows([])
-      setTotal(0)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
     } finally {
       setLoading(false)
     }
@@ -307,8 +309,10 @@ export default function WalletsPage() {
 
         <Pagination
           page={page}
-          totalPages={totalPages}
-          total={total}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          pageCount={rows.length}
+          limit={TABLE_LIMIT}
           label="Wallets"
           onPageChange={setPage}
         />

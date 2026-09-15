@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Wallet } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
 import { getMerchantWallets } from '../../services/merchants'
 
@@ -34,8 +35,8 @@ export default function MerchantWalletsPanel({ accountKey, financial }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
 
   const fetchWallets = useCallback(async () => {
     if (!accountKey) return
@@ -43,20 +44,15 @@ export default function MerchantWalletsPanel({ accountKey, financial }) {
     setError('')
     try {
       const res = await getMerchantWallets(accountKey, { page, limit: LIMIT })
-      const records = pickRecords(res)
-      const pag = unwrap(res)?.pagination || {}
+      const { records, pagination } = unwrapListPayload(res, { page, limit: LIMIT })
       setRows(records)
-      const t = Number(pag.total ?? records.length)
-      setTotal(t)
-      const tp = Number(pag.total_pages)
-      setTotalPages(
-        Number.isFinite(tp) && tp > 0 ? tp : Math.max(1, Math.ceil(t / LIMIT))
-      )
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load merchant wallets.')
       setRows([])
-      setTotal(0)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
     } finally {
       setLoading(false)
     }
@@ -156,8 +152,9 @@ export default function MerchantWalletsPanel({ accountKey, financial }) {
           </div>
           <Pagination
             page={page}
-            totalPages={totalPages}
-            total={total}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
+            pageCount={rows.length}
             limit={LIMIT}
             label="wallets"
             onPageChange={setPage}

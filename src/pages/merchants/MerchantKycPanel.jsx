@@ -18,15 +18,9 @@ import {
   parseMerchantKycListResponse,
 } from '../../lib/kycUi'
 import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
+import { normalizeListPagination } from '../../lib/listPagination'
 
 const KYC_PAGE_SIZE = 10
-
-function inferTotalPages(total, limit, currentPage, rowCount) {
-  const t = Number(total)
-  if (Number.isFinite(t) && t > 0) return Math.max(1, Math.ceil(t / limit))
-  if (rowCount < limit) return Math.max(1, currentPage)
-  return Math.max(currentPage + 1, 2)
-}
 
 export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMetaChange }) {
   const { user } = useAuth()
@@ -38,7 +32,8 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
   const [merchantKyc, setMerchantKyc] = useState(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [approving, setApproving] = useState(false)
@@ -79,10 +74,13 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
           ? parsed.pendingCount
           : rowPending
       setPendingCount(pending)
-      const total = Number(
-        parsed.pagination?.total ?? parsed.merchant?.kyc_record_count ?? parsed.records.length
-      )
-      setTotalPages(inferTotalPages(total, KYC_PAGE_SIZE, page, parsed.records.length))
+      const pagination = normalizeListPagination(parsed.pagination, {
+        page,
+        limit: KYC_PAGE_SIZE,
+        recordCount: parsed.records.length,
+      })
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
       emitMeta({
         status: parsed.merchant?.kyc_status ?? profileKycStatus,
         pendingCount: pending,
@@ -94,7 +92,8 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
       const profilePending =
         normalizeKycAggregateStatus(profileKycStatus) === 'pending' ? 1 : 0
       setPendingCount(profilePending)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
       setLoadError(getApiErrorMessage(err, 'Failed to load merchant KYC.'))
       emitMeta({
         status: profileKycStatus ?? null,
@@ -331,15 +330,15 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
         </div>
       )}
 
-      {totalPages > 1 ? (
+      {hasNext || hasPrev || page > 1 ? (
         <div className="flex items-center justify-between border-t border-border/60 px-4 py-3 text-xs text-text-muted">
           <span>
-            Page {page} of {totalPages}
+            Showing {records.length} records · Page {String(page).padStart(2, '0')}
           </span>
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={page <= 1 || loading}
+              disabled={!hasPrev || loading}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               className="rounded-full border border-border px-3 py-1 hover:bg-card-hover disabled:opacity-40"
             >
@@ -347,7 +346,7 @@ export default function MerchantKycPanel({ accountKey, merchantProfile, onKycMet
             </button>
             <button
               type="button"
-              disabled={page >= totalPages || loading}
+              disabled={!hasNext || loading}
               onClick={() => setPage((p) => p + 1)}
               className="rounded-full border border-border px-3 py-1 hover:bg-card-hover disabled:opacity-40"
             >

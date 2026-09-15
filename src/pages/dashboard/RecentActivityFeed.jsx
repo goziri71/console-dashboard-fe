@@ -14,6 +14,7 @@ import {
   Bitcoin,
   Loader2,
 } from 'lucide-react'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { timeAgo } from '../../lib/utils'
 
 const LIMIT = 6
@@ -55,18 +56,19 @@ const typeColorMap = {
 export default function RecentActivityFeed() {
   const [activities, setActivities] = useState([])
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
   const [loading, setLoading] = useState(true)
 
   async function fetchPage(pageNum) {
     setLoading(true)
     try {
       const res = await getActivities(pageNum, LIMIT)
-      const records = res.records || res.data || []
-      const pagination = res.pagination || {}
+      const { records, pagination } = unwrapListPayload(res, { page: pageNum, limit: LIMIT })
       setActivities(records)
       setPage(pageNum)
-      setTotalPages(pagination.total_pages || Math.ceil((pagination.total || records.length) / LIMIT))
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch {
       // silently fail
     } finally {
@@ -126,21 +128,19 @@ export default function RecentActivityFeed() {
           </div>
         ))}
       </div>
-      {totalPages > 1 && (
+      {(hasNext || hasPrev || page > 1) && (
         <div className="flex items-center justify-between border-t border-border px-4 py-2.5">
           <button
             onClick={() => fetchPage(page - 1)}
-            disabled={page <= 1 || loading}
+            disabled={!hasPrev || loading}
             className="rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium text-text-secondary transition-all duration-200 hover:bg-card-hover hover:text-text-primary active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
           >
             Previous
           </button>
-          <span className="text-xs text-text-muted">
-            Page {page} of {totalPages}
-          </span>
+          <span className="text-xs text-text-muted">Page {String(page).padStart(2, '0')}</span>
           <button
             onClick={() => fetchPage(page + 1)}
-            disabled={page >= totalPages || loading}
+            disabled={!hasNext || loading}
             className="rounded-lg border border-border bg-card px-3 py-1 text-xs font-medium text-text-secondary transition-all duration-200 hover:bg-card-hover hover:text-text-primary active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
           >
             Next

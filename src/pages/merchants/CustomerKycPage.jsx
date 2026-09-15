@@ -29,6 +29,7 @@ import {
 import { kycKeyToUpper } from '../../lib/kycUi'
 import { useKycDisplayStatus } from '../../hooks/useKycDisplayStatus'
 import Pagination from '../../components/ui/Pagination'
+import { unwrapListPayload } from '../../lib/listPagination'
 
 const KYC_PAGE_SIZE = 10
 
@@ -49,37 +50,6 @@ function pickRecords(res) {
   if (Array.isArray(inner?.data)) return inner.data
   if (Array.isArray(inner)) return inner
   return []
-}
-
-function pickPagination(res) {
-  const inner = unwrapPayload(res) ?? res ?? {}
-  const nested =
-    inner.pagination ??
-    inner.meta?.pagination ??
-    (inner.meta && typeof inner.meta === 'object' && (inner.meta.total != null || inner.meta.last_page != null) ? inner.meta : null) ??
-    {}
-  const rootHints = {
-    total: inner.total ?? inner.count,
-    total_pages: inner.total_pages ?? inner.totalPages ?? inner.last_page ?? inner.lastPage,
-    last_page: inner.last_page ?? inner.lastPage,
-  }
-  const merged = { ...rootHints, ...nested }
-  if ((merged.total_pages == null || merged.total_pages === '') && merged.last_page != null) {
-    const lp = Number(merged.last_page)
-    if (Number.isFinite(lp) && lp > 0) merged.total_pages = lp
-  }
-  return merged
-}
-
-function inferTotalPagesFromResponse(res, limit, currentPage) {
-  const rows = pickRecords(res)
-  const pag = pickPagination(res)
-  const tp = Number(pag.total_pages ?? pag.last_page ?? pag.lastPage)
-  const total = Number(pag.total ?? pag.count)
-  if (Number.isFinite(tp) && tp > 0) return tp
-  if (Number.isFinite(total) && total > 0) return Math.max(1, Math.ceil(total / limit))
-  if (rows.length < limit) return Math.max(1, currentPage)
-  return Math.max(currentPage + 1, 2)
 }
 
 function pickKycField(row, keys) {
@@ -224,8 +194,8 @@ export default function CustomerKycPage() {
   const [error, setError] = useState(null)
   const [kycRows, setKycRows] = useState([])
   const [kycPage, setKycPage] = useState(1)
-  const [kycTotalPages, setKycTotalPages] = useState(1)
-  const [kycTotal, setKycTotal] = useState(0)
+  const [kycHasNext, setKycHasNext] = useState(false)
+  const [kycHasPrev, setKycHasPrev] = useState(false)
   const [kycLoading, setKycLoading] = useState(false)
   const [kycMsg, setKycMsg] = useState(null)
   const [approving, setApproving] = useState(false)
@@ -276,16 +246,14 @@ export default function CustomerKycPage() {
       if (nestedCustomer) {
         setCustomer((prev) => mergeCustomerFromKycPayload(prev, nestedCustomer))
       }
-      const rows = pickRecords(res)
-      setKycRows(rows)
-      const pag = pickPagination(res)
-      const total = Number(pag.total ?? pag.count)
-      setKycTotal(Number.isFinite(total) && total >= 0 ? total : rows.length)
-      setKycTotalPages(inferTotalPagesFromResponse(res, KYC_PAGE_SIZE, kycPage))
+      const { records, pagination } = unwrapListPayload(res, { page: kycPage, limit: KYC_PAGE_SIZE })
+      setKycRows(records)
+      setKycHasNext(pagination.hasNext)
+      setKycHasPrev(pagination.hasPrev)
     } catch {
       setKycRows([])
-      setKycTotal(0)
-      setKycTotalPages(1)
+      setKycHasNext(false)
+      setKycHasPrev(false)
     } finally {
       setKycLoading(false)
     }
@@ -656,8 +624,9 @@ export default function CustomerKycPage() {
               <div className="border-t border-[#2a2a2a] bg-[#0c0c0c]">
                 <Pagination
                   page={kycPage}
-                  totalPages={kycTotalPages}
-                  total={kycTotal}
+                  hasNext={kycHasNext}
+                  hasPrev={kycHasPrev}
+                  pageCount={kycRows.length}
                   limit={KYC_PAGE_SIZE}
                   label="KYC documents"
                   onPageChange={setKycPage}

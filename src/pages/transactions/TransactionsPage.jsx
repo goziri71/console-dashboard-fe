@@ -23,6 +23,7 @@ import Pagination from '../../components/ui/Pagination'
 import OverlayPortal from '../../components/ui/OverlayPortal'
 import { useAuth } from '../../context/AuthContext'
 import { canUpdateMerchant } from '../../lib/permissions'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { cn, exportToCsv, formatBalance, formatDate } from '../../lib/utils'
 import {
   getNgnDeposits,
@@ -350,8 +351,8 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -394,22 +395,17 @@ export default function TransactionsPage() {
     try {
       const res = await selectedTab.fetcher(params, controller.signal)
       const payload = res?.data || res || {}
-      const records = payload.records || payload.data?.records || payload.data || []
-      const pagination = payload.pagination || payload.meta || payload.data?.pagination || {}
-      const nextTotal = Number(pagination.total ?? records.length ?? 0)
-      const nextTotalPages = Number(
-        pagination.total_pages || Math.max(1, Math.ceil((nextTotal || 0) / TABLE_LIMIT))
-      )
+      const { records, pagination } = unwrapListPayload(payload, { page, limit: TABLE_LIMIT })
 
-      setRows(Array.isArray(records) ? records : [])
-      setTotal(nextTotal)
-      setTotalPages(nextTotalPages)
+      setRows(records)
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       setError(err.response?.data?.message || 'Failed to load transactions.')
       setRows([])
-      setTotal(0)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
     } finally {
       setLoading(false)
     }
@@ -855,8 +851,10 @@ export default function TransactionsPage() {
 
         <Pagination
           page={page}
-          totalPages={totalPages}
-          total={total}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          pageCount={rows.length}
+          limit={TABLE_LIMIT}
           label="Transactions"
           onPageChange={setPage}
         />

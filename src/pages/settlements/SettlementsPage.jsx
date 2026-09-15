@@ -13,6 +13,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import Pagination from '../../components/ui/Pagination'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
 import { getSettlementBatch, getSettlementBatches, getSettlementSummary } from '../../services/settlements'
 
@@ -45,13 +46,10 @@ function normalizeSummary(payload) {
   }
 }
 
-function normalizeBatches(payload) {
+function normalizeBatches(payload, opts = {}) {
   const node = payload?.data || payload || {}
-  const records = node.records || node.batches || node.data || []
-  const pagination = node.pagination || {}
-  const total = Number(pagination.total ?? node.total ?? records.length)
-  const totalPages = Math.max(1, Number(pagination.total_pages || Math.ceil(total / TABLE_LIMIT) || 1))
-  return { records, total, totalPages }
+  const { records, pagination } = unwrapListPayload(node, opts)
+  return { records, pagination }
 }
 
 function getByPath(obj, path) {
@@ -105,8 +103,8 @@ export default function SettlementsPage() {
     settled_total: 0,
   })
   const [rows, setRows] = useState([])
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedBatch, setSelectedBatch] = useState(null)
@@ -149,15 +147,15 @@ export default function SettlementsPage() {
       }
       if (settlementType) params.settlement_type = settlementType
       const res = await getSettlementBatches(params)
-      const normalized = normalizeBatches(res)
-      setRows(normalized.records)
-      setTotal(normalized.total)
-      setTotalPages(normalized.totalPages)
+      const { records, pagination } = normalizeBatches(res, { page, limit: TABLE_LIMIT })
+      setRows(records)
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to load settlement batches.')
       setRows([])
-      setTotal(0)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
     } finally {
       setLoading(false)
     }
@@ -388,8 +386,10 @@ export default function SettlementsPage() {
 
         <Pagination
           page={page}
-          totalPages={totalPages}
-          total={total}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          pageCount={rows.length}
+          limit={TABLE_LIMIT}
           label="Batches"
           onPageChange={setPage}
         />

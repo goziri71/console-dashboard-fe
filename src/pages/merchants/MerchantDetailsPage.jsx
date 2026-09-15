@@ -32,6 +32,7 @@ import {
   canReadPricing,
   canUpdateMerchant,
 } from '../../lib/permissions'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { cn, exportToCsv, formatNumber } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import MerchantToolbar from './MerchantToolbar'
@@ -158,8 +159,9 @@ export default function MerchantDetailsPage() {
   const [customers, setCustomers] = useState([])
   const [customersLoading, setCustomersLoading] = useState(false)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
+  const [customersTotal, setCustomersTotal] = useState(null)
   const [resourceCounts, setResourceCounts] = useState({
     customers: null,
     wallets: null,
@@ -262,25 +264,21 @@ export default function MerchantDetailsPage() {
       else if (statusFilter === 'kyc_pending') params.kyc_status = 'pending'
 
       const res = await getMerchantCustomers(accountKey, params)
-      const records = res.records || res.data || []
-      const pag = res.pagination || {}
+      const { records, pagination } = unwrapListPayload(res, { page, limit: LIMIT })
       setCustomers(records)
-      const t = pag.total ?? records.length
-      setTotal(t)
-      const tp = pag.total_pages
-      setTotalPages(
-        Number.isFinite(Number(tp)) && Number(tp) > 0
-          ? Number(tp)
-          : Math.max(1, Math.ceil(t / LIMIT))
-      )
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
+      const apiTotal = Number.isFinite(Number(pagination.total)) ? Number(pagination.total) : null
+      setCustomersTotal(apiTotal)
       // Keep header/overview count in sync when viewing unfiltered customers.
-      if (!q && !statusFilter) {
-        setResourceCounts((prev) => ({ ...prev, customers: Number(t) }))
+      if (!q && !statusFilter && apiTotal != null) {
+        setResourceCounts((prev) => ({ ...prev, customers: apiTotal }))
       }
     } catch {
       setCustomers([])
-      setTotal(0)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
+      setCustomersTotal(null)
     } finally {
       setCustomersLoading(false)
     }
@@ -357,10 +355,10 @@ export default function MerchantDetailsPage() {
     const fromMerchant = merchantCustomerCount(merchant)
     if (fromMerchant != null && fromMerchant > 0) return fromMerchant
     // Avoid showing a fake "0" from the uninitialized customers list total.
-    if (!search.trim() && !statusFilter && total > 0) return total
+    if (!search.trim() && !statusFilter && customersTotal != null && customersTotal > 0) return customersTotal
     if (fromMerchant != null) return fromMerchant
     return null
-  }, [resourceCounts.customers, merchant, total, search, statusFilter])
+  }, [resourceCounts.customers, merchant, customersTotal, search, statusFilter])
 
   const handleExportCustomers = () => {
     if (!customers.length) return
@@ -911,8 +909,9 @@ export default function MerchantDetailsPage() {
 
           <Pagination
             page={page}
-            totalPages={totalPages}
-            total={total}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
+            pageCount={customers.length}
             limit={LIMIT}
             label="Customers"
             onPageChange={setPage}

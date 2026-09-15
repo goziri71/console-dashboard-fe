@@ -8,6 +8,7 @@ import {
   Search,
   Shuffle,
 } from 'lucide-react'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { cn, formatBalance, formatDate } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
 import {
@@ -53,26 +54,6 @@ function pickRecords(res) {
   if (Array.isArray(inner.transactions)) return inner.transactions
   if (Array.isArray(inner)) return inner
   return []
-}
-
-function pickPagination(res) {
-  const inner = unwrapPayload(res) ?? res ?? {}
-  const nested = inner.pagination ?? inner.meta?.pagination ?? inner.meta ?? {}
-  return {
-    total: inner.total ?? nested.total ?? nested.count,
-    total_pages: inner.total_pages ?? inner.totalPages ?? nested.total_pages ?? nested.last_page,
-  }
-}
-
-function inferTotalPages(res, limit, currentPage) {
-  const pag = pickPagination(res)
-  const tp = Number(pag.total_pages)
-  const total = Number(pag.total)
-  if (Number.isFinite(tp) && tp > 0) return tp
-  if (Number.isFinite(total) && total > 0) return Math.max(1, Math.ceil(total / limit))
-  const rows = pickRecords(res)
-  if (rows.length < limit) return Math.max(1, currentPage)
-  return Math.max(currentPage + 1, 2)
 }
 
 function pickFirst(obj, keys) {
@@ -183,8 +164,8 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [currencyFilter, setCurrencyFilter] = useState('')
@@ -214,8 +195,8 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
   const fetchTransactions = useCallback(async () => {
     if (!accountKey) {
       setRows([])
-      setTotalPages(1)
-      setTotal(0)
+      setHasNext(false)
+      setHasPrev(false)
       setLoading(false)
       return
     }
@@ -237,17 +218,16 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
     setError(null)
     try {
       const res = await selectedTab.fetcher(params, controller.signal)
-      const records = pickRecords(res)
-      const pag = pickPagination(res)
+      const { records, pagination } = unwrapListPayload(res, { page, limit: TX_PAGE_SIZE })
       setRows(records)
-      setTotalPages(inferTotalPages(res, TX_PAGE_SIZE, page))
-      setTotal(Number(pag.total) || records.length)
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       setError(err.response?.data?.message || 'Failed to load merchant activity.')
       setRows([])
-      setTotalPages(1)
-      setTotal(0)
+      setHasNext(false)
+      setHasPrev(false)
     } finally {
       setLoading(false)
     }
@@ -411,8 +391,9 @@ export default function MerchantActivityPanel({ accountKey, financial }) {
           </div>
           <Pagination
             page={page}
-            totalPages={totalPages}
-            total={total}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
+            pageCount={rows.length}
             limit={TX_PAGE_SIZE}
             label="transactions"
             onPageChange={setPage}

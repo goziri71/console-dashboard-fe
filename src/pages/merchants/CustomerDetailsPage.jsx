@@ -47,6 +47,7 @@ import {
   flagYes,
 } from '../../lib/utils'
 import Pagination from '../../components/ui/Pagination'
+import { unwrapListPayload } from '../../lib/listPagination'
 import { countryToFlagEmoji } from './merchantUi'
 import {
   customerDisplayName,
@@ -85,37 +86,6 @@ function pickRecords(res) {
   if (Array.isArray(inner?.data)) return inner.data
   if (Array.isArray(inner)) return inner
   return []
-}
-
-function pickPagination(res) {
-  const inner = unwrapPayload(res) ?? res ?? {}
-  const nested =
-    inner.pagination ??
-    inner.meta?.pagination ??
-    (inner.meta && typeof inner.meta === 'object' && (inner.meta.total != null || inner.meta.last_page != null) ? inner.meta : null) ??
-    {}
-  const rootHints = {
-    total: inner.total ?? inner.count,
-    total_pages: inner.total_pages ?? inner.totalPages ?? inner.last_page ?? inner.lastPage,
-    last_page: inner.last_page ?? inner.lastPage,
-  }
-  const merged = { ...rootHints, ...nested }
-  if ((merged.total_pages == null || merged.total_pages === '') && merged.last_page != null) {
-    const lp = Number(merged.last_page)
-    if (Number.isFinite(lp) && lp > 0) merged.total_pages = lp
-  }
-  return merged
-}
-
-function inferTotalPagesFromResponse(res, limit, currentPage) {
-  const rows = pickRecords(res)
-  const pag = pickPagination(res)
-  const tp = Number(pag.total_pages ?? pag.last_page ?? pag.lastPage)
-  const total = Number(pag.total ?? pag.count)
-  if (Number.isFinite(tp) && tp > 0) return tp
-  if (Number.isFinite(total) && total > 0) return Math.max(1, Math.ceil(total / limit))
-  if (rows.length < limit) return Math.max(1, currentPage)
-  return Math.max(currentPage + 1, 2)
 }
 
 function pickKycField(row, keys) {
@@ -187,7 +157,8 @@ export default function CustomerDetailsPage() {
   const [metrics, setMetrics] = useState({ total_wallets: 0, sub_accounts: 0, disputes: 0 })
   const [wallets, setWallets] = useState([])
   const [walletPage, setWalletPage] = useState(1)
-  const [walletTotalPages, setWalletTotalPages] = useState(1)
+  const [walletHasNext, setWalletHasNext] = useState(false)
+  const [walletHasPrev, setWalletHasPrev] = useState(false)
   const [walletSearchInput, setWalletSearchInput] = useState('')
   const [walletSearch, setWalletSearch] = useState('')
   const [walletsLoading, setWalletsLoading] = useState(false)
@@ -203,8 +174,8 @@ export default function CustomerDetailsPage() {
 
   const [kycRows, setKycRows] = useState([])
   const [kycPage, setKycPage] = useState(1)
-  const [kycTotalPages, setKycTotalPages] = useState(1)
-  const [kycTotal, setKycTotal] = useState(0)
+  const [kycHasNext, setKycHasNext] = useState(false)
+  const [kycHasPrev, setKycHasPrev] = useState(false)
   const [kycLoading, setKycLoading] = useState(false)
   const [kycApproving, setKycApproving] = useState(false)
   const [kycApproveConfirm, setKycApproveConfirm] = useState({
@@ -240,15 +211,11 @@ export default function CustomerDetailsPage() {
         limit: WALLET_PAGE_SIZE,
         search: walletSearch.trim() || undefined,
       })
-      const rows = pickRecords(res)
-      setWallets(rows)
-      const pag = pickPagination(res)
-      const tp = pag.total_pages
-      const total = pag.total
-      setWalletTotalPages(
-        Number.isFinite(Number(tp)) && Number(tp) > 0 ? Number(tp) : Math.max(1, Math.ceil(Number(total ?? rows.length) / WALLET_PAGE_SIZE))
-      )
-      const keys = rows.map((w) => w.wallet_key || w.wallet_id).filter(Boolean)
+      const { records, pagination } = unwrapListPayload(res, { page: walletPage, limit: WALLET_PAGE_SIZE })
+      setWallets(records)
+      setWalletHasNext(pagination.hasNext)
+      setWalletHasPrev(pagination.hasPrev)
+      const keys = records.map((w) => w.wallet_key || w.wallet_id).filter(Boolean)
       setSelectedWalletKey((prev) => {
         const preferred = walletFromQuery || prev
         if (preferred) {
@@ -260,7 +227,8 @@ export default function CustomerDetailsPage() {
       })
     } catch {
       setWallets([])
-      setWalletTotalPages(1)
+      setWalletHasNext(false)
+      setWalletHasPrev(false)
     } finally {
       setWalletsLoading(false)
     }
@@ -342,16 +310,14 @@ export default function CustomerDetailsPage() {
       if (nestedCustomer) {
         setCustomer((prev) => mergeCustomerFromKycPayload(prev, nestedCustomer))
       }
-      const rows = pickRecords(res)
-      setKycRows(rows)
-      const pag = pickPagination(res)
-      const total = Number(pag.total ?? pag.count)
-      setKycTotal(Number.isFinite(total) && total >= 0 ? total : rows.length)
-      setKycTotalPages(inferTotalPagesFromResponse(res, KYC_PAGE_SIZE, kycPage))
+      const { records, pagination } = unwrapListPayload(res, { page: kycPage, limit: KYC_PAGE_SIZE })
+      setKycRows(records)
+      setKycHasNext(pagination.hasNext)
+      setKycHasPrev(pagination.hasPrev)
     } catch {
       setKycRows([])
-      setKycTotal(0)
-      setKycTotalPages(1)
+      setKycHasNext(false)
+      setKycHasPrev(false)
     } finally {
       setKycLoading(false)
     }
@@ -995,8 +961,9 @@ export default function CustomerDetailsPage() {
             </div>
             <Pagination
               page={kycPage}
-              totalPages={kycTotalPages}
-              total={kycTotal}
+              hasNext={kycHasNext}
+              hasPrev={kycHasPrev}
+              pageCount={kycRows.length}
               limit={KYC_PAGE_SIZE}
               label="KYC records"
               onPageChange={setKycPage}
@@ -1056,29 +1023,29 @@ export default function CustomerDetailsPage() {
                 <p className="py-10 text-center text-sm text-text-muted">No wallets found.</p>
               )}
             </div>
-            <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-[10px] text-text-muted">
-              <span className="min-w-0">
-                Page {walletPage} of {walletTotalPages}
-              </span>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  disabled={walletPage <= 1 || walletsLoading}
-                  onClick={() => setWalletPage((p) => Math.max(1, p - 1))}
-                  className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  disabled={walletPage >= walletTotalPages || walletsLoading}
-                  onClick={() => setWalletPage((p) => p + 1)}
-                  className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
-                >
-                  Next
-                </button>
+            {(walletHasNext || walletHasPrev || walletPage > 1) && (
+              <div className="mt-3 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 text-[10px] text-text-muted">
+                <span className="min-w-0">Page {String(walletPage).padStart(2, '0')}</span>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    disabled={!walletHasPrev || walletsLoading}
+                    onClick={() => setWalletPage((p) => Math.max(1, p - 1))}
+                    className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!walletHasNext || walletsLoading}
+                    onClick={() => setWalletPage((p) => p + 1)}
+                    className="rounded-full border border-border px-3 py-1 text-[10px] text-text-secondary hover:bg-card-hover disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="flex min-h-[280px] min-w-0 flex-col bg-[#090b0f] p-0 lg:min-h-0">

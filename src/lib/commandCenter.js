@@ -99,7 +99,7 @@ function unwrapRoot(payload) {
 export function unwrapCommandCenterEvents(payload) {
   const root = unwrapRoot(payload)
   const records = root.records ?? root.events ?? (Array.isArray(root) ? root : [])
-  const pagination = root.pagination ?? root.meta ?? {}
+  const pagination = root.pagination ?? root.meta ?? payload?.pagination ?? {}
   return {
     records: Array.isArray(records) ? records.filter((row) => row && typeof row === 'object') : [],
     pagination: pagination && typeof pagination === 'object' ? pagination : {},

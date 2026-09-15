@@ -250,8 +250,9 @@ export default function DisputesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [total, setTotal] = useState(0)
+  const [hasNext, setHasNext] = useState(false)
+  const [hasPrev, setHasPrev] = useState(false)
+  const [listTotal, setListTotal] = useState(null)
 
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
@@ -322,19 +323,18 @@ export default function DisputesPage() {
       if (query.to_date) params.to_date = query.to_date
 
       const res = await getPendingReviewTransactions(params, controller.signal)
-      const { records, pagination } = unwrapPendingReviewList(res)
+      const { records, pagination } = unwrapPendingReviewList(res, { page, limit: LIMIT })
       setRows(records)
-      const t = Number(pagination.total ?? records.length ?? 0)
-      setTotal(t)
-      setTotalPages(
-        Math.max(1, Number(pagination.total_pages || Math.ceil(t / LIMIT) || 1))
-      )
+      setHasNext(pagination.hasNext)
+      setHasPrev(pagination.hasPrev)
+      setListTotal(Number.isFinite(Number(pagination.total)) ? Number(pagination.total) : null)
     } catch (err) {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
       setError(err?.response?.data?.message || 'Failed to load pending transactions.')
       setRows([])
-      setTotal(0)
-      setTotalPages(1)
+      setHasNext(false)
+      setHasPrev(false)
+      setListTotal(null)
     } finally {
       setLoading(false)
     }
@@ -600,9 +600,17 @@ export default function DisputesPage() {
           </div>
         )}
 
-        <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} label="pending transactions" limit={LIMIT} />
-        {!loading && total > 0 ? (
-          <p className="border-t border-border px-4 py-2 text-center text-xs text-text-muted">{formatNumber(total)} pending total</p>
+        <Pagination
+          page={page}
+          hasNext={hasNext}
+          hasPrev={hasPrev}
+          pageCount={rows.length}
+          onPageChange={setPage}
+          label="pending transactions"
+          limit={LIMIT}
+        />
+        {!loading && listTotal != null && listTotal > 0 ? (
+          <p className="border-t border-border px-4 py-2 text-center text-xs text-text-muted">{formatNumber(listTotal)} pending total</p>
         ) : null}
       </div>
     </div>

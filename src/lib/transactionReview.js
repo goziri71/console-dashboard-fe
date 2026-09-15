@@ -1,3 +1,4 @@
+import { normalizeListPagination } from './listPagination'
 import { formatDate, formatBalance } from './utils'
 export const REVIEW_TYPE_TO_SEGMENT = {
   ngn_deposit: 'ngn-deposits',
@@ -86,14 +87,17 @@ export function reviewStatusBadge(status) {
   return { label: status || '—', cls: 'bg-card-hover text-text-muted' }
 }
 
-export function unwrapPendingReviewList(payload) {
+export function unwrapPendingReviewList(payload, opts = {}) {
   const root = payload?.data != null && typeof payload.data === 'object' ? payload.data : payload
   const records = root?.records ?? root?.data?.records ?? (Array.isArray(root) ? root : [])
-  const pagination = root?.pagination ?? root?.meta ?? {}
-  return {
-    records: Array.isArray(records) ? records : [],
-    pagination,
-  }
+  const list = Array.isArray(records) ? records : []
+  const paginationRaw = root?.pagination ?? root?.meta ?? payload?.pagination ?? {}
+  const pagination = normalizeListPagination(paginationRaw, {
+    page: opts.page,
+    limit: opts.limit,
+    recordCount: list.length,
+  })
+  return { records: list, pagination }
 }
 
 export function unwrapPendingReviewSummary(payload) {
