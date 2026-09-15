@@ -212,7 +212,7 @@ tbody tr {
   }
 
   .modal-overlay {
-    @apply fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6;
+    @apply fixed inset-0 z-[110] flex items-end justify-center bg-black/45 p-3 backdrop-blur-sm sm:items-center sm:p-6;
   }
 
   .modal-panel {
