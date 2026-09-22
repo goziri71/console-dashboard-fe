@@ -102,7 +102,7 @@ export function extractAuthData(payload) {
 }
 
 /**
- * Crosslink success: `{ authToken, sessionID, userKey }` (no MFA).
+ * Authenticated success: `{ token|authToken, session?, user? }`.
  * MFA challenge responses must not be stored as sessions.
  * @param {unknown} payload
  * @returns {{

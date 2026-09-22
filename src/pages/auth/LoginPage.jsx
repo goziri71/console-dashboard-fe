@@ -1,101 +1,57 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Copy, KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../context/AuthContext'
 import { consumeAuthNotice } from '../../lib/authStorage'
 import { extractAuthenticatedSession } from '../../lib/authUser'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
-const PENDING_CROSSLINK_KEY = 'sterllo_pending_crosslink'
-const ACCOUNT_LOGIN_URL =
-  'https://account.redbiller.com/login/?rr=https://www.console.sterllo.com/'
-
-/** Survive React StrictMode remounts without burning the one-time Crosslink token twice. */
-let inflightCrosslink = null
-let inflightCrosslinkToken = null
+/** Survive React StrictMode remounts during MFA without resetting mid-challenge. */
 let activeMfaChallenge = null
-
-function readCrosslinkTokenFromLocation() {
-  const params = new URLSearchParams(window.location.search)
-  const value = params.get('x92Qko8x9UwMs8') ?? params.get('token')
-  return value ? value.trim() : null
-}
-
-function removeCrosslinkTokenFromLocation() {
-  window.history.replaceState({}, '', '/login')
-}
-
-function captureCrosslinkTokenEarly() {
-  try {
-    const fromUrl = readCrosslinkTokenFromLocation()
-    if (!fromUrl) return
-    sessionStorage.setItem(PENDING_CROSSLINK_KEY, fromUrl)
-    removeCrosslinkTokenFromLocation()
-  } catch {
-    // Ignore storage/history failures during boot.
-  }
-}
-
-captureCrosslinkTokenEarly()
-
-function takeCrosslinkTokenFromUrl() {
-  const fromUrl = readCrosslinkTokenFromLocation()
-  if (fromUrl) {
-    sessionStorage.setItem(PENDING_CROSSLINK_KEY, fromUrl)
-    removeCrosslinkTokenFromLocation()
-    return fromUrl
-  }
-  return sessionStorage.getItem(PENDING_CROSSLINK_KEY)
-}
-
-function clearPendingCrosslinkToken() {
-  sessionStorage.removeItem(PENDING_CROSSLINK_KEY)
-  inflightCrosslink = null
-  inflightCrosslinkToken = null
-}
 
 function clearActiveMfaChallenge() {
   activeMfaChallenge = null
-  clearPendingCrosslinkToken()
 }
 
 function authErrorMessage(error, stage) {
   const status = error.response?.status
   const serverMessage = error.response?.data?.message
-  if (status === 400) return serverMessage || 'Check the information entered and try again.'
+  if (status === 400) {
+    return serverMessage || 'Check your email and password and try again.'
+  }
   if (status === 401) {
-    return stage === 'crosslink'
-      ? 'This login is invalid, expired, or has already been used.'
+    return stage === 'credentials'
+      ? serverMessage || 'Invalid email or password.'
       : serverMessage || 'The code is incorrect, expired, or has already been used.'
   }
   if (status === 404) {
-    return 'Your account has not been provisioned for Sterllo Console. Contact an administrator.'
+    return (
+      serverMessage ||
+      'User not provisioned. Contact an administrator to be added to Sterllo Console.'
+    )
   }
   if (status === 409) {
     return serverMessage || 'This authentication request is no longer valid.'
   }
-  if (status === 422) return serverMessage || 'The login token is missing or invalid.'
   if (status === 429) return 'Too many attempts. Wait a moment and try again.'
   if (status === 500 || status === 502) {
-    return 'The login service is temporarily unavailable. Try again shortly.'
+    return (
+      serverMessage ||
+      'The login service is temporarily unavailable. Try again shortly.'
+    )
   }
   return serverMessage || error.message || 'Authentication failed. Please try again.'
 }
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const {
-    token,
-    startCrosslink,
-    confirmMfaEnrollment,
-    verifyMfaChallenge,
-    completeAuthentication,
-  } = useAuth()
-  const [flow, setFlow] = useState(() =>
-    activeMfaChallenge ||
-    (takeCrosslinkTokenFromUrl() ? { status: 'processing' } : { status: 'waiting' })
-  )
+  const { token, login, confirmMfaEnrollment, verifyMfaChallenge, completeAuthentication } =
+    useAuth()
+  const [flow, setFlow] = useState(() => activeMfaChallenge || { status: 'credentials' })
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [code, setCode] = useState('')
   const [useRecoveryCode, setUseRecoveryCode] = useState(false)
   const [error, setError] = useState(() => consumeAuthNotice() || '')
@@ -106,55 +62,47 @@ export default function LoginPage() {
     if (token) {
       clearActiveMfaChallenge()
       navigate('/dashboard', { replace: true })
-      return undefined
+    }
+  }, [token, navigate])
+
+  const applyLoginResult = (data) => {
+    if (data?.state === 'mfa_enrollment_required') {
+      activeMfaChallenge = { status: 'enrollment', data }
+      setFlow(activeMfaChallenge)
+      return
+    }
+    if (data?.state === 'mfa_required') {
+      activeMfaChallenge = { status: 'verification', data }
+      setFlow(activeMfaChallenge)
+      return
+    }
+    if (!extractAuthenticatedSession(data)) {
+      throw new Error(`Unexpected login state "${data?.state ?? 'unknown'}".`)
+    }
+    clearActiveMfaChallenge()
+    completeAuthentication(data)
+    navigate('/dashboard', { replace: true })
+  }
+
+  const submitCredentials = async (event) => {
+    event.preventDefault()
+    setError('')
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !password) {
+      setError('Enter your email and password.')
+      return
     }
 
-    if (activeMfaChallenge) {
-      return undefined
+    setSubmitting(true)
+    try {
+      const data = await login(trimmedEmail, password)
+      applyLoginResult(data)
+    } catch (err) {
+      setError(authErrorMessage(err, 'credentials'))
+    } finally {
+      setSubmitting(false)
     }
-
-    const crosslinkToken = takeCrosslinkTokenFromUrl()
-    if (!crosslinkToken) return undefined
-
-    let cancelled = false
-
-    if (!inflightCrosslink || inflightCrosslinkToken !== crosslinkToken) {
-      inflightCrosslinkToken = crosslinkToken
-      inflightCrosslink = startCrosslink(crosslinkToken)
-    }
-
-    inflightCrosslink
-      .then((data) => {
-        if (data?.state === 'mfa_enrollment_required') {
-          activeMfaChallenge = { status: 'enrollment', data }
-          clearPendingCrosslinkToken()
-          if (!cancelled) setFlow(activeMfaChallenge)
-          return
-        }
-        if (data?.state === 'mfa_required') {
-          activeMfaChallenge = { status: 'verification', data }
-          clearPendingCrosslinkToken()
-          if (!cancelled) setFlow(activeMfaChallenge)
-          return
-        }
-        if (!extractAuthenticatedSession(data)) {
-          throw new Error(`Unexpected login state "${data?.state ?? 'unknown'}".`)
-        }
-        clearActiveMfaChallenge()
-        completeAuthentication(data)
-        if (!cancelled) navigate('/dashboard', { replace: true })
-      })
-      .catch((err) => {
-        if (cancelled) return
-        clearActiveMfaChallenge()
-        setError(authErrorMessage(err, 'crosslink'))
-        setFlow({ status: 'waiting' })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [token, startCrosslink, completeAuthentication, navigate])
+  }
 
   const submitCode = async (event) => {
     event.preventDefault()
@@ -218,15 +166,6 @@ export default function LoginPage() {
   }
 
   const renderFlow = () => {
-    if (flow.status === 'processing') {
-      return (
-        <div className="flex flex-col items-center gap-4 py-10 text-center">
-          <LoaderCircle className="animate-spin text-accent" size={34} />
-          <p className="text-sm text-text-secondary">Signing in…</p>
-        </div>
-      )
-    }
-
     if (flow.status === 'recovery_codes') {
       return (
         <div className="space-y-5">
@@ -346,26 +285,75 @@ export default function LoginPage() {
     }
 
     return (
-      <div className="space-y-5 text-center">
+      <form onSubmit={submitCredentials} className="space-y-5">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-text-primary">Sign in</h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            Use your Sterllo account email and password.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="login-email" className="mb-1 block px-1 text-sm text-text-secondary">
+            Email
+          </label>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="username"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@example.com"
+            autoFocus
+            required
+            className="min-h-12 w-full rounded-2xl border border-border bg-card px-4 text-sm text-text-primary outline-none focus:border-accent/50"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="login-password" className="mb-1 block px-1 text-sm text-text-secondary">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              required
+              className="min-h-12 w-full rounded-2xl border border-border bg-card px-4 pr-12 text-sm text-text-primary outline-none focus:border-accent/50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              className="absolute inset-y-0 right-0 flex items-center px-4 text-text-muted hover:text-text-primary"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
         {error ? (
-          <p className="rounded-xl border border-error/30 bg-error/10 p-3 text-sm text-error">
+          <p className="rounded-xl border border-error/30 bg-error/10 p-3 text-center text-sm text-error">
             {error}
           </p>
         ) : null}
+
         <button
-          type="button"
-          onClick={() => {
-            setError('')
-            window.location.assign(ACCOUNT_LOGIN_URL)
-          }}
-          className="min-h-12 w-full rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90"
+          type="submit"
+          disabled={submitting}
+          className="min-h-12 w-full rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90 disabled:opacity-50"
         >
-          Login
+          {submitting ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="text-xs leading-relaxed text-text-muted">
+
+        <p className="text-center text-xs leading-relaxed text-text-muted">
           Signing in successfully on this device will sign out the previously active device.
         </p>
-      </div>
+      </form>
     )
   }
 

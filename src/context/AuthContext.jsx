@@ -70,9 +70,9 @@ export function AuthProvider({ children }) {
     return authenticated
   }, [])
 
-  const startCrosslink = useCallback(
-    async (crosslinkToken) => {
-      const res = await authService.loginWithCrosslink(crosslinkToken, deviceLabel)
+  const login = useCallback(
+    async (email, password) => {
+      const res = await authService.login(email, password, deviceLabel)
       return extractAuthData(res)
     },
     [deviceLabel]
@@ -198,7 +198,7 @@ export function AuthProvider({ children }) {
         userKey,
         session,
         loading,
-        startCrosslink,
+        login,
         confirmMfaEnrollment,
         verifyMfaChallenge,
         completeAuthentication,
