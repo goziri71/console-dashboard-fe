@@ -71,8 +71,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   const login = useCallback(
-    async (email, password) => {
-      const res = await authService.login(email, password, deviceLabel)
+    async (email) => {
+      const res = await authService.login(email, deviceLabel)
       return extractAuthData(res)
     },
     [deviceLabel]
