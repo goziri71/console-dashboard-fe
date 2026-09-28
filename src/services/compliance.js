@@ -29,3 +29,9 @@ export async function getComplianceReports() {
   const { data } = await api.get('/compliance/reports')
   return data
 }
+
+/** Requires financial.read — see Reports page or GET /compliance/transaction-anomalies */
+export async function getTransactionAnomalies(params) {
+  const { data } = await api.get('/compliance/transaction-anomalies', { params })
+  return data
+}
