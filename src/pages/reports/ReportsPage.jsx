@@ -1,12 +1,20 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Download, FileSpreadsheet, LoaderCircle, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { downloadReportCsv } from '../../lib/reportDownload'
 import {
+  DEFAULT_REPORT_LIMIT,
+  MAX_REPORT_LIMIT,
+  PARAM_LABELS,
   REPORT_DEFINITIONS,
+  buildReportQuery,
   canExportReport,
+  previewColumnsForReport,
   reportById,
+  reportSupportsParam,
   requiredPermissionLabel,
+  scopeFilterKeysForReport,
   unwrapReportPayload,
 } from '../../lib/reportsCatalog'
 import { canReadConsole, canReadFinancial } from '../../lib/permissions'
@@ -19,38 +27,12 @@ const GROUP_LABELS = {
   compliance: 'Compliance',
 }
 
-const DEFAULT_LIMIT = '500'
-
 function inputClassName() {
   return 'w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent/50'
 }
 
 function labelClassName() {
   return 'mb-1 block text-xs font-medium text-text-secondary'
-}
-
-function buildQuery(form, report) {
-  const q = {
-    from_date: form.from_date,
-    to_date: form.to_date,
-    account_key: form.account_key,
-    identifier: form.identifier,
-    currency_code: form.currency_code,
-    status: form.status,
-    search: form.search,
-    wallet_key: form.wallet_key,
-    limit: form.limit || DEFAULT_LIMIT,
-  }
-  if (report.extraParams?.includes('scope')) {
-    q.scope = form.scope || 'all'
-  }
-  if (report.extraParams?.includes('window_ms')) {
-    q.window_ms = form.window_ms || '1000'
-  }
-  if (report.extraParams?.includes('min_amount')) {
-    q.min_amount = form.min_amount || '1000000'
-  }
-  return q
 }
 
 function SummaryBlock({ summary }) {
@@ -73,7 +55,37 @@ function SummaryBlock({ summary }) {
   )
 }
 
-function PreviewTable({ rows }) {
+function AnomalyLegend() {
+  return (
+    <div className="rounded-xl border border-border/70 bg-card p-4 text-xs leading-relaxed text-text-secondary">
+      <p className="mb-2 font-medium text-text-primary">Anomaly types</p>
+      <ul className="list-disc space-y-2 pl-4">
+        <li>
+          <code className="text-text-primary">same_ticket_millisecond</code> — same customer, amount,
+          and currency within the window, with a shared{' '}
+          <strong>session_id</strong>, <strong>message</strong> (ticket text), or{' '}
+          <strong>ip_address + account</strong>.
+        </li>
+        <li>
+          <code className="text-text-primary">duplicate_amount_millisecond</code> — broad rule (same
+          customer / amount / currency / ms) when no ticket anchor matched.
+        </li>
+        <li>
+          <code className="text-text-primary">high_ticket</code> — amount ≥ min threshold on
+          transfers or deposits.
+        </li>
+      </ul>
+      <p className="mt-3 text-text-muted">
+        Strict rows may include <code className="text-text-secondary">ticket_match</code>:{' '}
+        <code className="text-text-secondary">session_id</code>,{' '}
+        <code className="text-text-secondary">message</code>, or{' '}
+        <code className="text-text-secondary">ip_address</code>.
+      </p>
+    </div>
+  )
+}
+
+function PreviewTable({ reportId, rows }) {
   if (!rows.length) {
     return (
       <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-text-muted">
@@ -82,7 +94,7 @@ function PreviewTable({ rows }) {
     )
   }
 
-  const columns = Object.keys(rows[0]).slice(0, 12)
+  const columns = previewColumnsForReport(reportId, rows)
   return (
     <div className="overflow-x-auto rounded-xl border border-border/70">
       <table className="min-w-full text-left text-xs">
@@ -109,21 +121,38 @@ function PreviewTable({ rows }) {
       </table>
       {rows.length > 50 ? (
         <p className="border-t border-border px-3 py-2 text-xs text-text-muted">
-          Showing first 50 of {rows.length} rows returned (server cap 5000).
+          Showing first 50 of {rows.length} rows returned (server cap {MAX_REPORT_LIMIT}).
         </p>
       ) : null}
     </div>
   )
 }
 
+function initialReportId(searchParams) {
+  const fromUrl = searchParams.get('report')
+  if (fromUrl && REPORT_DEFINITIONS.some((r) => r.id === fromUrl)) return fromUrl
+  return REPORT_DEFINITIONS[0].id
+}
+
 export default function ReportsPage() {
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const permissions = user?.permissions
   const canFinancial = canReadFinancial(permissions)
   const canConsole = canReadConsole(permissions)
 
-  const [reportId, setReportId] = useState(REPORT_DEFINITIONS[0].id)
+  const [reportId, setReportId] = useState(() => initialReportId(searchParams))
   const report = useMemo(() => reportById(reportId), [reportId])
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('report')
+    if (!fromUrl || !REPORT_DEFINITIONS.some((r) => r.id === fromUrl)) return
+    setReportId(fromUrl)
+    setRows([])
+    setSummary(null)
+    setError('')
+    setNotice('')
+  }, [searchParams])
 
   const [form, setForm] = useState({
     from_date: '',
@@ -134,7 +163,7 @@ export default function ReportsPage() {
     status: '',
     search: '',
     wallet_key: '',
-    limit: DEFAULT_LIMIT,
+    limit: String(DEFAULT_REPORT_LIMIT),
     scope: 'all',
     window_ms: '1000',
     min_amount: '1000000',
@@ -149,6 +178,7 @@ export default function ReportsPage() {
 
   const canCsv = canExportReport(report, { canFinancial, canConsole })
   const permLabel = requiredPermissionLabel(report)
+  const scopeFilters = useMemo(() => scopeFilterKeysForReport(report), [report])
 
   const groupedReports = useMemo(() => {
     const groups = { reports: [], growth: [], compliance: [] }
@@ -162,12 +192,14 @@ export default function ReportsPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const query = useMemo(() => buildReportQuery(report, form), [report, form])
+
   const runPreview = async () => {
     setError('')
     setNotice('')
     setLoading(true)
     try {
-      const payload = await fetchReportJson(report.path, buildQuery(form, report))
+      const payload = await fetchReportJson(report.path, query)
       const parsed = unwrapReportPayload(payload)
       setRows(parsed.rows)
       setSummary(parsed.summary)
@@ -191,7 +223,7 @@ export default function ReportsPage() {
     setNotice('')
     setExporting(true)
     try {
-      await downloadReportCsv(report.path, buildQuery(form, report), `${report.id}.csv`)
+      await downloadReportCsv(report.path, query, `${report.id}.csv`)
       setNotice('Download started.')
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'CSV export failed.')
@@ -199,6 +231,9 @@ export default function ReportsPage() {
       setExporting(false)
     }
   }
+
+  const showDateRange =
+    reportSupportsParam(report, 'from_date') || reportSupportsParam(report, 'to_date')
 
   return (
     <div className="space-y-6">
@@ -244,37 +279,43 @@ export default function ReportsPage() {
             ) : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="from_date" className={labelClassName()}>
-                From
-              </label>
-              <input
-                id="from_date"
-                type="date"
-                value={form.from_date}
-                onChange={(e) => setField('from_date', e.target.value)}
-                className={inputClassName()}
-              />
+          {showDateRange ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {reportSupportsParam(report, 'from_date') ? (
+                <div>
+                  <label htmlFor="from_date" className={labelClassName()}>
+                    {PARAM_LABELS.from_date}
+                  </label>
+                  <input
+                    id="from_date"
+                    type="datetime-local"
+                    value={form.from_date}
+                    onChange={(e) => setField('from_date', e.target.value)}
+                    className={inputClassName()}
+                  />
+                </div>
+              ) : null}
+              {reportSupportsParam(report, 'to_date') ? (
+                <div>
+                  <label htmlFor="to_date" className={labelClassName()}>
+                    {PARAM_LABELS.to_date}
+                  </label>
+                  <input
+                    id="to_date"
+                    type="datetime-local"
+                    value={form.to_date}
+                    onChange={(e) => setField('to_date', e.target.value)}
+                    className={inputClassName()}
+                  />
+                </div>
+              ) : null}
             </div>
-            <div>
-              <label htmlFor="to_date" className={labelClassName()}>
-                To
-              </label>
-              <input
-                id="to_date"
-                type="date"
-                value={form.to_date}
-                onChange={(e) => setField('to_date', e.target.value)}
-                className={inputClassName()}
-              />
-            </div>
-          </div>
+          ) : null}
 
-          {report.extraParams?.includes('scope') ? (
+          {reportSupportsParam(report, 'scope') ? (
             <div>
               <label htmlFor="scope" className={labelClassName()}>
-                Customer scope
+                {PARAM_LABELS.scope}
               </label>
               <select
                 id="scope"
@@ -288,11 +329,11 @@ export default function ReportsPage() {
             </div>
           ) : null}
 
-          {report.extraParams?.includes('window_ms') ? (
+          {reportSupportsParam(report, 'window_ms') ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="window_ms" className={labelClassName()}>
-                  Window (ms)
+                  {PARAM_LABELS.window_ms}
                 </label>
                 <input
                   id="window_ms"
@@ -303,64 +344,64 @@ export default function ReportsPage() {
                   className={inputClassName()}
                 />
               </div>
-              <div>
-                <label htmlFor="min_amount" className={labelClassName()}>
-                  Min amount
-                </label>
-                <input
-                  id="min_amount"
-                  type="number"
-                  min={0}
-                  value={form.min_amount}
-                  onChange={(e) => setField('min_amount', e.target.value)}
-                  className={inputClassName()}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          <details className="rounded-xl border border-border/60 bg-page/40 px-3 py-2">
-            <summary className="cursor-pointer text-xs font-medium text-text-secondary">
-              Scope filters
-            </summary>
-            <div className="mt-3 space-y-3">
-              {[
-                ['account_key', 'Account key'],
-                ['identifier', 'Customer identifier'],
-                ['wallet_key', 'Wallet key'],
-                ['currency_code', 'Currency'],
-                ['status', 'Status'],
-                ['search', 'Search'],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <label htmlFor={key} className={labelClassName()}>
-                    {label}
+              {reportSupportsParam(report, 'min_amount') ? (
+                <div>
+                  <label htmlFor="min_amount" className={labelClassName()}>
+                    {PARAM_LABELS.min_amount}
                   </label>
                   <input
-                    id={key}
-                    type="text"
-                    value={form[key]}
-                    onChange={(e) => setField(key, e.target.value)}
+                    id="min_amount"
+                    type="number"
+                    min={0}
+                    value={form.min_amount}
+                    onChange={(e) => setField('min_amount', e.target.value)}
                     className={inputClassName()}
                   />
                 </div>
-              ))}
-              <div>
-                <label htmlFor="limit" className={labelClassName()}>
-                  Row limit (max 5000)
-                </label>
-                <input
-                  id="limit"
-                  type="number"
-                  min={1}
-                  max={5000}
-                  value={form.limit}
-                  onChange={(e) => setField('limit', e.target.value)}
-                  className={inputClassName()}
-                />
-              </div>
+              ) : null}
             </div>
-          </details>
+          ) : null}
+
+          {scopeFilters.length > 0 ? (
+            <details className="rounded-xl border border-border/60 bg-page/40 px-3 py-2" open>
+              <summary className="cursor-pointer text-xs font-medium text-text-secondary">
+                Scope filters
+              </summary>
+              <div className="mt-3 space-y-3">
+                {scopeFilters.map((key) => (
+                  <div key={key}>
+                    <label htmlFor={key} className={labelClassName()}>
+                      {PARAM_LABELS[key] || key}
+                    </label>
+                    <input
+                      id={key}
+                      type="text"
+                      value={form[key]}
+                      onChange={(e) => setField(key, e.target.value)}
+                      className={inputClassName()}
+                    />
+                  </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
+
+          {reportSupportsParam(report, 'limit') ? (
+            <div>
+              <label htmlFor="limit" className={labelClassName()}>
+                {PARAM_LABELS.limit}
+              </label>
+              <input
+                id="limit"
+                type="number"
+                min={1}
+                max={MAX_REPORT_LIMIT}
+                value={form.limit}
+                onChange={(e) => setField('limit', e.target.value)}
+                className={inputClassName()}
+              />
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-2 pt-1">
             <button
@@ -427,16 +468,11 @@ export default function ReportsPage() {
             </p>
           ) : null}
 
+          {report.id === 'transaction-anomalies' ? <AnomalyLegend /> : null}
+
           {report.hasSummary && summary ? <SummaryBlock summary={summary} /> : null}
 
-          <PreviewTable rows={rows} />
-
-          {report.id === 'transaction-anomalies' && rows.length > 0 ? (
-            <p className="text-xs text-text-muted">
-              Anomaly types: <code className="text-text-secondary">same_ticket_millisecond</code>,{' '}
-              <code className="text-text-secondary">high_ticket</code>.
-            </p>
-          ) : null}
+          <PreviewTable reportId={report.id} rows={rows} />
         </div>
       </div>
     </div>

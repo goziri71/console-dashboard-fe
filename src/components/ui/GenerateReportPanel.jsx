@@ -1,28 +1,40 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BookOpen, XCircle, ChevronDown } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
+/** Dashboard shortcuts → catalog ids on /reports */
 const REPORT_TYPES = [
-  { value: 'transaction', label: 'Transaction Report', desc: 'Includes transfers, deposits, payouts, exchanges.' },
-  { value: 'compliance', label: 'Compliance Report', desc: 'Jurisdiction-specific regulatory reports (NG, GH, SA, KE).' },
-  { value: 'ledger', label: 'Ledger Report', desc: 'Detailed wallet ledger entries and balances.' },
-  { value: 'settlement', label: 'Settlement Report', desc: 'Settlement statement and reconciliation data.' },
-  { value: 'customer_activity', label: 'Customer Activity Report', desc: 'Customer transactions, wallet activity, and KYC status.' },
-  { value: 'dispute', label: 'Dispute Report', desc: 'Open, pending, and resolved disputes.' },
-]
-
-const DATE_RANGES = [
-  { value: 'today', label: 'Today' },
-  { value: '7d', label: 'Last 7 Days' },
-  { value: '30d', label: 'Last 30 Days' },
-  { value: '90d', label: 'Last 90 Days' },
-  { value: 'custom', label: 'Custom Range' },
-]
-
-const OUTPUT_FORMATS = [
-  { value: 'pdf', label: 'PDF' },
-  { value: 'csv', label: 'CSV' },
-  { value: 'excel', label: 'Excel' },
+  {
+    value: 'transactions',
+    label: 'Unified transactions',
+    desc: 'Transfers, deposits, and related activity.',
+  },
+  {
+    value: 'settlements',
+    label: 'Settlements',
+    desc: 'Settlement batches and summary totals.',
+  },
+  {
+    value: 'customer-balances',
+    label: 'Customer wallet balances',
+    desc: 'Wallet balance snapshot by customer.',
+  },
+  {
+    value: 'revenue',
+    label: 'Revenue by merchant',
+    desc: 'Fee revenue grouped by merchant.',
+  },
+  {
+    value: 'growth-customers',
+    label: 'Customer growth export',
+    desc: 'All or active customers (requires console.read for CSV).',
+  },
+  {
+    value: 'transaction-anomalies',
+    label: 'Transaction anomalies',
+    desc: 'Ticket-linked duplicates, broad duplicates, high-ticket activity.',
+  },
 ]
 
 function CustomDropdown({ label, placeholder, options, value, onChange, hasDesc }) {
@@ -72,15 +84,13 @@ function CustomDropdown({ label, placeholder, options, value, onChange, hasDesc 
                   setOpen(false)
                 }}
                 className={`flex w-full flex-col gap-0.5 px-4 py-3 text-left transition-colors first:rounded-t-2xl last:rounded-b-2xl ${
-                  value === opt.value
-                    ? 'bg-card-hover'
-                    : 'hover:bg-card-hover/60'
+                  value === opt.value ? 'bg-card-hover' : 'hover:bg-card-hover/60'
                 }`}
               >
                 <span className="text-sm font-medium text-text-primary">{opt.label}</span>
-                {hasDesc && opt.desc && (
+                {hasDesc && opt.desc ? (
                   <span className="text-xs text-text-muted">{opt.desc}</span>
-                )}
+                ) : null}
               </button>
             ))}
           </div>
@@ -91,11 +101,8 @@ function CustomDropdown({ label, placeholder, options, value, onChange, hasDesc 
 }
 
 export default function GenerateReportPanel({ isOpen, onClose }) {
-  const [reportName, setReportName] = useState('')
+  const navigate = useNavigate()
   const [reportType, setReportType] = useState('')
-  const [dateRange, setDateRange] = useState('')
-  const [outputFormat, setOutputFormat] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const panelRef = useRef(null)
 
   useEffect(() => {
@@ -113,24 +120,14 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
   }, [isOpen, onClose])
 
   useEffect(() => {
-    if (!isOpen) {
-      setReportName('')
-      setReportType('')
-      setDateRange('')
-      setOutputFormat('')
-      setSubmitting(false)
-    }
+    if (!isOpen) setReportType('')
   }, [isOpen])
 
-  const isValid = reportName.trim() && reportType && dateRange && outputFormat
-
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault()
-    if (!isValid || submitting) return
-    setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 1200))
-    setSubmitting(false)
+    if (!reportType) return
     onClose()
+    navigate(`/reports?report=${encodeURIComponent(reportType)}`)
   }
 
   return (
@@ -165,9 +162,9 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
               <BookOpen size={20} className="text-info" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-text-primary">Generate Report</h2>
+              <h2 className="text-base font-semibold text-text-primary">Reports</h2>
               <p className="text-xs text-text-muted">
-                Analyse platform activity, compliance, or financial operations.
+                Open the Reports page to preview JSON or download CSV from the API.
               </p>
             </div>
           </div>
@@ -175,45 +172,14 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="px-1 text-sm text-text-secondary">
-                Report Name <span className="text-accent">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Enter name of report"
-                value={reportName}
-                onChange={(e) => setReportName(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-card px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
-              />
-            </div>
-
             <CustomDropdown
-              label="Report Type"
-              placeholder="Select report type"
+              label="Report"
+              placeholder="Select report"
               options={REPORT_TYPES}
               value={reportType}
               onChange={setReportType}
               hasDesc
             />
-
-            <CustomDropdown
-              label="Date Range"
-              placeholder="Select date"
-              options={DATE_RANGES}
-              value={dateRange}
-              onChange={setDateRange}
-            />
-
-            <CustomDropdown
-              label="Output Format"
-              placeholder="Select document type"
-              options={OUTPUT_FORMATS}
-              value={outputFormat}
-              onChange={setOutputFormat}
-            />
-            </div>
           </div>
 
           <div className="flex shrink-0 gap-3 border-t border-border px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -226,10 +192,10 @@ export default function GenerateReportPanel({ isOpen, onClose }) {
             </button>
             <button
               type="submit"
-              disabled={!isValid || submitting}
+              disabled={!reportType}
               className="flex-1 rounded-full bg-accent py-2.5 text-sm font-medium text-page transition-all hover:opacity-90 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-40"
             >
-              {submitting ? 'Generating...' : 'Generate Report'}
+              Open Reports
             </button>
           </div>
         </form>
