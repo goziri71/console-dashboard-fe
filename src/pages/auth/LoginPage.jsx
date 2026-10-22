@@ -14,16 +14,30 @@ function clearActiveMfaChallenge() {
   activeMfaChallenge = null
 }
 
-function authErrorMessage(error, stage) {
+const ALPHA_MFA_REQUIRED_DEFAULT =
+  'MFA is not enabled on your Alpha account. Enable MFA on Redbiller/Alpha, then sign in to Console again.'
+
+function authErrorMessage(error) {
   const status = error.response?.status
-  const serverMessage = error.response?.data?.message
+  const body = error.response?.data
+  const serverMessage = body?.message
+  const dataCode = body?.data?.code ?? body?.code
+
   if (status === 400) {
     return serverMessage || 'Check your email and password and try again.'
   }
   if (status === 401) {
-    return stage === 'credentials'
-      ? serverMessage || 'Invalid email or password.'
-      : serverMessage || 'Invalid or expired authenticator code.'
+    return serverMessage || 'Invalid email, password, or authenticator code.'
+  }
+  if (status === 403) {
+    const mfaGate =
+      dataCode === 'alpha_mfa_required' ||
+      dataCode === 'account_mfa_disabled' ||
+      /account\.mfa|mfa.*not enabled|enable mfa/i.test(String(serverMessage ?? ''))
+    if (mfaGate || !serverMessage) {
+      return serverMessage || ALPHA_MFA_REQUIRED_DEFAULT
+    }
+    return serverMessage
   }
   if (status === 404) {
     return serverMessage || 'User not provisioned. Contact admin.'
@@ -32,11 +46,11 @@ function authErrorMessage(error, stage) {
     return serverMessage || 'This authentication request is no longer valid.'
   }
   if (status === 429) return 'Too many attempts. Wait a moment and try again.'
-  if (status === 500 || status === 502) {
-    return (
-      serverMessage ||
-      'The login service is temporarily unavailable. Try again shortly.'
-    )
+  if (status === 502) {
+    return serverMessage || 'Alpha Account Auth is unreachable or misconfigured. Try again shortly.'
+  }
+  if (status === 500) {
+    return serverMessage || 'The login service is temporarily unavailable. Try again shortly.'
   }
   return serverMessage || error.message || 'Authentication failed. Please try again.'
 }
@@ -84,6 +98,15 @@ export default function LoginPage() {
     navigate('/dashboard', { replace: true })
   }
 
+  const handleLoginFailure = (err) => {
+    if (err.response?.status === 403) {
+      clearActiveMfaChallenge()
+      setFlow({ status: 'credentials' })
+      setCode('')
+    }
+    setError(authErrorMessage(err))
+  }
+
   const submitCredentials = async (event) => {
     event.preventDefault()
     setError('')
@@ -98,7 +121,7 @@ export default function LoginPage() {
       const data = await login(trimmedEmail, password)
       applyLoginResult(data)
     } catch (err) {
-      setError(authErrorMessage(err, 'credentials'))
+      handleLoginFailure(err)
     } finally {
       setSubmitting(false)
     }
@@ -122,7 +145,7 @@ export default function LoginPage() {
           : await verifyMfaChallenge(challengeToken, value)
       applyLoginResult(data)
     } catch (err) {
-      setError(authErrorMessage(err, 'mfa'))
+      handleLoginFailure(err)
     } finally {
       setSubmitting(false)
     }
@@ -207,9 +230,10 @@ export default function LoginPage() {
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-text-primary">Sign in</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Sign in with your Alpha account email and password. Console{' '}
-            <strong className="font-medium text-text-primary">Users.email</strong> must match after
-            Alpha verifies you.
+            Sign in with your Alpha account email and password.{' '}
+            <strong className="font-medium text-text-primary">account.mfa</strong> must be enabled on
+            Alpha, and Console <strong className="font-medium text-text-primary">Users.email</strong>{' '}
+            must match, before a Console session is issued.
           </p>
         </div>
 
