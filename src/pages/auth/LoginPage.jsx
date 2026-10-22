@@ -229,12 +229,7 @@ export default function LoginPage() {
       <form onSubmit={submitCredentials} className="space-y-5">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-text-primary">Sign in</h2>
-          <p className="mt-2 text-sm text-text-secondary">
-            Sign in with your Alpha account email and password.{' '}
-            <strong className="font-medium text-text-primary">account.mfa</strong> must be enabled on
-            Alpha, and Console <strong className="font-medium text-text-primary">Users.email</strong>{' '}
-            must match, before a Console session is issued.
-          </p>
+          <p className="mt-2 text-sm text-text-secondary">Enter your email and password.</p>
         </div>
 
         <div>
