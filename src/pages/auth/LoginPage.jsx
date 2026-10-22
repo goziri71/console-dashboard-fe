@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Copy, KeyRound, ShieldCheck } from 'lucide-react'
+import { Check, Copy, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../context/AuthContext'
 import { consumeAuthNotice } from '../../lib/authStorage'
@@ -18,10 +18,12 @@ function authErrorMessage(error, stage) {
   const status = error.response?.status
   const serverMessage = error.response?.data?.message
   if (status === 400) {
-    return serverMessage || 'Enter a valid email address.'
+    return serverMessage || 'Check your email and password and try again.'
   }
   if (status === 401) {
-    return serverMessage || 'The code is incorrect, expired, or has already been used.'
+    return stage === 'credentials'
+      ? serverMessage || 'Invalid email or password.'
+      : serverMessage || 'The code is incorrect, expired, or has already been used.'
   }
   if (status === 404) {
     return serverMessage || 'User not provisioned. Contact admin.'
@@ -43,8 +45,10 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { token, login, confirmMfaEnrollment, verifyMfaChallenge, completeAuthentication } =
     useAuth()
-  const [flow, setFlow] = useState(() => activeMfaChallenge || { status: 'email' })
+  const [flow, setFlow] = useState(() => activeMfaChallenge || { status: 'credentials' })
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [code, setCode] = useState('')
   const [useRecoveryCode, setUseRecoveryCode] = useState(false)
   const [error, setError] = useState(() => consumeAuthNotice() || '')
@@ -77,21 +81,21 @@ export default function LoginPage() {
     navigate('/dashboard', { replace: true })
   }
 
-  const submitEmail = async (event) => {
+  const submitCredentials = async (event) => {
     event.preventDefault()
     setError('')
     const trimmedEmail = email.trim()
-    if (!trimmedEmail) {
-      setError('Enter your email address.')
+    if (!trimmedEmail || !password) {
+      setError('Enter your email and password.')
       return
     }
 
     setSubmitting(true)
     try {
-      const data = await login(trimmedEmail)
+      const data = await login(trimmedEmail, password)
       applyLoginResult(data)
     } catch (err) {
-      setError(authErrorMessage(err, 'email'))
+      setError(authErrorMessage(err, 'credentials'))
     } finally {
       setSubmitting(false)
     }
@@ -278,11 +282,12 @@ export default function LoginPage() {
     }
 
     return (
-      <form onSubmit={submitEmail} className="space-y-5">
+      <form onSubmit={submitCredentials} className="space-y-5">
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-text-primary">Sign in</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Enter the email address provisioned for Sterllo Console.
+            Use your Alpha account email and password. Console{' '}
+            <strong className="font-medium text-text-primary">Users.email</strong> must match.
           </p>
         </div>
 
@@ -303,6 +308,32 @@ export default function LoginPage() {
           />
         </div>
 
+        <div>
+          <label htmlFor="login-password" className="mb-1 block px-1 text-sm text-text-secondary">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••"
+              required
+              className="min-h-12 w-full rounded-2xl border border-border bg-card px-4 pr-12 text-sm text-text-primary outline-none focus:border-accent/50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              className="absolute inset-y-0 right-0 flex items-center px-4 text-text-muted hover:text-text-primary"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
         {error ? (
           <p className="rounded-xl border border-error/30 bg-error/10 p-3 text-center text-sm text-error">
             {error}
@@ -314,7 +345,7 @@ export default function LoginPage() {
           disabled={submitting}
           className="min-h-12 w-full rounded-full bg-accent py-3.5 font-semibold text-page hover:opacity-90 disabled:opacity-50"
         >
-          {submitting ? 'Continuing…' : 'Continue'}
+          {submitting ? 'Signing in…' : 'Sign in'}
         </button>
 
         <p className="text-center text-xs leading-relaxed text-text-muted">
