@@ -78,25 +78,15 @@ export function AuthProvider({ children }) {
     [deviceLabel]
   )
 
-  const confirmMfaEnrollment = useCallback(
-    async (challengeToken, code) => {
-      const res = await authService.confirmMfaEnrollment(challengeToken, code, deviceLabel)
-      return extractAuthData(res)
-    },
-    [deviceLabel]
-  )
+  const confirmMfaEnrollment = useCallback(async (challengeToken, code) => {
+    const res = await authService.confirmMfaEnrollment(challengeToken, code)
+    return extractAuthData(res)
+  }, [])
 
-  const verifyMfaChallenge = useCallback(
-    async (challengeToken, credential) => {
-      const res = await authService.verifyMfaChallenge(
-        challengeToken,
-        credential,
-        deviceLabel
-      )
-      return extractAuthData(res)
-    },
-    [deviceLabel]
-  )
+  const verifyMfaChallenge = useCallback(async (challengeToken, code) => {
+    const res = await authService.verifyMfaChallenge(challengeToken, code)
+    return extractAuthData(res)
+  }, [])
 
   /** Whenever a token exists, GET /auth/profile is the source of truth for roles & permissions (guide §0.1). */
   useEffect(() => {
