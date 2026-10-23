@@ -11,20 +11,29 @@ export async function login(email, password, deviceLabel, deviceId) {
   return data
 }
 
-/** Alpha-backed login enrollment — `{ challenge_token, code }` only. */
-export async function confirmMfaEnrollment(challengeToken, code) {
+function loginDeviceFields(deviceLabel, deviceId) {
+  const fields = {}
+  if (deviceId) fields.device_id = deviceId
+  if (deviceLabel) fields.device_label = deviceLabel
+  return fields
+}
+
+/** Alpha-backed login enrollment — `{ challenge_token, code }` + optional device context. */
+export async function confirmMfaEnrollment(challengeToken, code, deviceLabel, deviceId) {
   const { data } = await api.post('/auth/mfa/enroll/confirm', {
     challenge_token: challengeToken,
     code,
+    ...loginDeviceFields(deviceLabel, deviceId),
   })
   return data
 }
 
 /** Alpha-backed login verify — TOTP `{ challenge_token, code }` only (no recovery_code). */
-export async function verifyMfaChallenge(challengeToken, code) {
+export async function verifyMfaChallenge(challengeToken, code, deviceLabel, deviceId) {
   const { data } = await api.post('/auth/mfa/challenge/verify', {
     challenge_token: challengeToken,
     code,
+    ...loginDeviceFields(deviceLabel, deviceId),
   })
   return data
 }

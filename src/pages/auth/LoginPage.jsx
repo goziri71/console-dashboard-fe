@@ -4,6 +4,7 @@ import { Eye, EyeOff, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../../context/AuthContext'
 import { consumeAuthNotice } from '../../lib/authStorage'
+import { authLoginErrorMessage } from '../../lib/authLoginErrors'
 import { extractAuthenticatedSession } from '../../lib/authUser'
 import authBranding from '../../assets/Authlogo/Container.svg'
 
@@ -12,47 +13,6 @@ let activeMfaChallenge = null
 
 function clearActiveMfaChallenge() {
   activeMfaChallenge = null
-}
-
-const ALPHA_MFA_REQUIRED_DEFAULT =
-  'MFA is not enabled on your Alpha account. Enable MFA on Redbiller/Alpha, then sign in to Console again.'
-
-function authErrorMessage(error) {
-  const status = error.response?.status
-  const body = error.response?.data
-  const serverMessage = body?.message
-  const dataCode = body?.data?.code ?? body?.code
-
-  if (status === 400) {
-    return serverMessage || 'Check your email and password and try again.'
-  }
-  if (status === 401) {
-    return serverMessage || 'Invalid email, password, or authenticator code.'
-  }
-  if (status === 403) {
-    const mfaGate =
-      dataCode === 'alpha_mfa_required' ||
-      dataCode === 'account_mfa_disabled' ||
-      /account\.mfa|mfa.*not enabled|enable mfa/i.test(String(serverMessage ?? ''))
-    if (mfaGate || !serverMessage) {
-      return serverMessage || ALPHA_MFA_REQUIRED_DEFAULT
-    }
-    return serverMessage
-  }
-  if (status === 404) {
-    return serverMessage || 'User not provisioned. Contact admin.'
-  }
-  if (status === 409) {
-    return serverMessage || 'This authentication request is no longer valid.'
-  }
-  if (status === 429) return 'Too many attempts. Wait a moment and try again.'
-  if (status === 502) {
-    return serverMessage || 'Alpha Account Auth is unreachable or misconfigured. Try again shortly.'
-  }
-  if (status === 500) {
-    return serverMessage || 'The login service is temporarily unavailable. Try again shortly.'
-  }
-  return serverMessage || error.message || 'Authentication failed. Please try again.'
 }
 
 export default function LoginPage() {
@@ -99,7 +59,7 @@ export default function LoginPage() {
       setFlow({ status: 'credentials' })
       setCode('')
     }
-    setError(authErrorMessage(err))
+    setError(authLoginErrorMessage(err))
   }
 
   const submitCredentials = async (event) => {
