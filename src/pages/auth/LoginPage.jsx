@@ -55,11 +55,6 @@ function authErrorMessage(error) {
   return serverMessage || error.message || 'Authentication failed. Please try again.'
 }
 
-function isAlphaMfa(data) {
-  const provider = String(data?.provider ?? '').toLowerCase()
-  return provider === 'alpha' || provider === ''
-}
-
 export default function LoginPage() {
   const navigate = useNavigate()
   const { token, login, confirmMfaEnrollment, verifyMfaChallenge, completeAuthentication } =
@@ -162,20 +157,15 @@ export default function LoginPage() {
         <form onSubmit={submitCode} className="space-y-5">
           <div className="text-center">
             <h2 className="text-2xl font-semibold text-text-primary">
-              {enrollment ? 'Alpha MFA enrollment' : 'Alpha MFA verification'}
+              {enrollment ? 'Set up authenticator' : 'Verify sign-in'}
             </h2>
             <p className="mt-2 text-sm text-text-secondary">
               {enrollment
                 ? showQr
-                  ? 'Scan the QR code with your authenticator app, then enter the six-digit code.'
-                  : 'Complete MFA setup in your Alpha account security settings, then enter the six-digit code from your authenticator app.'
-                : 'Enter the six-digit code from your Alpha authenticator app (TOTP).'}
+                  ? 'Scan the QR code, then enter the six-digit code.'
+                  : 'Enter the six-digit code from your authenticator app.'
+                : 'Enter the six-digit code from your authenticator app.'}
             </p>
-            {isAlphaMfa(flow.data) ? (
-              <p className="mt-2 text-xs text-text-muted">
-                Secured by Alpha Account Auth. Console recovery codes are not used at login.
-              </p>
-            ) : null}
           </div>
 
           {showQr ? (

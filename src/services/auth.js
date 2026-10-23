@@ -1,11 +1,12 @@
 import api from './api'
 import { clearStoredAuth } from '../lib/authStorage'
 
-export async function login(email, password, deviceLabel) {
+export async function login(email, password, deviceLabel, deviceId) {
   const { data } = await api.post('/auth/login', {
     email,
     password,
     device_label: deviceLabel,
+    device_id: deviceId,
   })
   return data
 }

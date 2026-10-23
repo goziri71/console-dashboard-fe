@@ -11,7 +11,7 @@ import {
   storeAuthenticatedSession,
   updateStoredUser,
 } from '../lib/authStorage'
-import { getDeviceLabel } from '../lib/deviceLabel'
+import { getDeviceId, getDeviceLabel } from '../lib/deviceLabel'
 
 const AuthContext = createContext(null)
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000
@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(initialAuth.session)
   const [loading, setLoading] = useState(Boolean(initialAuth.token))
   const [deviceLabel] = useState(getDeviceLabel)
+  const [deviceId] = useState(getDeviceId)
 
   useEffect(() => {
     localStorage.removeItem('sterllo_token')
@@ -72,10 +73,10 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(
     async (email, password) => {
-      const res = await authService.login(email, password, deviceLabel)
+      const res = await authService.login(email, password, deviceLabel, deviceId)
       return extractAuthData(res)
     },
-    [deviceLabel]
+    [deviceLabel, deviceId]
   )
 
   const confirmMfaEnrollment = useCallback(async (challengeToken, code) => {
