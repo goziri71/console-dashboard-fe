@@ -51,8 +51,8 @@ export default function LoginPage() {
       setFlow(activeMfaChallenge)
       return
     }
-    if (data?.state === 'account_locked_otp_required') {
-      activeMfaChallenge = { status: 'locked_otp', data }
+    if (data?.state === 'email_otp_required') {
+      activeMfaChallenge = { status: 'email_otp', data }
       setFlow(activeMfaChallenge)
       return
     }
@@ -99,7 +99,7 @@ export default function LoginPage() {
     const value = code.trim()
     if (!/^\d{6}$/.test(value)) {
       setError(
-        flow.status === 'locked_otp'
+        flow.status === 'email_otp'
           ? 'Enter the six-digit code we emailed you.'
           : 'Enter the six-digit code from your Alpha authenticator app.'
       )
@@ -112,7 +112,7 @@ export default function LoginPage() {
       const data =
         flow.status === 'enrollment'
           ? await confirmMfaEnrollment(challengeToken, value)
-          : flow.status === 'locked_otp'
+          : flow.status === 'email_otp'
             ? await verifyLoginOtp(challengeToken, value)
             : await verifyMfaChallenge(challengeToken, value)
       applyLoginResult(data)
@@ -127,10 +127,10 @@ export default function LoginPage() {
     if (
       flow.status === 'enrollment' ||
       flow.status === 'verification' ||
-      flow.status === 'locked_otp'
+      flow.status === 'email_otp'
     ) {
       const enrollment = flow.status === 'enrollment'
-      const lockedOtp = flow.status === 'locked_otp'
+      const emailOtp = flow.status === 'email_otp'
       const otpauthUri = flow.data.factor?.otpauth_uri
       const manualSecret = flow.data.factor?.secret
       const showQr = enrollment && typeof otpauthUri === 'string' && otpauthUri.length > 0
@@ -139,15 +139,15 @@ export default function LoginPage() {
         <form onSubmit={submitCode} className="space-y-5">
           <div className="text-center">
             <h2 className="text-2xl font-semibold text-text-primary">
-              {enrollment ? 'Set up authenticator' : lockedOtp ? 'Check your email' : 'Verify sign-in'}
+              {enrollment ? 'Set up authenticator' : emailOtp ? 'Check your email' : 'Verify sign-in'}
             </h2>
             <p className="mt-2 text-sm text-text-secondary">
               {enrollment
                 ? showQr
                   ? 'Scan the QR code, then enter the six-digit code.'
                   : 'Enter the six-digit code from your authenticator app.'
-                : lockedOtp
-                  ? 'Your account was locked after too many failed attempts. Enter the six-digit code we emailed you.'
+                : emailOtp
+                  ? 'Enter the code we emailed you.'
                   : 'Enter the six-digit code from your authenticator app.'}
             </p>
           </div>
@@ -170,7 +170,7 @@ export default function LoginPage() {
 
           <div>
             <label htmlFor="mfa-code" className="mb-1 block px-1 text-sm text-text-secondary">
-              {lockedOtp ? 'Emailed code' : 'Authenticator code'}
+              {emailOtp ? 'Emailed code' : 'Authenticator code'}
             </label>
             <input
               id="mfa-code"

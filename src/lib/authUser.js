@@ -120,7 +120,7 @@ export function extractAuthenticatedSession(payload) {
   if (
     data.state === 'mfa_required' ||
     data.state === 'mfa_enrollment_required' ||
-    data.state === 'account_locked_otp_required'
+    data.state === 'email_otp_required'
   ) {
     return null
   }
