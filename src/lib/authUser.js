@@ -117,7 +117,11 @@ export function extractAuthenticatedSession(payload) {
   const data = extractAuthData(payload)
   if (!data) return null
 
-  if (data.state === 'mfa_required' || data.state === 'mfa_enrollment_required') {
+  if (
+    data.state === 'mfa_required' ||
+    data.state === 'mfa_enrollment_required' ||
+    data.state === 'account_locked_otp_required'
+  ) {
     return null
   }
 

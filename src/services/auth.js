@@ -38,6 +38,16 @@ export async function verifyMfaChallenge(challengeToken, code, deviceLabel, devi
   return data
 }
 
+/** Locked-account email OTP verify — `{ challenge_token, code }` + optional device context. */
+export async function verifyLoginOtp(challengeToken, code, deviceLabel, deviceId) {
+  const { data } = await api.post('/auth/login/otp/verify', {
+    challenge_token: challengeToken,
+    code,
+    ...loginDeviceFields(deviceLabel, deviceId),
+  })
+  return data
+}
+
 export async function stepUpMfa(code) {
   const { data } = await api.post('/auth/mfa/step-up', { code })
   return data

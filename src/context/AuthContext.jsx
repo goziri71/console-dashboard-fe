@@ -105,6 +105,14 @@ export function AuthProvider({ children }) {
     [deviceLabel, deviceId]
   )
 
+  const verifyLoginOtp = useCallback(
+    async (challengeToken, code) => {
+      const res = await authService.verifyLoginOtp(challengeToken, code, deviceLabel, deviceId)
+      return extractAuthData(res)
+    },
+    [deviceLabel, deviceId]
+  )
+
   /** Whenever a token exists, GET /auth/profile is the source of truth for roles & permissions (guide §0.1). */
   useEffect(() => {
     if (!token) {
@@ -208,6 +216,7 @@ export function AuthProvider({ children }) {
         login,
         confirmMfaEnrollment,
         verifyMfaChallenge,
+        verifyLoginOtp,
         completeAuthentication,
         logout,
       }}
